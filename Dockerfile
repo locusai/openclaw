@@ -55,29 +55,13 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
 
 ENV NODE_ENV=production
-
-# Prepend the mounted OpenClaw state bin so persisted tool shims (agent-installed) are discoverable.
+# Prepend the mounted OpenClaw state bin dir so persistent tool shims are available.
 ENV PATH="/home/node/.openclaw/bin:${PATH}"
 
 # Map the built-in `node` user/group to the host UID/GID, then ensure /app is writable.
-RUN set -eu; \
-    case "${OPENCLAW_GID}" in (""|*[!0-9]*|0) ;; (*) \
-      grp="$(getent group "${OPENCLAW_GID}" 2>/dev/null | cut -d: -f1 || true)"; \
-      if [ -n "$grp" ] && [ "$grp" != node ]; then \
-        usermod -g "${OPENCLAW_GID}" node; \
-      elif [ -z "$grp" ]; then \
-        usermod -g root node; \
-        groupmod -g "${OPENCLAW_GID}" node; \
-        usermod -g node node; \
-      fi ;; \
-    esac; \
-    case "${OPENCLAW_UID}" in (""|*[!0-9]*|0) ;; (*) \
-      usr="$(getent passwd "${OPENCLAW_UID}" 2>/dev/null | cut -d: -f1 || true)"; \
-      if [ -n "$usr" ] && [ "$usr" != node ]; then \
-        echo "OPENCLAW_UID ${OPENCLAW_UID} already used by ${usr}; choose a different UID" >&2; exit 1; \
-      fi; \
-      if [ -z "$usr" ] || [ "$usr" = node ]; then usermod -u "${OPENCLAW_UID}" node; fi ;; \
-    esac; \
+USER root
+RUN groupmod -g "${OPENCLAW_GID}" node && \
+    usermod -u "${OPENCLAW_UID}" -g "${OPENCLAW_GID}" node && \
     chown -R node:node /app
 # Security hardening: Run as non-root user
 # The node:22-bookworm image includes a 'node' user (uid 1000)
