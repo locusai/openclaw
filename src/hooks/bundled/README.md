@@ -187,6 +187,11 @@ interface InternalHookEvent {
   timestamp: Date;
   messages: string[]; // Push messages here to send to user
 }
+
+type InternalHookResult = {
+  handled?: boolean;
+  reply?: { text?: string };
+};
 ```
 
 Example handler:
@@ -207,6 +212,12 @@ const myHandler: HookHandler = async (event) => {
 };
 
 export default myHandler;
+```
+
+To intercept a command turn and stop normal processing, return:
+
+```typescript
+return { handled: true, reply: { text: "Done." } };
 ```
 
 ## Testing

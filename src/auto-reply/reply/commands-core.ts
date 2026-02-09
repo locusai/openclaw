@@ -78,12 +78,23 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
       sessionEntry: params.sessionEntry,
       previousSessionEntry: params.previousSessionEntry,
       commandSource: params.command.surface,
+      commandBody: params.command.commandBodyNormalized,
+      commandArgs: params.ctx.CommandArgs,
       senderId: params.command.senderId,
       cfg: params.cfg, // Pass config for LLM slug generation
     });
-    await triggerInternalHook(hookEvent);
+    const hookResult = await triggerInternalHook(hookEvent);
+
+    if (hookResult?.handled === true) {
+      const reply =
+        hookResult.reply ??
+        (hookEvent.messages.length > 0 ? { text: hookEvent.messages.join("\n\n") } : undefined);
+      return { shouldContinue: false, ...(reply ? { reply } : {}) };
+    }
 
     // Send hook messages immediately if present
+    // Backward-compatibility path for legacy hooks that push to event.messages
+    // without returning handled/reply.
     if (hookEvent.messages.length > 0) {
       // Use OriginatingChannel/To if available, otherwise fall back to command channel/from
       // oxlint-disable-next-line typescript/no-explicit-any

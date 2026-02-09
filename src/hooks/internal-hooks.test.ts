@@ -42,7 +42,7 @@ describe("hooks", () => {
   });
 
   describe("unregisterInternalHook", () => {
-    it("should unregister a specific handler", () => {
+    it("should unregister a specific handler", async () => {
       const handler1 = vi.fn();
       const handler2 = vi.fn();
 
@@ -52,7 +52,7 @@ describe("hooks", () => {
       unregisterInternalHook("command:new", handler1);
 
       const event = createInternalHookEvent("command", "new", "test-session");
-      void triggerInternalHook(event);
+      await triggerInternalHook(event);
 
       expect(handler1).not.toHaveBeenCalled();
       expect(handler2).toHaveBeenCalled();
@@ -115,6 +115,34 @@ describe("hooks", () => {
       await triggerInternalHook(event);
 
       expect(handler).toHaveBeenCalledWith(event);
+    });
+
+    it("returns handled replies from handlers", async () => {
+      registerInternalHook("command:new", () => ({
+        handled: true,
+        reply: { text: "hello world" },
+      }));
+
+      const event = createInternalHookEvent("command", "new", "test-session");
+      const result = await triggerInternalHook(event);
+
+      expect(result).toEqual({ handled: true, reply: { text: "hello world" } });
+    });
+
+    it("prefers specific handled replies over general handled replies", async () => {
+      registerInternalHook("command", () => ({
+        handled: true,
+        reply: { text: "general" },
+      }));
+      registerInternalHook("command:new", () => ({
+        handled: true,
+        reply: { text: "specific" },
+      }));
+
+      const event = createInternalHookEvent("command", "new", "test-session");
+      const result = await triggerInternalHook(event);
+
+      expect(result).toEqual({ handled: true, reply: { text: "specific" } });
     });
 
     it("should catch and log errors from handlers", async () => {

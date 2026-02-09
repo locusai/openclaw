@@ -6,6 +6,7 @@
  */
 
 import type { WorkspaceBootstrapFile } from "../agents/workspace.js";
+import type { ReplyPayload } from "../auto-reply/types.js";
 import type { OpenClawConfig } from "../config/config.js";
 
 export type InternalHookEventType = "command" | "session" | "agent" | "gateway";
@@ -40,7 +41,14 @@ export interface InternalHookEvent {
   messages: string[];
 }
 
-export type InternalHookHandler = (event: InternalHookEvent) => Promise<void> | void;
+export type InternalHookResult = {
+  handled?: boolean;
+  reply?: ReplyPayload;
+};
+
+export type InternalHookHandler = (
+  event: InternalHookEvent,
+) => Promise<InternalHookResult | void> | InternalHookResult | void;
 
 /** Registry of hook handlers by event key */
 const handlers = new Map<string, InternalHookHandler[]>();
@@ -120,26 +128,37 @@ export function getRegisteredEventKeys(): string[] {
  *
  * @param event - The event to trigger
  */
-export async function triggerInternalHook(event: InternalHookEvent): Promise<void> {
+export async function triggerInternalHook(
+  event: InternalHookEvent,
+): Promise<InternalHookResult | undefined> {
   const typeHandlers = handlers.get(event.type) ?? [];
   const specificHandlers = handlers.get(`${event.type}:${event.action}`) ?? [];
 
-  const allHandlers = [...typeHandlers, ...specificHandlers];
-
-  if (allHandlers.length === 0) {
-    return;
-  }
-
-  for (const handler of allHandlers) {
-    try {
-      await handler(event);
-    } catch (err) {
-      console.error(
-        `Hook error [${event.type}:${event.action}]:`,
-        err instanceof Error ? err.message : String(err),
-      );
+  const runHandlers = async (
+    hookHandlers: InternalHookHandler[],
+  ): Promise<InternalHookResult | undefined> => {
+    let handledResult: InternalHookResult | undefined;
+    for (const handler of hookHandlers) {
+      try {
+        const result = await handler(event);
+        if (!handledResult && result?.handled === true) {
+          handledResult = { handled: true, reply: result.reply };
+        }
+      } catch (err) {
+        console.error(
+          `Hook error [${event.type}:${event.action}]:`,
+          err instanceof Error ? err.message : String(err),
+        );
+      }
     }
-  }
+    return handledResult;
+  };
+
+  // Preserve existing execution order (general first, then specific), while allowing
+  // specific handlers to override a generic handled reply if both return handled=true.
+  const typeResult = await runHandlers(typeHandlers);
+  const specificResult = await runHandlers(specificHandlers);
+  return specificResult ?? typeResult;
 }
 
 /**
