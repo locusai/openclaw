@@ -189,6 +189,75 @@ export type OpenClawPluginCommandDefinition = {
   handler: PluginCommandHandler;
 };
 
+export type PluginCommandOptionInvocation = {
+  commandName: string;
+  commandBody: string;
+  namespace?: string;
+  options: Array<{
+    name: string;
+    presentAs: string;
+    value?: string;
+  }>;
+  positionals: string[];
+};
+
+export type PluginCommandOptionContext = PluginCommandContext & {
+  invocation: PluginCommandOptionInvocation;
+  option: {
+    name: string;
+    presentAs: string;
+    value?: string;
+  };
+};
+
+export type PluginCommandOptionHandlerResult =
+  | { action: "continue" }
+  | { action: "reply"; reply: ReplyPayload }
+  | { action: "silent" };
+
+export type PluginCommandOptionHandler = (
+  ctx: PluginCommandOptionContext,
+) => PluginCommandOptionHandlerResult | void | Promise<PluginCommandOptionHandlerResult | void>;
+
+export type OpenClawPluginCommandOptionDefinition = {
+  /**
+   * Base command without a leading slash (e.g. "new", "reset", "compact").
+   */
+  command: string;
+  /**
+   * Option name without leading dashes (e.g. "print").
+   */
+  option: string;
+  /**
+   * Additional option aliases without leading dashes.
+   */
+  aliases?: string[];
+  /**
+   * Whether this option expects a value from `--option=value` or `--option value`.
+   * Defaults to false.
+   */
+  takesValue?: boolean;
+  /**
+   * Optional namespace selector for command options (e.g. "my-plugin").
+   */
+  namespace?: string;
+  /**
+   * Optional aliases for the namespace selector.
+   */
+  namespaceAliases?: string[];
+  /**
+   * Whether the matched option should be removed from the core command body when continuing.
+   * Defaults to true.
+   */
+  consume?: boolean;
+  /**
+   * Whether authorization is required for this option (default: true).
+   */
+  requireAuth?: boolean;
+  description?: string;
+  handler: PluginCommandOptionHandler;
+};
+
 export type OpenClawPluginHttpHandler = (
   req: IncomingMessage,
   res: ServerResponse,
@@ -274,6 +343,11 @@ export type OpenClawPluginApi = {
    * Use this for simple state-toggling or status commands that don't need AI reasoning.
    */
   registerCommand: (command: OpenClawPluginCommandDefinition) => void;
+  /**
+   * Register an option extension for an existing slash command.
+   * This lets plugins add option behavior (e.g. /new --print) without owning the whole command.
+   */
+  registerCommandOption: (definition: OpenClawPluginCommandOptionDefinition) => void;
   resolvePath: (input: string) => string;
   /** Register a lifecycle hook handler */
   on: <K extends PluginHookName>(

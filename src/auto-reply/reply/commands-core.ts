@@ -5,6 +5,7 @@ import type {
 } from "./commands-types.js";
 import { logVerbose } from "../../globals.js";
 import { createInternalHookEvent, triggerInternalHook } from "../../hooks/internal-hooks.js";
+import { executePluginCommandOptions } from "../../plugins/command-options.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
 import { handleAllowlistCommand } from "./commands-allowlist.js";
@@ -71,6 +72,37 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
     return { shouldContinue: false };
   }
 
+  const allowTextCommands = shouldHandleTextCommands({
+    cfg: params.cfg,
+    surface: params.command.surface,
+    commandSource: params.ctx.CommandSource,
+  });
+
+  if (allowTextCommands) {
+    const optionResult = await executePluginCommandOptions({
+      commandBody: params.command.commandBodyNormalized,
+      senderId: params.command.senderId,
+      channel: params.command.channel,
+      channelId: params.command.channelId,
+      isAuthorizedSender: params.command.isAuthorizedSender,
+      config: params.cfg,
+      from: params.command.from,
+      to: params.command.to,
+      accountId: params.ctx.AccountId ?? undefined,
+      messageThreadId:
+        typeof params.ctx.MessageThreadId === "number" ? params.ctx.MessageThreadId : undefined,
+    });
+    if (optionResult.commandBody !== params.command.commandBodyNormalized) {
+      params.command.commandBodyNormalized = optionResult.commandBody;
+    }
+    if (optionResult.shouldStop) {
+      return {
+        shouldContinue: false,
+        ...(optionResult.reply ? { reply: optionResult.reply } : {}),
+      };
+    }
+  }
+
   // Trigger internal hook for reset/new commands
   if (resetRequested && params.command.isAuthorizedSender) {
     const commandAction = resetMatch?.[1] ?? "new";
@@ -105,12 +137,6 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
       }
     }
   }
-
-  const allowTextCommands = shouldHandleTextCommands({
-    cfg: params.cfg,
-    surface: params.command.surface,
-    commandSource: params.ctx.CommandSource,
-  });
 
   for (const handler of HANDLERS) {
     const result = await handler(params, allowTextCommands);
