@@ -55,7 +55,7 @@ ENV OPENCLAW_PREFER_PNPM=1
 RUN pnpm ui:build
 
 ENV NODE_ENV=production
-# Prepend the mounted OpenClaw state bin dir so persistent tool shims are available.
+# Prepend the mounted OpenClaw state bin so persisted tool shims (agent-installed) are discoverable.
 ENV PATH="/home/node/.openclaw/bin:${PATH}"
 
 # Map the built-in `node` user/group to the host UID/GID, then ensure /app is writable.
