@@ -54,6 +54,11 @@ export type ExecutePluginCommandOptionsResult = {
   commandBody: string;
 };
 
+export type StripPluginCommandOptionsResult = {
+  matched: boolean;
+  commandBody: string;
+};
+
 function normalizeName(input: string): string {
   return input.trim().toLowerCase();
 }
@@ -556,6 +561,101 @@ export async function executePluginCommandOptions(params: {
   return {
     matched,
     shouldStop: false,
+    commandBody,
+  };
+}
+
+export function stripPluginCommandOptionsFromBody(params: {
+  commandBody: string;
+}): StripPluginCommandOptionsResult {
+  const parsed = splitCommandBody(params.commandBody);
+  if (!parsed) {
+    return {
+      matched: false,
+      commandBody: params.commandBody,
+    };
+  }
+
+  const registrations = commandOptionsByCommand.get(parsed.commandName);
+  if (!registrations || registrations.length === 0) {
+    return {
+      matched: false,
+      commandBody: params.commandBody,
+    };
+  }
+
+  const { options, positionals } = parseArgTokens(parsed.argTokens);
+  const consumedTokenIndexes = new Set<number>();
+
+  let selectedNamespace: string | undefined;
+  const pluginSelector = options.find((option) => option.name === "plugin");
+  if (pluginSelector) {
+    const pluginSelectorResolved = resolveOptionValue(parsed.argTokens, pluginSelector, true);
+    if (pluginSelectorResolved.value) {
+      selectedNamespace = normalizeNamespace(pluginSelectorResolved.value);
+    }
+    consumedTokenIndexes.add(pluginSelector.tokenIndex);
+    const pluginValueIndex = pluginSelectorResolved.valueTokenIndex;
+    if (typeof pluginValueIndex === "number") {
+      consumedTokenIndexes.add(pluginValueIndex);
+    }
+  }
+
+  if (!selectedNamespace && positionals.length > 0) {
+    const firstPositional = normalizeNamespace(positionals[0].value);
+    const namespaceKnown = registrations.some((registration) =>
+      registration.namespace
+        ? registration.namespace === firstPositional ||
+          registration.namespaceAliases.includes(firstPositional)
+        : false,
+    );
+    if (namespaceKnown) {
+      selectedNamespace = firstPositional;
+      consumedTokenIndexes.add(positionals[0].tokenIndex);
+    }
+  }
+
+  let matched = false;
+  registryLocked = true;
+  try {
+    for (const optionToken of options) {
+      if (optionToken.name === "plugin") {
+        continue;
+      }
+      const candidates = registrations.filter((registration) =>
+        optionMatchesRegistration(optionToken.name, registration),
+      );
+      const registration = resolveOptionRegistration({
+        candidates,
+        selectedNamespace,
+      });
+      if (!registration) {
+        continue;
+      }
+      matched = true;
+      if (registration.consume) {
+        consumedTokenIndexes.add(optionToken.tokenIndex);
+        const valueTokenIndex = resolveOptionValue(
+          parsed.argTokens,
+          optionToken,
+          registration.takesValue,
+        ).valueTokenIndex;
+        if (typeof valueTokenIndex === "number") {
+          consumedTokenIndexes.add(valueTokenIndex);
+        }
+      }
+    }
+  } finally {
+    registryLocked = false;
+  }
+
+  const commandBody = rebuildCommandBody(
+    parsed.commandToken,
+    parsed.argTokens,
+    consumedTokenIndexes,
+  );
+  return {
+    matched,
     commandBody,
   };
 }
