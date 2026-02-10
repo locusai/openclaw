@@ -1,4 +1,4 @@
-export type ControlUiExtensionMount = {
+export type PluginUiMount = {
   kind: "web_component";
   modulePath: string;
   tagName: string;
@@ -7,7 +7,7 @@ export type ControlUiExtensionMount = {
   sessionAttribute?: string;
 };
 
-export type ControlUiExtensionDescriptor = {
+export type PluginUiDescriptor = {
   id: string;
   pluginId: string;
   extensionId: string;
@@ -16,9 +16,9 @@ export type ControlUiExtensionDescriptor = {
   icon?: string;
   group?: string;
   order?: number;
-  mount: ControlUiExtensionMount;
+  mount: PluginUiMount;
 };
 
-export type ControlUiExtensionsListResponse = {
-  extensions: ControlUiExtensionDescriptor[];
+export type PluginUiListResponse = {
+  extensions: PluginUiDescriptor[];
 };

@@ -7,7 +7,6 @@ import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
-import { controlUiExtensionsHandlers } from "./server-methods/control-ui-extensions.js";
 import { cronHandlers } from "./server-methods/cron.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
@@ -15,6 +14,7 @@ import { healthHandlers } from "./server-methods/health.js";
 import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
+import { pluginUiHandlers } from "./server-methods/plugin-ui.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -73,7 +73,7 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
-  "controlui.extensions.list",
+  "plugins.ui.list",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -171,7 +171,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...healthHandlers,
   ...channelsHandlers,
   ...chatHandlers,
-  ...controlUiExtensionsHandlers,
+  ...pluginUiHandlers,
   ...cronHandlers,
   ...deviceHandlers,
   ...execApprovalsHandlers,

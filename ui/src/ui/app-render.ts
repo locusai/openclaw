@@ -1,7 +1,7 @@
 import { html, nothing } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
 import type { UsageState } from "./controllers/usage.ts";
-import type { ControlUiExtensionDescriptor } from "./extensions/types.ts";
+import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
@@ -54,9 +54,9 @@ import {
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
 import { icons, type IconName } from "./icons.ts";
 import {
-  extensionIdFromTab,
-  extensionTabFromId,
-  isExtensionTab,
+  pluginIdFromTab,
+  pluginTabFromId,
+  isPluginTab,
   normalizeBasePath,
   TAB_GROUPS,
   subtitleForTab,
@@ -83,7 +83,7 @@ import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
-import { renderPluginExtension } from "./views/plugin-extension.ts";
+import { renderPluginUi } from "./views/plugin-ui.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderUsage } from "./views/usage.ts";
@@ -93,7 +93,7 @@ const AVATAR_HTTP_RE = /^https?:\/\//i;
 
 type ExtensionTabGroup = {
   label: string;
-  tabs: ControlUiExtensionDescriptor[];
+  tabs: PluginUiDescriptor[];
 };
 
 function normalizeExtensionGroupLabel(value: string | undefined): string {
@@ -108,8 +108,8 @@ function resolveExtensionIcon(icon: string | undefined): IconName {
   return "puzzle";
 }
 
-function buildExtensionTabGroups(extensions: ControlUiExtensionDescriptor[]): ExtensionTabGroup[] {
-  const grouped = new Map<string, ControlUiExtensionDescriptor[]>();
+function buildExtensionTabGroups(extensions: PluginUiDescriptor[]): ExtensionTabGroup[] {
+  const grouped = new Map<string, PluginUiDescriptor[]>();
   for (const extension of extensions) {
     const key = normalizeExtensionGroupLabel(extension.group);
     const list = grouped.get(key);
@@ -134,12 +134,12 @@ function buildExtensionTabGroups(extensions: ControlUiExtensionDescriptor[]): Ex
     .toSorted((a, b) => a.label.localeCompare(b.label));
 }
 
-function resolveActiveExtension(state: AppViewState): ControlUiExtensionDescriptor | null {
-  const extensionId = extensionIdFromTab(state.tab);
+function resolveActiveExtension(state: AppViewState): PluginUiDescriptor | null {
+  const extensionId = pluginIdFromTab(state.tab);
   if (!extensionId) {
     return null;
   }
-  return state.controlUiExtensions.find((entry) => entry.id === extensionId) ?? null;
+  return state.pluginUiEntries.find((entry) => entry.id === extensionId) ?? null;
 }
 
 function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
@@ -159,7 +159,7 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
-  const extensionGroups = buildExtensionTabGroups(state.controlUiExtensions);
+  const extensionGroups = buildExtensionTabGroups(state.pluginUiEntries);
   const activeExtension = resolveActiveExtension(state);
   const extensionGroup = activeExtension?.group?.trim().toLowerCase();
   const presenceCount = state.presenceEntries.length;
@@ -247,9 +247,7 @@ export function renderApp(state: AppViewState) {
         })}
         ${extensionGroups.map((group) => {
           const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
-          const hasActiveTab = group.tabs.some(
-            (entry) => extensionTabFromId(entry.id) === state.tab,
-          );
+          const hasActiveTab = group.tabs.some((entry) => pluginTabFromId(entry.id) === state.tab);
           return html`
             <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
               <button
@@ -269,7 +267,7 @@ export function renderApp(state: AppViewState) {
               </button>
               <div class="nav-group__items">
                 ${group.tabs.map((entry) =>
-                  renderTab(state, extensionTabFromId(entry.id), {
+                  renderTab(state, pluginTabFromId(entry.id), {
                     label: entry.label,
                     icon: resolveExtensionIcon(entry.icon),
                     title: entry.description ?? entry.label,
@@ -1154,11 +1152,11 @@ export function renderApp(state: AppViewState) {
         }
 
         ${
-          isExtensionTab(state.tab) && !activeExtension
+          isPluginTab(state.tab) && !activeExtension
             ? html`
-                <section class="card chat plugin-extension">
-                  <div class="plugin-extension__status">
-                    <div class="muted">This plugin extension is not available in the current gateway runtime.</div>
+                <section class="card chat plugin-ui">
+                  <div class="plugin-ui__status">
+                    <div class="muted">This plugin UI is not available in the current gateway runtime.</div>
                   </div>
                 </section>
               `
@@ -1167,13 +1165,13 @@ export function renderApp(state: AppViewState) {
 
         ${
           activeExtension
-            ? renderPluginExtension({
+            ? renderPluginUi({
                 extension: activeExtension,
-                ready: Boolean(state.controlUiExtensionReadyById[activeExtension.id]),
-                loadError: state.controlUiExtensionLoadErrorById[activeExtension.id] ?? null,
+                ready: Boolean(state.pluginUiReadyById[activeExtension.id]),
+                loadError: state.pluginUiLoadErrorById[activeExtension.id] ?? null,
                 sessionKey: state.sessionKey,
-                adapter: state.resolveControlUiExtensionAdapter(activeExtension),
-                onRetryLoad: () => state.ensureControlUiExtensionLoaded(activeExtension.id),
+                adapter: state.resolvePluginUiAdapterForEntry(activeExtension),
+                onRetryLoad: () => state.ensurePluginUiLoaded(activeExtension.id),
               })
             : nothing
         }

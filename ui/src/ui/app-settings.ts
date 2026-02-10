@@ -23,9 +23,9 @@ import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import {
-  extensionIdFromTab,
+  pluginIdFromTab,
   inferBasePathFromPathname,
-  isExtensionTab,
+  isPluginTab,
   normalizeBasePath,
   normalizePath,
   pathForTab,
@@ -56,7 +56,7 @@ type SettingsHost = {
   themeMedia: MediaQueryList | null;
   themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
   pendingGatewayUrl?: string | null;
-  ensureControlUiExtensionLoaded?: (extensionId: string) => Promise<void>;
+  ensurePluginUiLoaded?: (extensionId: string) => Promise<void>;
 };
 
 export function applySettings(host: SettingsHost, next: UiSettings) {
@@ -156,9 +156,9 @@ export function setTab(host: SettingsHost, next: Tab) {
   if (next === "chat") {
     host.chatHasAutoScrolled = false;
   }
-  const nextExtensionId = extensionIdFromTab(next);
+  const nextExtensionId = pluginIdFromTab(next);
   if (nextExtensionId) {
-    void host.ensureControlUiExtensionLoaded?.(nextExtensionId);
+    void host.ensurePluginUiLoaded?.(nextExtensionId);
   }
   if (next === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
@@ -242,9 +242,9 @@ export async function refreshActiveTab(host: SettingsHost) {
       !host.chatHasAutoScrolled,
     );
   }
-  const activeExtensionId = extensionIdFromTab(host.tab);
+  const activeExtensionId = pluginIdFromTab(host.tab);
   if (activeExtensionId) {
-    await host.ensureControlUiExtensionLoaded?.(activeExtensionId);
+    await host.ensurePluginUiLoaded?.(activeExtensionId);
   }
   if (host.tab === "config") {
     await loadConfigSchema(host as unknown as OpenClawApp);
@@ -363,9 +363,9 @@ export function setTabFromRoute(host: SettingsHost, next: Tab) {
   if (next === "chat") {
     host.chatHasAutoScrolled = false;
   }
-  const nextExtensionId = extensionIdFromTab(next);
+  const nextExtensionId = pluginIdFromTab(next);
   if (nextExtensionId) {
-    void host.ensureControlUiExtensionLoaded?.(nextExtensionId);
+    void host.ensurePluginUiLoaded?.(nextExtensionId);
   }
   if (next === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
@@ -390,7 +390,7 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
   const currentPath = normalizePath(window.location.pathname);
   const url = new URL(window.location.href);
 
-  if ((tab === "chat" || isExtensionTab(tab)) && host.sessionKey) {
+  if ((tab === "chat" || isPluginTab(tab)) && host.sessionKey) {
     url.searchParams.set("session", host.sessionKey);
   } else {
     url.searchParams.delete("session");

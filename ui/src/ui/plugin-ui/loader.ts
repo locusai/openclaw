@@ -1,23 +1,19 @@
-import type { ControlUiExtensionDescriptor } from "./types.ts";
-import { getControlUiRuntimeApi } from "./runtime.ts";
+import type { PluginUiDescriptor } from "./types.ts";
+import { getPluginUiRuntimeApi } from "./runtime.ts";
 
-type DefineControlUiExtension = (
-  api: ReturnType<typeof getControlUiRuntimeApi>,
-) => void | Promise<void>;
+type DefinePluginUi = (api: ReturnType<typeof getPluginUiRuntimeApi>) => void | Promise<void>;
 
 type ExtensionModule = Record<string, unknown> & {
-  defineControlUiExtension?: DefineControlUiExtension;
+  definePluginUi?: DefinePluginUi;
 };
 
 const extensionLoadPromises = new Map<string, Promise<void>>();
 
-function resolveLoadKey(extension: ControlUiExtensionDescriptor): string {
+function resolveLoadKey(extension: PluginUiDescriptor): string {
   return `${extension.id}:${extension.mount.modulePath}`;
 }
 
-export async function ensureControlUiExtensionLoaded(
-  extension: ControlUiExtensionDescriptor,
-): Promise<void> {
+export async function ensurePluginUiLoaded(extension: PluginUiDescriptor): Promise<void> {
   const key = resolveLoadKey(extension);
   const existing = extensionLoadPromises.get(key);
   if (existing) {
@@ -26,19 +22,19 @@ export async function ensureControlUiExtensionLoaded(
   const loadPromise = (async () => {
     try {
       const loaded = (await import(extension.mount.modulePath)) as ExtensionModule;
-      const runtimeApi = getControlUiRuntimeApi();
+      const runtimeApi = getPluginUiRuntimeApi();
       const exportName = extension.mount.exportName?.trim();
       if (exportName) {
         const handler = loaded[exportName];
         if (typeof handler === "function") {
-          await (handler as DefineControlUiExtension)(runtimeApi);
+          await (handler as DefinePluginUi)(runtimeApi);
         } else {
           throw new Error(
             `Extension module ${extension.mount.modulePath} is missing function export "${exportName}".`,
           );
         }
-      } else if (typeof loaded.defineControlUiExtension === "function") {
-        await loaded.defineControlUiExtension(runtimeApi);
+      } else if (typeof loaded.definePluginUi === "function") {
+        await loaded.definePluginUi(runtimeApi);
       }
     } catch (err) {
       extensionLoadPromises.delete(key);

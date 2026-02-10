@@ -25,26 +25,26 @@ export type CoreTab =
   | "debug"
   | "logs";
 
-const EXTENSION_TAB_PREFIX = "ext:" as const;
-const EXTENSION_ROUTE_PREFIX = "/ext/" as const;
+const PLUGIN_TAB_PREFIX = "plugin:" as const;
+const PLUGIN_ROUTE_PREFIX = "/plugin/" as const;
 
-export type ExtensionTab = `${typeof EXTENSION_TAB_PREFIX}${string}`;
-export type Tab = CoreTab | ExtensionTab;
+export type PluginTab = `${typeof PLUGIN_TAB_PREFIX}${string}`;
+export type Tab = CoreTab | PluginTab;
 
-export function extensionTabFromId(id: string): ExtensionTab {
-  return `${EXTENSION_TAB_PREFIX}${id}`;
+export function pluginTabFromId(id: string): PluginTab {
+  return `${PLUGIN_TAB_PREFIX}${id}`;
 }
 
-export function extensionIdFromTab(tab: Tab): string | null {
-  if (typeof tab !== "string" || !tab.startsWith(EXTENSION_TAB_PREFIX)) {
+export function pluginIdFromTab(tab: Tab): string | null {
+  if (typeof tab !== "string" || !tab.startsWith(PLUGIN_TAB_PREFIX)) {
     return null;
   }
-  const id = tab.slice(EXTENSION_TAB_PREFIX.length).trim();
+  const id = tab.slice(PLUGIN_TAB_PREFIX.length).trim();
   return id || null;
 }
 
-export function isExtensionTab(tab: Tab): tab is ExtensionTab {
-  return extensionIdFromTab(tab) !== null;
+export function isPluginTab(tab: Tab): tab is PluginTab {
+  return pluginIdFromTab(tab) !== null;
 }
 
 const TAB_PATHS: Record<CoreTab, string> = {
@@ -97,10 +97,10 @@ export function normalizePath(path: string): string {
 }
 
 export function pathForTab(tab: Tab, basePath = ""): string {
-  const extensionId = extensionIdFromTab(tab);
+  const extensionId = pluginIdFromTab(tab);
   if (extensionId) {
     const encoded = encodeURIComponent(extensionId);
-    const extensionPath = `${EXTENSION_ROUTE_PREFIX}${encoded}`;
+    const extensionPath = `${PLUGIN_ROUTE_PREFIX}${encoded}`;
     const base = normalizeBasePath(basePath);
     return base ? `${base}${extensionPath}` : extensionPath;
   }
@@ -127,8 +127,8 @@ export function tabFromPath(pathname: string, basePath = ""): Tab | null {
   if (normalizedLower === "/") {
     return "chat";
   }
-  if (normalizedLower.startsWith(EXTENSION_ROUTE_PREFIX)) {
-    const raw = normalizedPath.slice(EXTENSION_ROUTE_PREFIX.length);
+  if (normalizedLower.startsWith(PLUGIN_ROUTE_PREFIX)) {
+    const raw = normalizedPath.slice(PLUGIN_ROUTE_PREFIX.length);
     const firstSegment = raw.split("/")[0] ?? "";
     if (!firstSegment) {
       return null;
@@ -138,7 +138,7 @@ export function tabFromPath(pathname: string, basePath = ""): Tab | null {
       if (!decoded) {
         return null;
       }
-      return extensionTabFromId(decoded);
+      return pluginTabFromId(decoded);
     } catch {
       return null;
     }
@@ -164,8 +164,8 @@ export function inferBasePathFromPathname(pathname: string): string {
       const prefix = segments.slice(0, i);
       return prefix.length ? `/${prefix.join("/")}` : "";
     }
-    if (candidate.startsWith(EXTENSION_ROUTE_PREFIX)) {
-      const suffix = candidate.slice(EXTENSION_ROUTE_PREFIX.length);
+    if (candidate.startsWith(PLUGIN_ROUTE_PREFIX)) {
+      const suffix = candidate.slice(PLUGIN_ROUTE_PREFIX.length);
       if (suffix) {
         const prefix = segments.slice(0, i);
         return prefix.length ? `/${prefix.join("/")}` : "";
@@ -176,7 +176,7 @@ export function inferBasePathFromPathname(pathname: string): string {
 }
 
 export function iconForTab(tab: Tab): IconName {
-  if (isExtensionTab(tab)) {
+  if (isPluginTab(tab)) {
     return "puzzle";
   }
   switch (tab) {
@@ -212,7 +212,7 @@ export function iconForTab(tab: Tab): IconName {
 }
 
 export function titleForTab(tab: Tab) {
-  if (isExtensionTab(tab)) {
+  if (isPluginTab(tab)) {
     return "Plugin";
   }
   switch (tab) {
@@ -248,8 +248,8 @@ export function titleForTab(tab: Tab) {
 }
 
 export function subtitleForTab(tab: Tab) {
-  if (isExtensionTab(tab)) {
-    return "Plugin UI extension.";
+  if (isPluginTab(tab)) {
+    return "Plugin UI.";
   }
   switch (tab) {
     case "agents":

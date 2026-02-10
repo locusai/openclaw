@@ -13,7 +13,7 @@ const createEmptyRegistry = (): PluginRegistry => ({
   cliRegistrars: [],
   services: [],
   commands: [],
-  controlUiExtensions: [],
+  pluginUiEntries: [],
   diagnostics: [],
 });
 

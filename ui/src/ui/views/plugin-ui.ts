@@ -1,9 +1,9 @@
 import { html, nothing, type TemplateResult } from "lit";
 import { html as staticHtml, unsafeStatic } from "lit/static-html.js";
-import type { ControlUiExtensionDescriptor } from "../extensions/types.ts";
+import type { PluginUiDescriptor } from "../plugin-ui/types.ts";
 
-export type PluginExtensionViewProps = {
-  extension: ControlUiExtensionDescriptor;
+export type PluginUiViewProps = {
+  extension: PluginUiDescriptor;
   ready: boolean;
   loadError: string | null;
   sessionKey: string;
@@ -12,7 +12,7 @@ export type PluginExtensionViewProps = {
 };
 
 function renderMountedExtension(
-  extension: ControlUiExtensionDescriptor,
+  extension: PluginUiDescriptor,
   sessionKey: string,
   adapter: unknown,
 ): TemplateResult {
@@ -22,7 +22,7 @@ function renderMountedExtension(
   if (attrName) {
     return staticHtml`
       <${tagName}
-        class="plugin-extension__host"
+        class="plugin-ui__host"
         .adapter=${adapter}
         .sessionId=${sessionKey}
         session-id=${sessionKey}
@@ -32,7 +32,7 @@ function renderMountedExtension(
   }
   return staticHtml`
     <${tagName}
-      class="plugin-extension__host"
+      class="plugin-ui__host"
       .adapter=${adapter}
       .sessionId=${sessionKey}
       session-id=${sessionKey}
@@ -40,19 +40,19 @@ function renderMountedExtension(
   `;
 }
 
-export function renderPluginExtension(props: PluginExtensionViewProps) {
+export function renderPluginUi(props: PluginUiViewProps) {
   return html`
-    <section class="card chat plugin-extension">
+    <section class="card chat plugin-ui">
       ${
         props.ready
           ? renderMountedExtension(props.extension, props.sessionKey, props.adapter)
           : html`
-              <div class="plugin-extension__status">
+              <div class="plugin-ui__status">
                 <div class="muted">
                   ${
                     props.loadError
-                      ? `Unable to load plugin extension "${props.extension.label}": ${props.loadError}`
-                      : `Loading plugin extension "${props.extension.label}"...`
+                      ? `Unable to load plugin UI "${props.extension.label}": ${props.loadError}`
+                      : `Loading plugin UI "${props.extension.label}"...`
                   }
                 </div>
                 <button class="btn btn--sm" @click=${() => void props.onRetryLoad()}>

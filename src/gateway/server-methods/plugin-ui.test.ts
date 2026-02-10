@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { GatewayRequestHandlerOptions } from "./types.js";
-import { controlUiExtensionsHandlers } from "./control-ui-extensions.js";
+import { pluginUiHandlers } from "./plugin-ui.js";
 
 const mocks = vi.hoisted(() => ({
   getActivePluginRegistry: vi.fn(),
@@ -11,8 +11,8 @@ vi.mock("../../plugins/runtime.js", () => ({
 }));
 
 const invokeList = (respond: GatewayRequestHandlerOptions["respond"]) => {
-  void controlUiExtensionsHandlers["controlui.extensions.list"]({
-    req: { type: "req", id: "1", method: "controlui.extensions.list" },
+  void pluginUiHandlers["plugins.ui.list"]({
+    req: { type: "req", id: "1", method: "plugins.ui.list" },
     params: {},
     client: null,
     isWebchatConnect: () => false,
@@ -21,14 +21,14 @@ const invokeList = (respond: GatewayRequestHandlerOptions["respond"]) => {
   });
 };
 
-describe("controlui.extensions.list", () => {
+describe("plugins.ui.list", () => {
   beforeEach(() => {
     mocks.getActivePluginRegistry.mockReset();
   });
 
   it("returns sanitized extensions sorted by order then label", () => {
     mocks.getActivePluginRegistry.mockReturnValue({
-      controlUiExtensions: [
+      pluginUiEntries: [
         {
           pluginId: "plugin-z",
           extension: {
@@ -112,7 +112,7 @@ describe("controlui.extensions.list", () => {
 
   it("normalizes tagName and optional mount fields", () => {
     mocks.getActivePluginRegistry.mockReturnValue({
-      controlUiExtensions: [
+      pluginUiEntries: [
         {
           pluginId: "plugin-x",
           extension: {

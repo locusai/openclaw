@@ -49,7 +49,7 @@ function setup(config: Record<string, unknown>): Registered {
     registerTool: (tool) => tools.push(tool),
     registerCli: () => {},
     registerService: () => {},
-    registerControlUiExtension: () => {},
+    registerPluginUi: () => {},
     resolvePath: (p: string) => p,
   });
   return { methods, tools };
@@ -163,7 +163,7 @@ describe("voice-call plugin", () => {
           logger: noopLogger,
         }),
       registerService: () => {},
-      registerControlUiExtension: () => {},
+      registerPluginUi: () => {},
       resolvePath: (p: string) => p,
     });
 

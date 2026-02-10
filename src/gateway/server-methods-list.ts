@@ -19,7 +19,7 @@ const BASE_METHODS = [
   "config.apply",
   "config.patch",
   "config.schema",
-  "controlui.extensions.list",
+  "plugins.ui.list",
   "exec.approvals.get",
   "exec.approvals.set",
   "exec.approvals.node.get",

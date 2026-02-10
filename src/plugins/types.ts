@@ -266,7 +266,7 @@ export type OpenClawPluginApi = {
   registerGatewayMethod: (method: string, handler: GatewayRequestHandler) => void;
   registerCli: (registrar: OpenClawPluginCliRegistrar, opts?: { commands?: string[] }) => void;
   registerService: (service: OpenClawPluginService) => void;
-  registerControlUiExtension: (extension: OpenClawPluginControlUiExtension) => void;
+  registerPluginUi: (extension: OpenClawPluginUiEntry) => void;
   registerProvider: (provider: ProviderPlugin) => void;
   /**
    * Register a custom command that bypasses the LLM agent.
@@ -283,7 +283,7 @@ export type OpenClawPluginApi = {
   ) => void;
 };
 
-export type OpenClawPluginControlUiExtensionMount = {
+export type OpenClawPluginUiMount = {
   kind: "web_component";
   modulePath: string;
   tagName: string;
@@ -292,14 +292,14 @@ export type OpenClawPluginControlUiExtensionMount = {
   sessionAttribute?: string;
 };
 
-export type OpenClawPluginControlUiExtension = {
+export type OpenClawPluginUiEntry = {
   id: string;
   label: string;
   description?: string;
   icon?: string;
   group?: string;
   order?: number;
-  mount: OpenClawPluginControlUiExtensionMount;
+  mount: OpenClawPluginUiMount;
 };
 
 export type PluginOrigin = "bundled" | "global" | "workspace" | "config";

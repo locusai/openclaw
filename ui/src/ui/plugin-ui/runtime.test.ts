@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
-import type { ControlUiExtensionDescriptor } from "./types.ts";
+import type { PluginUiDescriptor } from "./types.ts";
 import {
-  getControlUiRuntimeApi,
-  installControlUiRuntimeApi,
-  registerControlUiAdapter,
-  resolveControlUiAdapter,
+  getPluginUiRuntimeApi,
+  installPluginUiRuntimeApi,
+  registerPluginUiAdapter,
+  resolvePluginUiAdapter,
 } from "./runtime.ts";
 
-const EXTENSION: ControlUiExtensionDescriptor = {
+const EXTENSION: PluginUiDescriptor = {
   id: "plugin:demo",
   pluginId: "plugin",
   extensionId: "demo",
@@ -19,12 +19,12 @@ const EXTENSION: ControlUiExtensionDescriptor = {
   },
 };
 
-describe("control UI runtime adapter registry", () => {
+describe("plugin UI runtime adapter registry", () => {
   it("registers and resolves adapters", () => {
     const adapterId = `adapter-${Math.random().toString(16).slice(2)}`;
-    registerControlUiAdapter(adapterId, ({ sessionKey }) => ({ sessionKey, ok: true }));
+    registerPluginUiAdapter(adapterId, ({ sessionKey }) => ({ sessionKey, ok: true }));
 
-    const adapter = resolveControlUiAdapter(adapterId, {
+    const adapter = resolvePluginUiAdapter(adapterId, {
       extension: EXTENSION,
       sessionKey: "main",
     });
@@ -34,9 +34,9 @@ describe("control UI runtime adapter registry", () => {
 
   it("normalizes adapter ids for lookup", () => {
     const adapterId = `adapter-${Math.random().toString(16).slice(2)}`;
-    registerControlUiAdapter(` ${adapterId.toUpperCase()} `, () => "value");
+    registerPluginUiAdapter(` ${adapterId.toUpperCase()} `, () => "value");
     expect(
-      resolveControlUiAdapter(adapterId, {
+      resolvePluginUiAdapter(adapterId, {
         extension: EXTENSION,
         sessionKey: "main",
       }),
@@ -44,13 +44,13 @@ describe("control UI runtime adapter registry", () => {
   });
 
   it("installs runtime api on globalThis", () => {
-    installControlUiRuntimeApi();
-    expect(globalThis.__OPENCLAW_CONTROL_UI_RUNTIME__).toBeDefined();
-    expect(globalThis.__OPENCLAW_CONTROL_UI_RUNTIME__).toBe(getControlUiRuntimeApi());
+    installPluginUiRuntimeApi();
+    expect(globalThis.__OPENCLAW_PLUGIN_UI_RUNTIME__).toBeDefined();
+    expect(globalThis.__OPENCLAW_PLUGIN_UI_RUNTIME__).toBe(getPluginUiRuntimeApi());
     const adapterId = `adapter-${Math.random().toString(16).slice(2)}`;
-    globalThis.__OPENCLAW_CONTROL_UI_RUNTIME__?.registerAdapter(adapterId, () => "from-global");
+    globalThis.__OPENCLAW_PLUGIN_UI_RUNTIME__?.registerAdapter(adapterId, () => "from-global");
     expect(
-      resolveControlUiAdapter(adapterId, {
+      resolvePluginUiAdapter(adapterId, {
         extension: EXTENSION,
         sessionKey: "main",
       }),

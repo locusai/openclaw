@@ -1,8 +1,8 @@
-import type { OpenClawPluginControlUiExtension } from "../../plugins/types.js";
+import type { OpenClawPluginUiEntry } from "../../plugins/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
 import { getActivePluginRegistry } from "../../plugins/runtime.js";
 
-export type ControlUiExtensionDescriptor = {
+export type PluginUiDescriptor = {
   id: string;
   pluginId: string;
   extensionId: string;
@@ -11,17 +11,17 @@ export type ControlUiExtensionDescriptor = {
   icon?: string;
   group?: string;
   order?: number;
-  mount: OpenClawPluginControlUiExtension["mount"];
+  mount: OpenClawPluginUiEntry["mount"];
 };
 
 function resolveDescriptorId(pluginId: string, extensionId: string): string {
   return `${pluginId}:${extensionId}`;
 }
 
-function normalizeControlUiExtension(params: {
+function normalizePluginUiEntry(params: {
   pluginId: string;
-  extension: OpenClawPluginControlUiExtension;
-}): ControlUiExtensionDescriptor | null {
+  extension: OpenClawPluginUiEntry;
+}): PluginUiDescriptor | null {
   const pluginId = params.pluginId.trim();
   const extensionId = params.extension.id.trim();
   const label = params.extension.label.trim();
@@ -63,18 +63,18 @@ function normalizeControlUiExtension(params: {
   };
 }
 
-export const controlUiExtensionsHandlers: GatewayRequestHandlers = {
-  "controlui.extensions.list": ({ respond }) => {
+export const pluginUiHandlers: GatewayRequestHandlers = {
+  "plugins.ui.list": ({ respond }) => {
     const registry = getActivePluginRegistry();
-    const raw = registry?.controlUiExtensions ?? [];
+    const raw = registry?.pluginUiEntries ?? [];
     const extensions = raw
       .map((entry) =>
-        normalizeControlUiExtension({
+        normalizePluginUiEntry({
           pluginId: entry.pluginId,
           extension: entry.extension,
         }),
       )
-      .filter((entry): entry is ControlUiExtensionDescriptor => Boolean(entry))
+      .filter((entry): entry is PluginUiDescriptor => Boolean(entry))
       .toSorted((a, b) => {
         const aOrder = a.order ?? 100;
         const bOrder = b.order ?? 100;

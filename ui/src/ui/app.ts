@@ -6,8 +6,8 @@ import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
-import type { ControlUiExtensionDescriptor } from "./extensions/types.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
+import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import type { ResolvedTheme, ThemeMode } from "./theme.ts";
 import type {
   AgentsListResult,
@@ -78,10 +78,10 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
-import { loadControlUiExtensions } from "./controllers/control-ui-extensions.ts";
-import { ensureControlUiExtensionLoaded } from "./extensions/loader.ts";
-import { installControlUiRuntimeApi, resolveControlUiAdapter } from "./extensions/runtime.ts";
-import { extensionIdFromTab, type Tab } from "./navigation.ts";
+import { loadPluginUi } from "./controllers/plugin-ui.ts";
+import { pluginIdFromTab, type Tab } from "./navigation.ts";
+import { ensurePluginUiLoaded } from "./plugin-ui/loader.ts";
+import { installPluginUiRuntimeApi, resolvePluginUiAdapter } from "./plugin-ui/runtime.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -141,11 +141,11 @@ export class OpenClawApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
-  @state() controlUiExtensionsLoading = false;
-  @state() controlUiExtensionsError: string | null = null;
-  @state() controlUiExtensions: ControlUiExtensionDescriptor[] = [];
-  @state() controlUiExtensionReadyById: Record<string, boolean> = {};
-  @state() controlUiExtensionLoadErrorById: Record<string, string | null> = {};
+  @state() pluginUiLoading = false;
+  @state() pluginUiError: string | null = null;
+  @state() pluginUiEntries: PluginUiDescriptor[] = [];
+  @state() pluginUiReadyById: Record<string, boolean> = {};
+  @state() pluginUiLoadErrorById: Record<string, string | null> = {};
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -355,7 +355,7 @@ export class OpenClawApp extends LitElement {
 
   constructor() {
     super();
-    installControlUiRuntimeApi();
+    installPluginUiRuntimeApi();
   }
 
   createRenderRoot() {
@@ -443,55 +443,55 @@ export class OpenClawApp extends LitElement {
     await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
   }
 
-  async loadControlUiExtensions() {
-    await loadControlUiExtensions(this as unknown as Parameters<typeof loadControlUiExtensions>[0]);
-    const extensionId = extensionIdFromTab(this.tab);
+  async loadPluginUi() {
+    await loadPluginUi(this as unknown as Parameters<typeof loadPluginUi>[0]);
+    const extensionId = pluginIdFromTab(this.tab);
     if (extensionId) {
-      await this.ensureControlUiExtensionLoaded(extensionId);
+      await this.ensurePluginUiLoaded(extensionId);
     }
   }
 
-  getControlUiExtensionById(extensionId: string): ControlUiExtensionDescriptor | null {
+  getPluginUiEntryById(extensionId: string): PluginUiDescriptor | null {
     const normalized = extensionId.trim();
     if (!normalized) {
       return null;
     }
-    return this.controlUiExtensions.find((entry) => entry.id === normalized) ?? null;
+    return this.pluginUiEntries.find((entry) => entry.id === normalized) ?? null;
   }
 
-  resolveControlUiExtensionAdapter(extension: ControlUiExtensionDescriptor): unknown {
+  resolvePluginUiAdapterForEntry(extension: PluginUiDescriptor): unknown {
     const adapterId = extension.mount.adapterId?.trim();
     if (!adapterId) {
       return undefined;
     }
-    return resolveControlUiAdapter(adapterId, {
+    return resolvePluginUiAdapter(adapterId, {
       extension,
       sessionKey: this.sessionKey,
     });
   }
 
-  async ensureControlUiExtensionLoaded(extensionId: string) {
-    const extension = this.getControlUiExtensionById(extensionId);
+  async ensurePluginUiLoaded(extensionId: string) {
+    const extension = this.getPluginUiEntryById(extensionId);
     if (!extension) {
       return;
     }
     try {
-      await ensureControlUiExtensionLoaded(extension);
-      this.controlUiExtensionReadyById = {
-        ...this.controlUiExtensionReadyById,
+      await ensurePluginUiLoaded(extension);
+      this.pluginUiReadyById = {
+        ...this.pluginUiReadyById,
         [extension.id]: true,
       };
-      this.controlUiExtensionLoadErrorById = {
-        ...this.controlUiExtensionLoadErrorById,
+      this.pluginUiLoadErrorById = {
+        ...this.pluginUiLoadErrorById,
         [extension.id]: null,
       };
     } catch (err) {
-      this.controlUiExtensionReadyById = {
-        ...this.controlUiExtensionReadyById,
+      this.pluginUiReadyById = {
+        ...this.pluginUiReadyById,
         [extension.id]: false,
       };
-      this.controlUiExtensionLoadErrorById = {
-        ...this.controlUiExtensionLoadErrorById,
+      this.pluginUiLoadErrorById = {
+        ...this.pluginUiLoadErrorById,
         [extension.id]: String(err),
       };
     }

@@ -1,22 +1,19 @@
-import type {
-  ControlUiExtensionDescriptor,
-  ControlUiExtensionsListResponse,
-} from "../extensions/types.ts";
 import type { GatewayBrowserClient } from "../gateway.ts";
+import type { PluginUiDescriptor, PluginUiListResponse } from "../plugin-ui/types.ts";
 
-export type ControlUiExtensionsState = {
+export type PluginUiState = {
   client: GatewayBrowserClient | null;
   connected: boolean;
-  controlUiExtensionsLoading: boolean;
-  controlUiExtensionsError: string | null;
-  controlUiExtensions: ControlUiExtensionDescriptor[];
+  pluginUiLoading: boolean;
+  pluginUiError: string | null;
+  pluginUiEntries: PluginUiDescriptor[];
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value && typeof value === "object" && !Array.isArray(value));
 }
 
-function normalizeExtension(entry: unknown): ControlUiExtensionDescriptor | null {
+function normalizeExtension(entry: unknown): PluginUiDescriptor | null {
   if (!isRecord(entry)) {
     return null;
   }
@@ -66,31 +63,28 @@ function normalizeExtension(entry: unknown): ControlUiExtensionDescriptor | null
   };
 }
 
-export async function loadControlUiExtensions(state: ControlUiExtensionsState): Promise<void> {
+export async function loadPluginUi(state: PluginUiState): Promise<void> {
   if (!state.client || !state.connected) {
-    state.controlUiExtensions = [];
-    state.controlUiExtensionsError = null;
-    state.controlUiExtensionsLoading = false;
+    state.pluginUiEntries = [];
+    state.pluginUiError = null;
+    state.pluginUiLoading = false;
     return;
   }
-  if (state.controlUiExtensionsLoading) {
+  if (state.pluginUiLoading) {
     return;
   }
-  state.controlUiExtensionsLoading = true;
-  state.controlUiExtensionsError = null;
+  state.pluginUiLoading = true;
+  state.pluginUiError = null;
   try {
-    const response = await state.client.request<ControlUiExtensionsListResponse>(
-      "controlui.extensions.list",
-      {},
-    );
+    const response = await state.client.request<PluginUiListResponse>("plugins.ui.list", {});
     const raw = Array.isArray(response?.extensions) ? response.extensions : [];
-    state.controlUiExtensions = raw
+    state.pluginUiEntries = raw
       .map((entry) => normalizeExtension(entry))
-      .filter((entry): entry is ControlUiExtensionDescriptor => Boolean(entry));
+      .filter((entry): entry is PluginUiDescriptor => Boolean(entry));
   } catch (err) {
-    state.controlUiExtensionsError = err instanceof Error ? err.message : String(err);
-    state.controlUiExtensions = [];
+    state.pluginUiError = err instanceof Error ? err.message : String(err);
+    state.pluginUiEntries = [];
   } finally {
-    state.controlUiExtensionsLoading = false;
+    state.pluginUiLoading = false;
   }
 }

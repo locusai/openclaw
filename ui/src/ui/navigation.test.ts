@@ -37,7 +37,7 @@ describe("iconForTab", () => {
     expect(iconForTab("config")).toBe("settings");
     expect(iconForTab("debug")).toBe("bug");
     expect(iconForTab("logs")).toBe("scrollText");
-    expect(iconForTab("ext:demo")).toBe("puzzle");
+    expect(iconForTab("plugin:demo")).toBe("puzzle");
   });
 
   it("returns a fallback icon for unknown tab", () => {
@@ -126,8 +126,8 @@ describe("pathForTab", () => {
   });
 
   it("builds extension paths", () => {
-    expect(pathForTab("ext:demo")).toBe("/ext/demo");
-    expect(pathForTab("ext:plugin:demo", "/ui")).toBe("/ui/ext/plugin%3Ademo");
+    expect(pathForTab("plugin:demo")).toBe("/plugin/demo");
+    expect(pathForTab("plugin:plugin:demo", "/ui")).toBe("/ui/plugin/plugin%3Ademo");
   });
 });
 
@@ -157,8 +157,8 @@ describe("tabFromPath", () => {
   });
 
   it("resolves extension paths", () => {
-    expect(tabFromPath("/ext/demo")).toBe("ext:demo");
-    expect(tabFromPath("/ui/ext/plugin%3Ademo", "/ui")).toBe("ext:plugin:demo");
+    expect(tabFromPath("/plugin/demo")).toBe("plugin:demo");
+    expect(tabFromPath("/ui/plugin/plugin%3Ademo", "/ui")).toBe("plugin:plugin:demo");
   });
 });
 
@@ -170,13 +170,13 @@ describe("inferBasePathFromPathname", () => {
   it("returns empty string for direct tab path", () => {
     expect(inferBasePathFromPathname("/chat")).toBe("");
     expect(inferBasePathFromPathname("/overview")).toBe("");
-    expect(inferBasePathFromPathname("/ext/demo")).toBe("");
+    expect(inferBasePathFromPathname("/plugin/demo")).toBe("");
   });
 
   it("infers base path from nested paths", () => {
     expect(inferBasePathFromPathname("/ui/chat")).toBe("/ui");
     expect(inferBasePathFromPathname("/apps/openclaw/sessions")).toBe("/apps/openclaw");
-    expect(inferBasePathFromPathname("/ui/ext/demo")).toBe("/ui");
+    expect(inferBasePathFromPathname("/ui/plugin/demo")).toBe("/ui");
   });
 
   it("handles index.html suffix", () => {
