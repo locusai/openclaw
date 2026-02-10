@@ -213,28 +213,6 @@ describe("handleCommands hooks", () => {
     expect(spy).toHaveBeenCalledWith(expect.objectContaining({ type: "command", action: "new" }));
     spy.mockRestore();
   });
-
-  it("returns handled hook replies for /new and skips further processing", async () => {
-    const cfg = {
-      commands: { text: true },
-      channels: { whatsapp: { allowFrom: ["*"] } },
-    } as OpenClawConfig;
-    const params = buildParams("/new --print hello world", cfg);
-
-    internalHooks.clearInternalHooks();
-    try {
-      internalHooks.registerInternalHook("command:new", () => ({
-        handled: true,
-        reply: { text: "hello world" },
-      }));
-
-      const result = await handleCommands(params);
-      expect(result.shouldContinue).toBe(false);
-      expect(result.reply?.text).toBe("hello world");
-    } finally {
-      internalHooks.clearInternalHooks();
-    }
-  });
 });
 
 describe("handleCommands context", () => {

@@ -1,5 +1,0 @@
-{
-  "id": "new-print",
-  "name": "New Print Demo",
-  "description": "Demonstrates plugin-handled /new options via `--print`."
-}
