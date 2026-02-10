@@ -202,6 +202,8 @@ export type PluginCommandOptionInvocation = {
 };
 
 export type PluginCommandOptionContext = PluginCommandContext & {
+  sessionKey?: string;
+  sessionId?: string;
   invocation: PluginCommandOptionInvocation;
   option: {
     name: string;

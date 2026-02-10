@@ -377,6 +377,8 @@ export function registerPluginCommandOption(
 
 export async function executePluginCommandOptions(params: {
   commandBody: string;
+  sessionKey?: string;
+  sessionId?: string;
   senderId?: string;
   channel: string;
   channelId?: ChannelId;
@@ -481,6 +483,8 @@ export async function executePluginCommandOptions(params: {
       }
 
       const context: PluginCommandOptionContext = {
+        sessionKey: params.sessionKey,
+        sessionId: params.sessionId,
         senderId: params.senderId,
         channel: params.channel,
         channelId: params.channelId,

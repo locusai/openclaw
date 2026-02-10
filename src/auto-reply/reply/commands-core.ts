@@ -81,6 +81,8 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
   if (allowTextCommands) {
     const optionResult = await executePluginCommandOptions({
       commandBody: params.command.commandBodyNormalized,
+      sessionKey: params.sessionKey,
+      sessionId: params.sessionEntry?.sessionId,
       senderId: params.command.senderId,
       channel: params.command.channel,
       channelId: params.command.channelId,
