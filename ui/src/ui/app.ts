@@ -6,8 +6,8 @@ import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
+import type { ControlUiExtensionDescriptor } from "./extensions/types.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
-import type { Tab } from "./navigation.ts";
 import type { ResolvedTheme, ThemeMode } from "./theme.ts";
 import type {
   AgentsListResult,
@@ -78,6 +78,10 @@ import {
 } from "./app-tool-stream.ts";
 import { resolveInjectedAssistantIdentity } from "./assistant-identity.ts";
 import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./controllers/assistant-identity.ts";
+import { loadControlUiExtensions } from "./controllers/control-ui-extensions.ts";
+import { ensureControlUiExtensionLoaded } from "./extensions/loader.ts";
+import { installControlUiRuntimeApi, resolveControlUiAdapter } from "./extensions/runtime.ts";
+import { extensionIdFromTab, type Tab } from "./navigation.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import { type ChatAttachment, type ChatQueueItem, type CronFormState } from "./ui-types.ts";
 
@@ -137,6 +141,11 @@ export class OpenClawApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
+  @state() controlUiExtensionsLoading = false;
+  @state() controlUiExtensionsError: string | null = null;
+  @state() controlUiExtensions: ControlUiExtensionDescriptor[] = [];
+  @state() controlUiExtensionReadyById: Record<string, boolean> = {};
+  @state() controlUiExtensionLoadErrorById: Record<string, string | null> = {};
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -344,6 +353,11 @@ export class OpenClawApp extends LitElement {
   private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
 
+  constructor() {
+    super();
+    installControlUiRuntimeApi();
+  }
+
   createRenderRoot() {
     return this;
   }
@@ -427,6 +441,60 @@ export class OpenClawApp extends LitElement {
 
   async loadCron() {
     await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
+  }
+
+  async loadControlUiExtensions() {
+    await loadControlUiExtensions(this as unknown as Parameters<typeof loadControlUiExtensions>[0]);
+    const extensionId = extensionIdFromTab(this.tab);
+    if (extensionId) {
+      await this.ensureControlUiExtensionLoaded(extensionId);
+    }
+  }
+
+  getControlUiExtensionById(extensionId: string): ControlUiExtensionDescriptor | null {
+    const normalized = extensionId.trim();
+    if (!normalized) {
+      return null;
+    }
+    return this.controlUiExtensions.find((entry) => entry.id === normalized) ?? null;
+  }
+
+  resolveControlUiExtensionAdapter(extension: ControlUiExtensionDescriptor): unknown {
+    const adapterId = extension.mount.adapterId?.trim();
+    if (!adapterId) {
+      return undefined;
+    }
+    return resolveControlUiAdapter(adapterId, {
+      extension,
+      sessionKey: this.sessionKey,
+    });
+  }
+
+  async ensureControlUiExtensionLoaded(extensionId: string) {
+    const extension = this.getControlUiExtensionById(extensionId);
+    if (!extension) {
+      return;
+    }
+    try {
+      await ensureControlUiExtensionLoaded(extension);
+      this.controlUiExtensionReadyById = {
+        ...this.controlUiExtensionReadyById,
+        [extension.id]: true,
+      };
+      this.controlUiExtensionLoadErrorById = {
+        ...this.controlUiExtensionLoadErrorById,
+        [extension.id]: null,
+      };
+    } catch (err) {
+      this.controlUiExtensionReadyById = {
+        ...this.controlUiExtensionReadyById,
+        [extension.id]: false,
+      };
+      this.controlUiExtensionLoadErrorById = {
+        ...this.controlUiExtensionLoadErrorById,
+        [extension.id]: String(err),
+      };
+    }
   }
 
   async handleAbortChat() {

@@ -4,6 +4,7 @@ import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
+import type { ControlUiExtensionDescriptor } from "./extensions/types.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
 import type { UiSettings } from "./storage.ts";
@@ -65,6 +66,11 @@ export type AppViewState = {
   chatThinkingLevel: string | null;
   chatQueue: ChatQueueItem[];
   chatManualRefreshInFlight: boolean;
+  controlUiExtensionsLoading: boolean;
+  controlUiExtensionsError: string | null;
+  controlUiExtensions: ControlUiExtensionDescriptor[];
+  controlUiExtensionReadyById: Record<string, boolean>;
+  controlUiExtensionLoadErrorById: Record<string, string | null>;
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
@@ -228,6 +234,8 @@ export type AppViewState = {
   loadOverview: () => Promise<void>;
   loadAssistantIdentity: () => Promise<void>;
   loadCron: () => Promise<void>;
+  ensureControlUiExtensionLoaded: (extensionId: string) => Promise<void>;
+  resolveControlUiExtensionAdapter: (extension: ControlUiExtensionDescriptor) => unknown;
   handleWhatsAppStart: (force: boolean) => Promise<void>;
   handleWhatsAppWait: () => Promise<void>;
   handleWhatsAppLogout: () => Promise<void>;

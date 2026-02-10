@@ -7,6 +7,7 @@ import { channelsHandlers } from "./server-methods/channels.js";
 import { chatHandlers } from "./server-methods/chat.js";
 import { configHandlers } from "./server-methods/config.js";
 import { connectHandlers } from "./server-methods/connect.js";
+import { controlUiExtensionsHandlers } from "./server-methods/control-ui-extensions.js";
 import { cronHandlers } from "./server-methods/cron.js";
 import { deviceHandlers } from "./server-methods/devices.js";
 import { execApprovalsHandlers } from "./server-methods/exec-approvals.js";
@@ -72,6 +73,7 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
+  "controlui.extensions.list",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -169,6 +171,7 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...healthHandlers,
   ...channelsHandlers,
   ...chatHandlers,
+  ...controlUiExtensionsHandlers,
   ...cronHandlers,
   ...deviceHandlers,
   ...execApprovalsHandlers,
