@@ -26,6 +26,7 @@ import {
   type SessionScope,
   updateSessionStore,
 } from "../../config/sessions.js";
+import { stripPluginCommandOptionsFromBody } from "../../plugins/command-options.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
 import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
@@ -51,6 +52,45 @@ export type SessionInitResult = {
   bodyStripped?: string;
   triggerBodyNormalized: string;
 };
+
+function stripResetMetadataArgs(body: string, trigger: string): string {
+  if (!body) {
+    return "";
+  }
+  const tokens = body.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "";
+  }
+  const filtered = tokens.filter((token) => {
+    const lower = token.toLowerCase();
+    // Legacy persona: args live here; structured /new options are now handled via plugin command options.
+    // These should not be forwarded to the agent as user prompt text.
+    if (lower.startsWith("persona:")) {
+      return false;
+    }
+    return true;
+  });
+  const cleaned = filtered.join(" ").trim();
+  if (!cleaned) {
+    return "";
+  }
+  const triggerToken = trigger?.trim() || "/new";
+  const rebuilt = stripPluginCommandOptionsFromBody({
+    commandBody: `${triggerToken} ${cleaned}`.trim(),
+  }).commandBody;
+  const rebuiltTokens = rebuilt.split(/\s+/).filter(Boolean);
+  if (rebuiltTokens.length === 0) {
+    return "";
+  }
+  const triggerLower = triggerToken.toLowerCase();
+  if (rebuiltTokens[0]?.toLowerCase() === triggerLower) {
+    return rebuiltTokens.slice(1).join(" ").trim();
+  }
+  if (rebuiltTokens[0]?.startsWith("/")) {
+    return rebuiltTokens.slice(1).join(" ").trim();
+  }
+  return rebuiltTokens.join(" ").trim();
+}
 
 function forkSessionFromParent(params: {
   parentEntry: SessionEntry;
@@ -187,7 +227,10 @@ export async function initSessionState(params: {
       strippedForResetLower.startsWith(triggerPrefixLower)
     ) {
       isNewSession = true;
-      bodyStripped = strippedForReset.slice(trigger.length).trimStart();
+      bodyStripped = stripResetMetadataArgs(
+        strippedForReset.slice(trigger.length).trimStart(),
+        trigger,
+      );
       resetTriggered = true;
       break;
     }
