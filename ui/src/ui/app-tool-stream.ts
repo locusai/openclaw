@@ -10,7 +10,10 @@ export type AgentEventPayload = {
   stream: string;
   ts: number;
   sessionKey?: string;
-  data: Record<string, unknown>;
+  data: {
+    isError?: boolean;
+    [key: string]: unknown;
+  };
 };
 
 export type ToolStreamEntry = {
@@ -248,6 +251,8 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       : phase === "result"
         ? formatToolOutput(data.result)
         : undefined;
+  const resolvedOutput =
+    phase === "result" && isError && !output ? "Error (details hidden)" : output || undefined;
 
   const now = Date.now();
   let entry = host.toolStreamById.get(toolCallId);
@@ -258,8 +263,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       sessionKey,
       name,
       args,
-      output:
-        phase === "result" && isError && !output ? "Error (details hidden)" : output || undefined,
+      output: resolvedOutput,
       startedAt: typeof payload.ts === "number" ? payload.ts : now,
       updatedAt: now,
       message: {},
@@ -271,9 +275,8 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
     if (args !== undefined) {
       entry.args = args;
     }
-    if (output !== undefined) {
-      entry.output =
-        phase === "result" && isError && !output ? "Error (details hidden)" : output || undefined;
+    if (resolvedOutput !== undefined) {
+      entry.output = resolvedOutput;
     }
     entry.updatedAt = now;
   }
