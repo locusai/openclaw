@@ -19,6 +19,8 @@ import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenClawConfig;
+  provider?: string;
+  model?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -46,6 +48,8 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
       workspaceDir,
       agentDir,
       config: params.cfg,
+      ...(params.provider ? { provider: params.provider } : {}),
+      ...(params.model ? { model: params.model } : {}),
       prompt,
       timeoutMs: 15_000, // 15 second timeout
       runId: `slug-gen-${Date.now()}`,
