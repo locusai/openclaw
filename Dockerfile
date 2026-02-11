@@ -44,9 +44,8 @@ RUN set -eu; \
     case "${OPENCLAW_GID}" in (""|*[!0-9]*|0) ;; (*) \
       grp="$(getent group "${OPENCLAW_GID}" 2>/dev/null | cut -d: -f1 || true)"; \
       if [ -n "$grp" ] && [ "$grp" != node ]; then \
-        echo "OPENCLAW_GID ${OPENCLAW_GID} already used by ${grp}; choose a different GID" >&2; exit 1; \
-      fi; \
-      if [ -z "$grp" ]; then \
+        usermod -g "${OPENCLAW_GID}" node; \
+      elif [ -z "$grp" ]; then \
         usermod -g root node; \
         groupmod -g "${OPENCLAW_GID}" node; \
         usermod -g node node; \
