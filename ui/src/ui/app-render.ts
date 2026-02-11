@@ -1,6 +1,7 @@
 import { html, nothing } from "lit";
 import type { AppViewState } from "./app-view-state.ts";
 import type { UsageState } from "./controllers/usage.ts";
+import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import { parseAgentSessionKey } from "../../../src/routing/session-key.js";
 import { refreshChatAvatar } from "./app-chat.ts";
 import { renderChatControls, renderTab, renderThemeToggle } from "./app-render.helpers.ts";
@@ -51,8 +52,16 @@ import {
   updateSkillEnabled,
 } from "./controllers/skills.ts";
 import { loadUsage, loadSessionTimeSeries, loadSessionLogs } from "./controllers/usage.ts";
-import { icons } from "./icons.ts";
-import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import { icons, type IconName } from "./icons.ts";
+import {
+  pluginIdFromTab,
+  pluginTabFromId,
+  isPluginTab,
+  normalizeBasePath,
+  TAB_GROUPS,
+  subtitleForTab,
+  titleForTab,
+} from "./navigation.ts";
 
 // Module-scope debounce for usage date changes (avoids type-unsafe hacks on state object)
 let usageDateDebounceTimeout: number | null = null;
@@ -74,12 +83,64 @@ import { renderInstances } from "./views/instances.ts";
 import { renderLogs } from "./views/logs.ts";
 import { renderNodes } from "./views/nodes.ts";
 import { renderOverview } from "./views/overview.ts";
+import { renderPluginUi } from "./views/plugin-ui.ts";
 import { renderSessions } from "./views/sessions.ts";
 import { renderSkills } from "./views/skills.ts";
 import { renderUsage } from "./views/usage.ts";
 
 const AVATAR_DATA_RE = /^data:/i;
 const AVATAR_HTTP_RE = /^https?:\/\//i;
+
+type ExtensionTabGroup = {
+  label: string;
+  tabs: PluginUiDescriptor[];
+};
+
+function normalizeExtensionGroupLabel(value: string | undefined): string {
+  const trimmed = value?.trim();
+  return trimmed || "Plugins";
+}
+
+function resolveExtensionIcon(icon: string | undefined): IconName {
+  if (icon && Object.prototype.hasOwnProperty.call(icons, icon)) {
+    return icon as IconName;
+  }
+  return "puzzle";
+}
+
+function buildExtensionTabGroups(extensions: PluginUiDescriptor[]): ExtensionTabGroup[] {
+  const grouped = new Map<string, PluginUiDescriptor[]>();
+  for (const extension of extensions) {
+    const key = normalizeExtensionGroupLabel(extension.group);
+    const list = grouped.get(key);
+    if (list) {
+      list.push(extension);
+    } else {
+      grouped.set(key, [extension]);
+    }
+  }
+  return Array.from(grouped.entries())
+    .map(([label, tabs]) => ({
+      label,
+      tabs: tabs.toSorted((a, b) => {
+        const aOrder = a.order ?? 100;
+        const bOrder = b.order ?? 100;
+        if (aOrder !== bOrder) {
+          return aOrder - bOrder;
+        }
+        return a.label.localeCompare(b.label);
+      }),
+    }))
+    .toSorted((a, b) => a.label.localeCompare(b.label));
+}
+
+function resolveActiveExtension(state: AppViewState): PluginUiDescriptor | null {
+  const extensionId = pluginIdFromTab(state.tab);
+  if (!extensionId) {
+    return null;
+  }
+  return state.pluginUiEntries.find((entry) => entry.id === extensionId) ?? null;
+}
 
 function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
   const list = state.agentsList?.agents ?? [];
@@ -98,12 +159,16 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 }
 
 export function renderApp(state: AppViewState) {
+  const extensionGroups = buildExtensionTabGroups(state.pluginUiEntries);
+  const activeExtension = resolveActiveExtension(state);
+  const extensionGroup = activeExtension?.group?.trim().toLowerCase();
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
   const chatDisabledReason = state.connected ? null : "Disconnected from gateway.";
-  const isChat = state.tab === "chat";
+  const isChat = state.tab === "chat" || extensionGroup === "chat";
   const chatFocus = isChat && (state.settings.chatFocusMode || state.onboarding);
+  const showChatControls = state.tab === "chat";
   const showThinking = state.onboarding ? false : state.settings.chatShowThinking;
   const assistantAvatarUrl = resolveAssistantAvatarUrl(state);
   const chatAvatarUrl = state.chatAvatarUrl ?? assistantAvatarUrl ?? null;
@@ -115,6 +180,8 @@ export function renderApp(state: AppViewState) {
     state.agentsList?.defaultId ??
     state.agentsList?.agents?.[0]?.id ??
     null;
+  const pageTitle = activeExtension?.label ?? titleForTab(state.tab);
+  const pageSubtitle = activeExtension?.description ?? subtitleForTab(state.tab);
 
   return html`
     <div class="shell ${isChat ? "shell--chat" : ""} ${chatFocus ? "shell--chat-focus" : ""} ${state.settings.navCollapsed ? "shell--nav-collapsed" : ""} ${state.onboarding ? "shell--onboarding" : ""}">
@@ -178,6 +245,38 @@ export function renderApp(state: AppViewState) {
             </div>
           `;
         })}
+        ${extensionGroups.map((group) => {
+          const isGroupCollapsed = state.settings.navGroupsCollapsed[group.label] ?? false;
+          const hasActiveTab = group.tabs.some((entry) => pluginTabFromId(entry.id) === state.tab);
+          return html`
+            <div class="nav-group ${isGroupCollapsed && !hasActiveTab ? "nav-group--collapsed" : ""}">
+              <button
+                class="nav-label"
+                @click=${() => {
+                  const next = { ...state.settings.navGroupsCollapsed };
+                  next[group.label] = !isGroupCollapsed;
+                  state.applySettings({
+                    ...state.settings,
+                    navGroupsCollapsed: next,
+                  });
+                }}
+                aria-expanded=${!isGroupCollapsed}
+              >
+                <span class="nav-label__text">${group.label}</span>
+                <span class="nav-label__chevron">${isGroupCollapsed ? "+" : "−"}</span>
+              </button>
+              <div class="nav-group__items">
+                ${group.tabs.map((entry) =>
+                  renderTab(state, pluginTabFromId(entry.id), {
+                    label: entry.label,
+                    icon: resolveExtensionIcon(entry.icon),
+                    title: entry.description ?? entry.label,
+                  }),
+                )}
+              </div>
+            </div>
+          `;
+        })}
         <div class="nav-group nav-group--links">
           <div class="nav-label nav-label--static">
             <span class="nav-label__text">Resources</span>
@@ -199,12 +298,12 @@ export function renderApp(state: AppViewState) {
       <main class="content ${isChat ? "content--chat" : ""}">
         <section class="content-header">
           <div>
-            ${state.tab === "usage" ? nothing : html`<div class="page-title">${titleForTab(state.tab)}</div>`}
-            ${state.tab === "usage" ? nothing : html`<div class="page-sub">${subtitleForTab(state.tab)}</div>`}
+            ${state.tab === "usage" ? nothing : html`<div class="page-title">${pageTitle}</div>`}
+            ${state.tab === "usage" ? nothing : html`<div class="page-sub">${pageSubtitle}</div>`}
           </div>
           <div class="page-meta">
             ${state.lastError ? html`<div class="pill danger">${state.lastError}</div>` : nothing}
-            ${isChat ? renderChatControls(state) : nothing}
+            ${showChatControls ? renderChatControls(state) : nothing}
           </div>
         </section>
 
@@ -1048,6 +1147,31 @@ export function renderApp(state: AppViewState) {
                       : { kind: "gateway" as const };
                   return saveExecApprovals(state, target);
                 },
+              })
+            : nothing
+        }
+
+        ${
+          isPluginTab(state.tab) && !activeExtension
+            ? html`
+                <section class="card chat plugin-ui">
+                  <div class="plugin-ui__status">
+                    <div class="muted">This plugin UI is not available in the current gateway runtime.</div>
+                  </div>
+                </section>
+              `
+            : nothing
+        }
+
+        ${
+          activeExtension
+            ? renderPluginUi({
+                extension: activeExtension,
+                ready: Boolean(state.pluginUiReadyById[activeExtension.id]),
+                loadError: state.pluginUiLoadErrorById[activeExtension.id] ?? null,
+                sessionKey: state.sessionKey,
+                adapter: state.resolvePluginUiAdapterForEntry(activeExtension),
+                onRetryLoad: () => state.ensurePluginUiLoaded(activeExtension.id),
               })
             : nothing
         }
