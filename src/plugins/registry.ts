@@ -13,6 +13,7 @@ import type {
   OpenClawPluginChannelRegistration,
   OpenClawPluginCliRegistrar,
   OpenClawPluginCommandDefinition,
+  OpenClawPluginUiEntry,
   OpenClawPluginHttpHandler,
   OpenClawPluginHttpRouteHandler,
   OpenClawPluginHookOptions,
@@ -94,6 +95,12 @@ export type PluginCommandRegistration = {
   source: string;
 };
 
+export type PluginUiEntryRegistration = {
+  pluginId: string;
+  extension: OpenClawPluginUiEntry;
+  source: string;
+};
+
 export type PluginRecord = {
   id: string;
   name: string;
@@ -134,6 +141,7 @@ export type PluginRegistry = {
   cliRegistrars: PluginCliRegistration[];
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
+  pluginUiEntries?: PluginUiEntryRegistration[];
   diagnostics: PluginDiagnostic[];
 };
 
@@ -157,6 +165,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     cliRegistrars: [],
     services: [],
     commands: [],
+    pluginUiEntries: [],
     diagnostics: [],
   };
   const coreGatewayMethods = new Set(Object.keys(registryParams.coreGatewayHandlers ?? {}));
@@ -442,6 +451,75 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
+  const registerPluginUi = (record: PluginRecord, extension: OpenClawPluginUiEntry) => {
+    const id = extension.id.trim();
+    const label = extension.label.trim();
+    const modulePath = extension.mount.modulePath.trim();
+    const tagName = extension.mount.tagName.trim().toLowerCase();
+    if (!id || !label) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: "plugin UI entry registration missing id or label",
+      });
+      return;
+    }
+    if (extension.mount.kind !== "web_component") {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `unsupported plugin UI entry mount kind: ${String(extension.mount.kind)}`,
+      });
+      return;
+    }
+    if (!modulePath || !modulePath.startsWith("/")) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `plugin UI entry modulePath must be an absolute path: ${modulePath || "(empty)"}`,
+      });
+      return;
+    }
+    if (!/^[a-z][a-z0-9._-]*-[a-z0-9._-]+$/.test(tagName)) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `invalid plugin UI entry tagName: ${tagName || "(empty)"}`,
+      });
+      return;
+    }
+    const list = registry.pluginUiEntries ?? [];
+    registry.pluginUiEntries = list;
+    const key = `${record.id}:${id}`;
+    if (list.some((entry) => `${entry.pluginId}:${entry.extension.id}` === key)) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `duplicate plugin UI entry id: ${id}`,
+      });
+      return;
+    }
+    list.push({
+      pluginId: record.id,
+      source: record.source,
+      extension: {
+        ...extension,
+        id,
+        label,
+        mount: {
+          ...extension.mount,
+          modulePath,
+          tagName,
+        },
+      },
+    });
+  };
+
   const registerTypedHook = <K extends PluginHookName>(
     record: PluginRecord,
     hookName: K,
@@ -492,6 +570,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       registerGatewayMethod: (method, handler) => registerGatewayMethod(record, method, handler),
       registerCli: (registrar, opts) => registerCli(record, registrar, opts),
       registerService: (service) => registerService(record, service),
+      registerPluginUi: (extension) => registerPluginUi(record, extension),
       registerCommand: (command) => registerCommand(record, command),
       resolvePath: (input: string) => resolveUserPath(input),
       on: (hookName, handler, opts) => registerTypedHook(record, hookName, handler, opts),
@@ -508,6 +587,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerGatewayMethod,
     registerCli,
     registerService,
+    registerPluginUi,
     registerCommand,
     registerHook,
     registerTypedHook,
