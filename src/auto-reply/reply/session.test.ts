@@ -1674,6 +1674,47 @@ describe("initSessionState reset triggers in Slack channels", () => {
     expect(result.sessionId).not.toBe(existingSessionId);
     expect(result.bodyStripped).toBe("take notes");
   });
+
+  it("strips command-style options from reset body before prompting the agent", async () => {
+    setMinimalCurrentConversationBindingRegistryForTests();
+    const storePath = await createStorePath("openclaw-slack-channel-new-opts-");
+    const sessionKey = "agent:main:slack:channel:c3";
+    const existingSessionId = "existing-session-123";
+    await seedSessionStore({
+      storePath,
+      sessionKey,
+      sessionId: existingSessionId,
+    });
+
+    const cfg = {
+      session: { store: storePath, idleMinutes: 999 },
+    } as OpenClawConfig;
+
+    const result = await initSessionState({
+      ctx: {
+        Body: "<@U123> /new --persona marketing-assistant",
+        RawBody: "<@U123> /new --persona marketing-assistant",
+        BodyForCommands: "/new --persona marketing-assistant",
+        CommandBody: "<@U123> /new --persona marketing-assistant",
+        From: "slack:channel:C3",
+        To: "channel:C3",
+        ChatType: "channel",
+        SessionKey: sessionKey,
+        Provider: "slack",
+        Surface: "slack",
+        SenderId: "U123",
+        SenderName: "Owner",
+        WasMentioned: true,
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.resetTriggered).toBe(true);
+    expect(result.sessionId).not.toBe(existingSessionId);
+    expect(result.bodyStripped).toBe("");
+  });
 });
 
 describe("initSessionState preserves behavior overrides across /new and /reset", () => {
