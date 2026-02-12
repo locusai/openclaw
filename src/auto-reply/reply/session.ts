@@ -26,8 +26,8 @@ import {
   type SessionScope,
   updateSessionStore,
 } from "../../config/sessions.js";
-import { stripPluginCommandOptionsFromBody } from "../../plugins/command-options.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
+import { stripPluginCommandOptionsFromBody } from "../../plugins/command-options.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
 import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
@@ -61,6 +61,33 @@ function stripResetMetadataArgs(body: string, trigger: string): string {
   if (tokens.length === 0) {
     return "";
   }
+  const dropLooseResetOptions = (argsTokens: string[]): string => {
+    const kept: string[] = [];
+    for (let i = 0; i < argsTokens.length; i += 1) {
+      const token = argsTokens[i];
+      if (!token) {
+        continue;
+      }
+      if (token.startsWith("--")) {
+        if (!token.includes("=")) {
+          const next = argsTokens[i + 1];
+          if (next && !next.startsWith("-")) {
+            i += 1;
+          }
+        }
+        continue;
+      }
+      if (token.startsWith("-") && token.length > 1) {
+        const next = argsTokens[i + 1];
+        if (next && !next.startsWith("-")) {
+          i += 1;
+        }
+        continue;
+      }
+      kept.push(token);
+    }
+    return kept.join(" ").trim();
+  };
   const filtered = tokens.filter((token) => {
     const lower = token.toLowerCase();
     // Legacy persona: args live here; structured /new options are now handled via plugin command options.
@@ -83,13 +110,11 @@ function stripResetMetadataArgs(body: string, trigger: string): string {
     return "";
   }
   const triggerLower = triggerToken.toLowerCase();
-  if (rebuiltTokens[0]?.toLowerCase() === triggerLower) {
-    return rebuiltTokens.slice(1).join(" ").trim();
+  let argsTokens = rebuiltTokens;
+  if (rebuiltTokens[0]?.toLowerCase() === triggerLower || rebuiltTokens[0]?.startsWith("/")) {
+    argsTokens = rebuiltTokens.slice(1);
   }
-  if (rebuiltTokens[0]?.startsWith("/")) {
-    return rebuiltTokens.slice(1).join(" ").trim();
-  }
-  return rebuiltTokens.join(" ").trim();
+  return dropLooseResetOptions(argsTokens);
 }
 
 function forkSessionFromParent(params: {
