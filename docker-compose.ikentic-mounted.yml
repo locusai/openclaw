@@ -1,0 +1,17 @@
+# Ikentic overlay: host-mounted state + workspace, plugin mounted from host.
+services:
+  openclaw-gateway:
+    environment:
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ${IKENTIC_PLUGIN_DIR}:/home/node/.openclaw-plugins/ikentic
+
+  openclaw-cli:
+    environment:
+      OPENCLAW_STATE_DIR: /home/node/.openclaw
+    volumes:
+      - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
+      - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
+      - ${IKENTIC_PLUGIN_DIR}:/home/node/.openclaw-plugins/ikentic
