@@ -14,9 +14,11 @@ jobs:
       contents: read
       pull-requests: write
     runs-on: ubuntu-latest
+    env:
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
     steps:
       - name: Create GitHub App token
-        if: ${{ secrets.GH_APP_PRIVATE_KEY != '' }}
+        if: ${{ env.GH_APP_PRIVATE_KEY != '' }}
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
@@ -66,9 +68,11 @@ jobs:
     permissions:
       issues: write
     runs-on: ubuntu-latest
+    env:
+      GH_APP_PRIVATE_KEY: ${{ secrets.GH_APP_PRIVATE_KEY }}
     steps:
       - name: Create GitHub App token
-        if: ${{ secrets.GH_APP_PRIVATE_KEY != '' }}
+        if: ${{ env.GH_APP_PRIVATE_KEY != '' }}
         uses: actions/create-github-app-token@d72941d797fd3113feb6b93fd0dec494b13a2547 # v1
         id: app-token
         with:
