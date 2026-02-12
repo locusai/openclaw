@@ -577,6 +577,14 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     debug: logger.debug,
   });
 
+  const resolvePluginLogger = (record: PluginRecord): PluginLogger => {
+    const base = registryParams.logger as PluginLogger & {
+      child?: (name: string) => PluginLogger;
+    };
+    const childLogger = typeof base.child === "function" ? base.child(record.id) : base;
+    return normalizeLogger(childLogger);
+  };
+
   const createApi = (
     record: PluginRecord,
     params: {
@@ -593,7 +601,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       config: params.config,
       pluginConfig: params.pluginConfig,
       runtime: registryParams.runtime,
-      logger: normalizeLogger(registryParams.logger),
+      logger: resolvePluginLogger(record),
       registerTool: (tool, opts) => registerTool(record, tool, opts),
       registerHook: (events, handler, opts) =>
         registerHook(record, events, handler, opts, params.config),
