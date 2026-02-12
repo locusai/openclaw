@@ -36,6 +36,15 @@
 - See `docs/.i18n/README.md`.
 - The pipeline can be slow/inefficient; if it’s dragging, ping @jospalmbier on Discord instead of hacking around it.
 
+## Ikentic Overlay Flow (Fork)
+
+- Strategy doc: `docs/ikentic/overlay-flow.md` (keep it updated).
+- Consolidation changelog: update `docs/ikentic/overlay-changelog.md` with a brief summary for each
+  merged branch, including functionality, bead, and upstream PR reference.
+- No direct commits to `wip/*` or `integration/*`; merge topic branches only.
+- Prefer `integration/*` for promotion branches (legacy `e2e/*` should be replaced).
+- `integration/*` must be fast-forwarded from WIP only after E2E passes.
+
 ## exe.dev VM ops (general)
 
 - Access: stable path is `ssh exe.dev` then `ssh vm-name` (assume SSH key already set).

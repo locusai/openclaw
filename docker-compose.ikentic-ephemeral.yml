@@ -1,12 +1,16 @@
 # Ikentic overlay: container-only state (no host mounts), plugin mounted from host.
 services:
   openclaw-gateway:
+    env_file:
+      - .env
     environment:
       OPENCLAW_STATE_DIR: /home/node/.openclaw
     volumes:
       - ${IKENTIC_PLUGIN_DIR}:/home/node/.openclaw-plugins/ikentic
 
   openclaw-cli:
+    env_file:
+      - .env
     environment:
       OPENCLAW_STATE_DIR: /home/node/.openclaw
     volumes:
