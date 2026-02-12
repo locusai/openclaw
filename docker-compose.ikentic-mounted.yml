@@ -3,6 +3,7 @@ services:
   openclaw-gateway:
     environment:
       OPENCLAW_STATE_DIR: /home/node/.openclaw
+      IKENTIC_PLUGIN_PATH: ${IKENTIC_PLUGIN_PATH}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
@@ -11,6 +12,7 @@ services:
   openclaw-cli:
     environment:
       OPENCLAW_STATE_DIR: /home/node/.openclaw
+      IKENTIC_PLUGIN_PATH: ${IKENTIC_PLUGIN_PATH}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
