@@ -1,5 +1,5 @@
 {
-  "name": "openclaw",
+  "name": "@locusai/openclaw",
   "version": "2026.2.16",
   "description": "Multi-channel AI gateway with extensible messaging integrations",
   "keywords": [],
@@ -45,6 +45,9 @@
       "default": "./dist/plugin-sdk/account-id.js"
     },
     "./cli-entry": "./openclaw.mjs"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
   },
   "scripts": {
     "android:assemble": "cd apps/android && ./gradlew :app:assembleDebug",
