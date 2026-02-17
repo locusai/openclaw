@@ -55,9 +55,13 @@ import { loadAssistantIdentity as loadAssistantIdentityInternal } from "./contro
 import type { DevicePairingList } from "./controllers/devices.ts";
 import type { ExecApprovalRequest } from "./controllers/exec-approval.ts";
 import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exec-approvals.ts";
+import { loadPluginUi } from "./controllers/plugin-ui.ts";
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
-import type { Tab } from "./navigation.ts";
+import { pluginIdFromTab, type Tab } from "./navigation.ts";
+import { ensurePluginUiLoaded } from "./plugin-ui/loader.ts";
+import { installPluginUiRuntimeApi, resolvePluginUiAdapter } from "./plugin-ui/runtime.ts";
+import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import { loadSettings, type UiSettings } from "./storage.ts";
 import type { ResolvedTheme, ThemeMode } from "./theme.ts";
 import type {
@@ -109,6 +113,7 @@ export class OpenClawApp extends LitElement {
   @state() settings: UiSettings = loadSettings();
   constructor() {
     super();
+    installPluginUiRuntimeApi();
     if (isSupportedLocale(this.settings.locale)) {
       void i18n.setLocale(this.settings.locale);
     }
@@ -358,11 +363,6 @@ export class OpenClawApp extends LitElement {
   private themeMedia: MediaQueryList | null = null;
   private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
-
-  constructor() {
-    super();
-    installPluginUiRuntimeApi();
-  }
 
   createRenderRoot() {
     return this;

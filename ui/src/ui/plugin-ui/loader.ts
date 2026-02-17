@@ -1,5 +1,5 @@
-import type { PluginUiDescriptor } from "./types.ts";
 import { getPluginUiRuntimeApi } from "./runtime.ts";
+import type { PluginUiDescriptor } from "./types.ts";
 
 type DefinePluginUi = (api: ReturnType<typeof getPluginUiRuntimeApi>) => void | Promise<void>;
 

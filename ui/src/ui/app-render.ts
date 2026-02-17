@@ -52,8 +52,9 @@ import {
   updateSkillEdit,
   updateSkillEnabled,
 } from "./controllers/skills.ts";
-import { icons } from "./icons.ts";
+import { icons, type IconName } from "./icons.ts";
 import { normalizeBasePath, TAB_GROUPS, subtitleForTab, titleForTab } from "./navigation.ts";
+import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import { renderAgents } from "./views/agents.ts";
 import { renderChannels } from "./views/channels.ts";
 import { renderChat } from "./views/chat.ts";
@@ -143,7 +144,6 @@ function resolveAssistantAvatarUrl(state: AppViewState): string | undefined {
 export function renderApp(state: AppViewState) {
   const extensionGroups = buildExtensionTabGroups(state.pluginUiEntries);
   const activeExtension = resolveActiveExtension(state);
-  const extensionGroup = activeExtension?.group?.trim().toLowerCase();
   const presenceCount = state.presenceEntries.length;
   const sessionsCount = state.sessionsResult?.count ?? null;
   const cronNext = state.cronStatus?.nextWakeAtMs ?? null;
