@@ -145,6 +145,11 @@ export class OpenClawApp extends LitElement {
   @state() chatQueue: ChatQueueItem[] = [];
   @state() chatAttachments: ChatAttachment[] = [];
   @state() chatManualRefreshInFlight = false;
+  @state() pluginUiLoading = false;
+  @state() pluginUiError: string | null = null;
+  @state() pluginUiEntries: PluginUiDescriptor[] = [];
+  @state() pluginUiReadyById: Record<string, boolean> = {};
+  @state() pluginUiLoadErrorById: Record<string, string | null> = {};
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
   @state() sidebarContent: string | null = null;
@@ -354,6 +359,11 @@ export class OpenClawApp extends LitElement {
   private themeMediaHandler: ((event: MediaQueryListEvent) => void) | null = null;
   private topbarObserver: ResizeObserver | null = null;
 
+  constructor() {
+    super();
+    installPluginUiRuntimeApi();
+  }
+
   createRenderRoot() {
     return this;
   }
@@ -437,6 +447,60 @@ export class OpenClawApp extends LitElement {
 
   async loadCron() {
     await loadCronInternal(this as unknown as Parameters<typeof loadCronInternal>[0]);
+  }
+
+  async loadPluginUi() {
+    await loadPluginUi(this as unknown as Parameters<typeof loadPluginUi>[0]);
+    const extensionId = pluginIdFromTab(this.tab);
+    if (extensionId) {
+      await this.ensurePluginUiLoaded(extensionId);
+    }
+  }
+
+  getPluginUiEntryById(extensionId: string): PluginUiDescriptor | null {
+    const normalized = extensionId.trim();
+    if (!normalized) {
+      return null;
+    }
+    return this.pluginUiEntries.find((entry) => entry.id === normalized) ?? null;
+  }
+
+  resolvePluginUiAdapterForEntry(extension: PluginUiDescriptor): unknown {
+    const adapterId = extension.mount.adapterId?.trim();
+    if (!adapterId) {
+      return undefined;
+    }
+    return resolvePluginUiAdapter(adapterId, {
+      extension,
+      sessionKey: this.sessionKey,
+    });
+  }
+
+  async ensurePluginUiLoaded(extensionId: string) {
+    const extension = this.getPluginUiEntryById(extensionId);
+    if (!extension) {
+      return;
+    }
+    try {
+      await ensurePluginUiLoaded(extension);
+      this.pluginUiReadyById = {
+        ...this.pluginUiReadyById,
+        [extension.id]: true,
+      };
+      this.pluginUiLoadErrorById = {
+        ...this.pluginUiLoadErrorById,
+        [extension.id]: null,
+      };
+    } catch (err) {
+      this.pluginUiReadyById = {
+        ...this.pluginUiReadyById,
+        [extension.id]: false,
+      };
+      this.pluginUiLoadErrorById = {
+        ...this.pluginUiLoadErrorById,
+        [extension.id]: String(err),
+      };
+    }
   }
 
   async handleAbortChat() {
