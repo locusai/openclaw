@@ -21,11 +21,12 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - Confirm release CI has:
   - `IKENTIC_BUNDLE_SPEC` (repo variable, pinned full npm spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
   - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps)
+  - `NPM_PUBLISH_TAG` (optional repo variable override for npm dist-tag; otherwise prerelease identifier is used)
   - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages
 
 1. **Version & metadata**
 
-- [ ] Bump `package.json` version (e.g., `2026.1.29`).
+- [ ] Bump `package.json` version (e.g., `2026.1.29`; fork prerelease example: `2026.2.16-ike.0`).
 - [ ] Run `pnpm plugins:sync` to align extension package versions + changelogs.
 - [ ] Update CLI/version strings: [`src/cli/program.ts`](https://github.com/openclaw/openclaw/blob/main/src/cli/program.ts) and the Baileys user agent in [`src/provider-web.ts`](https://github.com/openclaw/openclaw/blob/main/src/provider-web.ts).
 - [ ] Confirm package metadata (name, description, repository, keywords, license) and `bin` map points to [`openclaw.mjs`](https://github.com/openclaw/openclaw/blob/main/openclaw.mjs) for `openclaw`.
@@ -82,7 +83,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 - [ ] Confirm git status is clean; commit and push as needed.
 - [ ] `npm login` (verify 2FA) if needed.
-- [ ] `npm publish --access public` (use `--tag beta` for pre-releases).
+- [ ] `npm publish --access public` (workflow equivalent: publish to GitHub Packages; prerelease versions auto-publish to the prerelease dist-tag, e.g. `-ike.0` -> `ike`, unless overridden by `NPM_PUBLISH_TAG`).
 - [ ] Verify the registry: `npm view openclaw version`, `npm view openclaw dist-tags`, and `npx -y openclaw@X.Y.Z --version` (or `--help`).
 
 ### Troubleshooting (notes from 2.0.0-beta2 release)
@@ -97,7 +98,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 7. **GitHub release + appcast**
 
-- [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z` (or `git push --tags`).
+- [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z` (or `git push --tags`). Tag must exactly match `package.json` version with a `v` prefix, including prerelease suffixes (example: `v2026.2.16-ike.0`).
 - [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `openclaw X.Y.Z`** (not just the tag); body should include the **full** changelog section for that version (Highlights + Changes + Fixes), inline (no bare links), and **must not repeat the title inside the body**.
 - [ ] Attach artifacts: `npm pack` tarball (optional), `OpenClaw-X.Y.Z.zip`, and `OpenClaw-X.Y.Z.dSYM.zip` (if generated).
 - [ ] Commit the updated `appcast.xml` and push it (Sparkle feeds from main).
