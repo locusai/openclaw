@@ -5,13 +5,13 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import type { OpenClawConfig } from "../config/config.js";
 import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
   resolveAgentDir,
 } from "../agents/agent-scope.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
-import type { OpenClawConfig } from "../config/config.js";
 
 /**
  * Generate a short 1-2 word filename slug from session content using LLM
@@ -19,6 +19,8 @@ import type { OpenClawConfig } from "../config/config.js";
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenClawConfig;
+  provider?: string;
+  model?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -46,6 +48,8 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
       workspaceDir,
       agentDir,
       config: params.cfg,
+      ...(params.provider ? { provider: params.provider } : {}),
+      ...(params.model ? { model: params.model } : {}),
       prompt,
       timeoutMs: 15_000, // 15 second timeout
       runId: `slug-gen-${Date.now()}`,
