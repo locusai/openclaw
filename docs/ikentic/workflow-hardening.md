@@ -8,7 +8,7 @@ without losing upstream compatibility.
 - `main`: exact mirror of `upstream/main` (fast-forward only; no internal commits).
 - `integration/ikentic`: canonical deploy lane (merge-based updates only; no force-push).
 - `pr/*`: upstream-bound topic branches (short-lived; rebase allowed).
-- `carry/*`: long-lived internal-only patchsets that are merged into integration.
+- `carry/*`: long-lived internal-only patchsets that are merged into integration and kept.
 
 ## Required Invariants
 
@@ -39,9 +39,28 @@ without losing upstream compatibility.
    - `git switch -c carry/<topic>`
 2. Add internal-only commits (or cherry-pick from temporary integration branches).
 3. Merge into integration with `--no-ff`.
-4. When no longer needed, verify retirement:
+4. Keep the branch after merge. Do not delete `carry/*` as routine cleanup.
+5. Only retire by explicit decision. Before retirement, verify:
    - `git cherry -v main carry/<topic>`
-   - If no `+` commits remain, delete branch after safety-tag window.
+   - If no `+` commits remain and the patchset is intentionally upstreamed/obsolete, retire after
+     safety-tag window.
+
+## PR Handling Model
+
+1. Classify every change first:
+   - `upstream-pr`: intended for `openclaw/openclaw`.
+   - `carry`: internal-only, not intended for upstream.
+   - `hybrid`: split into two branches (`pr/*` and `carry/*`).
+2. Base/head rules:
+   - Upstream-bound: PR from `pr/<topic>` into upstream `main`.
+   - Internal carry: PR from `carry/<topic>` into fork `integration/ikentic`.
+3. Merge behavior:
+   - Prefer GitHub PR merge with **Merge commit** for carry branches.
+   - Equivalent local merge:
+     - `git switch integration/ikentic`
+     - `git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"`
+     - `git push origin integration/ikentic`
+4. Never merge internal changes directly into `main`.
 
 ## Rebuild Method (When Integration Becomes Risky/Noisy)
 
@@ -72,3 +91,4 @@ without losing upstream compatibility.
 - Backups can be scripted.
 - Deletions must be executed one-by-one after each branch passes containment checks.
 - Default retention for `archive/*` and `safety/*`: 14 days after milestone validation.
+- `carry/*` branches are excluded from routine cleanup and stay long-lived by default.

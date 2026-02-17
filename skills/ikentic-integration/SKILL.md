@@ -18,6 +18,7 @@ internal changes.
 3. Never use blanket conflict sides (`-X ours` / `-X theirs`) for non-trivial conflicts.
 4. Always create safety refs before rewrites/deletions.
 5. Treat missing/renamed source branches as a stop-and-review item.
+6. Keep `carry/*` branches after merge; do not delete them as routine cleanup.
 
 ## Standard Runbook
 
@@ -57,6 +58,11 @@ git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"
 git push origin integration/ikentic
 ```
 
+GitHub flow is equivalent:
+
+- open PR `carry/<topic>` -> `integration/ikentic`
+- merge using **Merge commit** (not squash/rebase)
+
 ### 5) Validate “Nothing Lost”
 
 ```bash
@@ -91,3 +97,4 @@ Trees must match unless intentional differences are documented.
   - inspect unique commits:
   - `git log --left-right --cherry-pick --oneline integration/ikentic...<branch>`
 - Delete one branch at a time only after passing checks.
+- Do not apply retirement cleanup to `carry/*` unless retirement is explicitly approved.
