@@ -44,6 +44,9 @@ jobs:
             exit 1
           fi
 
+      - name: Pre-publish sanity (IKENTIC scope)
+        run: pnpm check:publish:ikentic
+
       - name: Bundle IKENTIC plugin
         run: pnpm bundle:ikentic
         env:
