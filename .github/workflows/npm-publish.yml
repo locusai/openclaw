@@ -11,6 +11,7 @@ permissions:
 
 env:
   IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
+  NPM_PUBLISH_TAG: ${{ vars.NPM_PUBLISH_TAG }}
 
 jobs:
   publish:
@@ -27,12 +28,17 @@ jobs:
         with:
           install-bun: "false"
 
-      - name: Validate tag matches package version
+      - name: Validate semver tag matches package version
         shell: bash
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
           PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")"
+          SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+          if ! [[ "$PACKAGE_VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "package.json version is not valid semver: $PACKAGE_VERSION"
+            exit 1
+          fi
           if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
             echo "Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_VERSION)."
             exit 1
@@ -105,7 +111,32 @@ jobs:
           registry-url: "https://npm.pkg.github.com"
           scope: "@locusai"
 
+      - name: Resolve publish dist-tag
+        id: resolve-publish-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")"
+          PRERELEASE="$(printf '%s' "$PACKAGE_VERSION" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-([^+]+)(\+.*)?$/\1/p')"
+          if [ -z "$PRERELEASE" ]; then
+            echo "dist_tag=" >> "$GITHUB_OUTPUT"
+            echo "No prerelease suffix detected; publishing with npm default tag."
+            exit 0
+          fi
+          DEFAULT_TAG="${PRERELEASE%%.*}"
+          DIST_TAG="${NPM_PUBLISH_TAG:-$DEFAULT_TAG}"
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Using npm dist-tag: $DIST_TAG"
+
       - name: Publish package
-        run: npm publish
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${NPM_PUBLISH_DIST_TAG:-}" ]; then
+            npm publish --tag "$NPM_PUBLISH_DIST_TAG"
+          else
+            npm publish
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_PUBLISH_DIST_TAG: ${{ steps.resolve-publish-tag.outputs.dist_tag }}
