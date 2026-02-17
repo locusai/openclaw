@@ -98,3 +98,30 @@ without losing upstream compatibility.
 - Deletions must be executed one-by-one after each branch passes containment checks.
 - Default retention for `archive/*` and `safety/*`: 14 days after milestone validation.
 - `carry/*` branches are excluded from routine cleanup and stay long-lived by default.
+
+## Retirement Log
+
+### 2026-02-17 historical lane retirement
+
+The following branches were explicitly retired after cutover to `integration/ikentic` as the canonical
+integration lane. These are historical lanes, not active carry lanes.
+
+| Historical branch                       | Last known local tip | Why it existed                                                    | Retirement disposition |
+| --------------------------------------- | -------------------- | ----------------------------------------------------------------- | ---------------------- |
+| `rebuild/ikentic-e2e-parity`            | `bf58e744d`          | Temporary rebuild lane for conflict-managed replay work           | Retired                |
+| `overlay/consolidated-internal-commits` | `8c628fe39`          | Historical consolidation/source lane for internal overlay commits | Retired                |
+| `integration/ikentic-v2`                | `9db849dc2`          | Pre-cutover integration replacement candidate                     | Retired                |
+
+Safety refs created before deletion (stamp `20260217-174919`):
+
+- `archive/20260217-174919-rebuild-ikentic-e2e-parity`
+- `archive/20260217-174919-overlay-consolidated-internal-commits`
+- `archive/20260217-174919-integration-ikentic-v2`
+- `safety/20260217-174919/rebuild-ikentic-e2e-parity`
+- `safety/20260217-174919/overlay-consolidated-internal-commits`
+- `safety/20260217-174919/integration-ikentic-v2`
+
+Retention evidence was captured before deletion using:
+
+- `git merge-base --is-ancestor <branch> integration/ikentic`
+- `git log --left-right --cherry-pick --oneline integration/ikentic...<branch>`
