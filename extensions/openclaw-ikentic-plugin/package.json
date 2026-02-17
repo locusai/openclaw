@@ -1,0 +1,48 @@
+{
+  "name": "@locusai/openclaw-ikentic-plugin",
+  "version": "0.1.0-test.20260217.1",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./openclaw.plugin.json": "./openclaw.plugin.json"
+  },
+  "files": [
+    "dist",
+    "openclaw.plugin.json",
+    "skills",
+    "scripts"
+  ],
+  "openclaw": {
+    "extensions": [
+      "./dist/index.js"
+    ]
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "gen-config": "node ./scripts/gen-config.mjs",
+    "prepack": "npm run build",
+    "test": "vitest"
+  },
+  "peerDependencies": {
+    "openclaw": "^2026.2.2"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.12",
+    "openclaw": "^2026.2.2",
+    "json5": "2.2.3",
+    "typescript": "^5.9.2",
+    "vitest": "3.2.4"
+  },
+  "dependencies": {
+    "@locusai/locus-api-client": "3.2.12-rc7"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  }
+}
