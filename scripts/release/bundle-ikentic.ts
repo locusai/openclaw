@@ -5,6 +5,7 @@ import path from "node:path";
 import { installPluginFromNpmSpec } from "../../src/plugins/install.js";
 
 const IKENTIC_PLUGIN_ID = "openclaw-ikentic-plugin";
+const DEFAULT_IKENTIC_BUNDLE_SPEC = "@locusai/openclaw-ikentic-plugin@0.1.0-test.20260217.1";
 
 function fail(message: string): never {
   console.error(`bundle:ikentic: ${message}`);
@@ -12,9 +13,11 @@ function fail(message: string): never {
 }
 
 async function main() {
-  const spec = process.env.IKENTIC_BUNDLE_SPEC?.trim();
-  if (!spec) {
-    fail("missing IKENTIC_BUNDLE_SPEC (example: @locusai/openclaw-ikentic-plugin@x.y.z)");
+  const spec = process.env.IKENTIC_BUNDLE_SPEC?.trim() || DEFAULT_IKENTIC_BUNDLE_SPEC;
+  if (!process.env.IKENTIC_BUNDLE_SPEC?.trim()) {
+    console.warn(
+      `bundle:ikentic: IKENTIC_BUNDLE_SPEC is unset; using fallback ${DEFAULT_IKENTIC_BUNDLE_SPEC}`,
+    );
   }
 
   const repoRoot = process.cwd();
