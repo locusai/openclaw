@@ -170,3 +170,49 @@ Next steps to complete phase 5 publish in the next pass:
 - Run pre-publish sanity checks (`check/lint/typecheck/release/prepack` subset we keep active).
 - Commit release bump on `integration/ikentic`, push branch, create/push `v<version>` tag.
 - Watch `npm-publish.yml` run and confirm GitHub Packages publish + expected dist-tag.
+
+### 2026-02-17 publish execution addendum (what actually happened)
+
+This records the concrete publish failure modes seen in the first real run and the fixes that
+produced a successful publish.
+
+Observed sequence:
+
+1. `v2026.2.17-ike.0` failed at `Bundle IKENTIC plugin`:
+   - Cause: `bundle:ikentic` script missing from root `package.json`.
+   - Fix: restored script entry:
+     - `"bundle:ikentic": "node --import tsx scripts/release/bundle-ikentic.ts"`
+
+2. `v2026.2.17-ike.1` failed in setup with frozen lockfile mismatch:
+   - Cause: generated `extensions/openclaw-ikentic-plugin/package.json` was accidentally committed.
+   - Fixes:
+     - remove tracked generated file from git history tip
+     - add guard ignore:
+       - `.gitignore`: `extensions/openclaw-ikentic-plugin/`
+     - keep generated plugin files ephemeral from `bundle:ikentic`.
+
+3. `v2026.2.17-ike.2` failed publish auth:
+   - Cause: publish attempted against npmjs without npm auth in earlier flow.
+   - Fix: force registry in publish command:
+     - `npm publish ... --registry https://npm.pkg.github.com`
+
+4. `v2026.2.17-ike.3` still failed with `E404` on GitHub Packages:
+   - Cause: package name was unscoped (`openclaw`), but GitHub Packages npm publish expects scoped name.
+   - Fix: publish-time scoped name override in workflow (no repo-wide workspace rename):
+     - before publish, rewrite `package.json.name` to `@${github.repository_owner}/openclaw`
+     - keep tag/version checks and release checks unchanged.
+
+Successful result:
+
+- `v2026.2.17-ike.4` (`npm-publish.yml` run `22120475640`) completed successfully.
+- Dist-tag resolution remained prerelease-derived (`ike` for `-ike.*`).
+
+Operational rules added for future runs:
+
+- Always run local sanity in CI order:
+  1. `pnpm check:publish:ikentic`
+  2. `pnpm bundle:ikentic`
+  3. `pnpm release:check`
+- Never stage generated bundle directory content (`extensions/openclaw-ikentic-plugin/*`).
+- For GitHub Packages with fork policy, keep package identity override in publish step instead of
+  renaming root workspace package metadata.
