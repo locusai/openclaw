@@ -136,9 +136,9 @@ jobs:
         run: |
           set -euo pipefail
           if [ -n "${NPM_PUBLISH_DIST_TAG:-}" ]; then
-            npm publish --tag "$NPM_PUBLISH_DIST_TAG"
+            npm publish --tag "$NPM_PUBLISH_DIST_TAG" --registry "https://npm.pkg.github.com"
           else
-            npm publish
+            npm publish --registry "https://npm.pkg.github.com"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
