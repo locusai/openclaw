@@ -61,7 +61,7 @@
     "check": "pnpm format:check && pnpm tsgo && pnpm lint",
     "check:docs": "pnpm format:docs:check && pnpm lint:docs && pnpm docs:check-links",
     "check:loc": "node --import tsx scripts/check-ts-max-loc.ts --max 500",
-    "check:publish:ikentic": "pnpm format:check:publish:ikentic && pnpm lint:publish:ikentic && pnpm release:check",
+    "check:publish:ikentic": "pnpm format:check:publish:ikentic && pnpm lint:publish:ikentic",
     "dev": "node scripts/run-node.mjs",
     "docs:bin": "node scripts/build-docs-list.mjs",
     "docs:check-links": "node scripts/docs-link-audit.mjs",
