@@ -61,3 +61,15 @@ pnpm test           # vitest tests
 pnpm check:docs     # docs format + lint + broken links
 pnpm release:check  # validate npm pack
 ```
+
+## Release Workflow Note (IKENTIC)
+
+Release workflows bundle IKENTIC before build (not at runtime):
+
+- `pnpm bundle:ikentic` runs before `pnpm build` in `npm-publish.yml` and `docker-release.yml`.
+- Required CI inputs:
+  - `IKENTIC_BUNDLE_SPEC` (repo variable, pinned full spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
+  - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret, read access for `npm.pkg.github.com` for IKENTIC and its transitive `@locusai/*` runtime deps)
+  - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` for bundle steps (ensures `@locusai` scope uses GitHub Packages when install runs inside `extensions/...`)
+- Release workflows also run smoke checks without `NODE_AUTH_TOKEN` and fail if the token value appears in npm tarballs or Docker image filesystem/history.
+- Tokens are used only in CI bundle/security-check steps and are not passed into Docker build args/layers.

@@ -86,6 +86,21 @@ function extensionUsesSkippedScannerPath(entry: string): boolean {
   );
 }
 
+function findUnsupportedNpmDependencySpecs(
+  dependencies: Record<string, string>,
+): Array<{ name: string; spec: string }> {
+  const unsupported: Array<{ name: string; spec: string }> = [];
+  for (const [name, spec] of Object.entries(dependencies)) {
+    if (
+      typeof spec === "string" &&
+      (spec.startsWith("catalog:") || spec.startsWith("workspace:"))
+    ) {
+      unsupported.push({ name, spec });
+    }
+  }
+  return unsupported;
+}
+
 async function ensureOpenClawExtensions(manifest: PackageManifest) {
   const extensions = manifest[MANIFEST_KEY]?.extensions;
   if (!Array.isArray(extensions)) {
@@ -277,19 +292,36 @@ async function installPluginFromPackageDir(params: {
   const deps = manifest.dependencies ?? {};
   const hasDeps = Object.keys(deps).length > 0;
   if (hasDeps) {
-    logger.info?.("Installing plugin dependencies…");
-    const npmRes = await runCommandWithTimeout(["npm", "install", "--omit=dev", "--silent"], {
-      timeoutMs: Math.max(timeoutMs, 300_000),
-      cwd: targetDir,
-    });
-    if (npmRes.code !== 0) {
+    const unsupportedSpecs = findUnsupportedNpmDependencySpecs(deps);
+    if (unsupportedSpecs.length > 0) {
+      const summary = unsupportedSpecs.map((entry) => `${entry.name}@${entry.spec}`).join(", ");
       if (backupDir) {
         await fs.rm(targetDir, { recursive: true, force: true }).catch(() => undefined);
         await fs.rename(backupDir, targetDir).catch(() => undefined);
       }
       return {
         ok: false,
-        error: `npm install failed: ${npmRes.stderr.trim() || npmRes.stdout.trim()}`,
+        error: `unsupported dependency spec for npm install: ${summary}. Replace with concrete versions before publishing.`,
+      };
+    }
+
+    logger.info?.("Installing plugin dependencies…");
+    const npmRes = await runCommandWithTimeout(["npm", "install", "--omit=dev"], {
+      timeoutMs: Math.max(timeoutMs, 300_000),
+      cwd: targetDir,
+    });
+    if (npmRes.code !== 0) {
+      const detail =
+        npmRes.stderr.trim() ||
+        npmRes.stdout.trim() ||
+        "npm install exited with no output; check dependency specs (for example catalog:/workspace:)";
+      if (backupDir) {
+        await fs.rm(targetDir, { recursive: true, force: true }).catch(() => undefined);
+        await fs.rename(backupDir, targetDir).catch(() => undefined);
+      }
+      return {
+        ok: false,
+        error: `npm install failed: ${detail}`,
       };
     }
   }

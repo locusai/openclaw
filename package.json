@@ -5,9 +5,6 @@
   "keywords": [],
   "license": "MIT",
   "author": "",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  },
   "bin": {
     "openclaw": "openclaw.mjs"
   },
@@ -30,6 +27,9 @@
     "./plugin-sdk": "./dist/plugin-sdk/index.js",
     "./cli-entry": "./openclaw.mjs"
   },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
   "scripts": {
     "android:assemble": "cd apps/android && ./gradlew :app:assembleDebug",
     "android:install": "cd apps/android && ./gradlew :app:installDebug",
@@ -37,6 +37,7 @@
     "android:test": "cd apps/android && ./gradlew :app:testDebugUnitTest",
     "build": "pnpm canvas:a2ui:bundle && tsdown && pnpm build:plugin-sdk:dts && node --import tsx scripts/write-plugin-sdk-entry-dts.ts && node --import tsx scripts/canvas-a2ui-copy.ts && node --import tsx scripts/copy-hook-metadata.ts && node --import tsx scripts/write-build-info.ts && node --import tsx scripts/write-cli-compat.ts",
     "build:plugin-sdk:dts": "tsc -p tsconfig.plugin-sdk.dts.json",
+    "bundle:ikentic": "node --import tsx scripts/release/bundle-ikentic.ts",
     "canvas:a2ui:bundle": "bash scripts/bundle-a2ui.sh",
     "check": "pnpm format:check && pnpm tsgo && pnpm lint",
     "check:docs": "pnpm format:docs:check && pnpm lint:docs && pnpm docs:check-links",
