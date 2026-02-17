@@ -43,7 +43,7 @@ jobs:
         env:
           IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
           NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
-          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Build
         run: pnpm build
@@ -86,7 +86,7 @@ jobs:
       - name: Security check (no token value in npm tarball)
         shell: bash
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
           TMP_DIR="$(mktemp -d)"
