@@ -17,6 +17,12 @@ without losing upstream compatibility.
 - Carry invariant: every permanent internal change must live on an explicit `carry/*` branch.
 - Safety invariant: create `archive/*` + annotated `safety/*` refs before branch rewrites/deletes.
 
+## Operator Environment
+
+- Keep a repo `.envrc` with:
+  - `source_up 2>/dev/null || true`
+- Run operational commands through `direnv exec . <command>` to ensure expected environment.
+
 ## Integration Update (Merge-Based)
 
 1. Sync mirror:

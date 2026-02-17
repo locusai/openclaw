@@ -19,6 +19,7 @@ internal changes.
 4. Always create safety refs before rewrites/deletions.
 5. Treat missing/renamed source branches as a stop-and-review item.
 6. Keep `carry/*` branches after merge; do not delete them as routine cleanup.
+7. Run Git/GitHub commands as `direnv exec . <command>` in this repo.
 
 ## Standard Runbook
 
