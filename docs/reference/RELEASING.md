@@ -18,6 +18,10 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - Read this doc and `docs/platforms/mac/release.md`.
 - Load env from `~/.profile` and confirm `SPARKLE_PRIVATE_KEY_FILE` + App Store Connect vars are set (SPARKLE_PRIVATE_KEY_FILE should live in `~/.profile`).
 - Use Sparkle keys from `~/Library/CloudStorage/Dropbox/Backup/Sparkle` if needed.
+- Confirm release CI has:
+  - `IKENTIC_BUNDLE_SPEC` (repo variable, pinned full npm spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
+  - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps)
+  - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages
 
 1. **Version & metadata**
 
@@ -42,10 +46,20 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 4. **Validation**
 
+- [ ] `pnpm bundle:ikentic` with:
+  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@x.y.z` (pinned exact version)
+  - `NODE_AUTH_TOKEN=<read-packages-token>`
+  - `NPM_CONFIG_USERCONFIG=$PWD/.npmrc`
 - [ ] `pnpm build`
 - [ ] `pnpm check`
 - [ ] `pnpm test` (or `pnpm test:coverage` if you need coverage output)
 - [ ] `pnpm release:check` (verifies npm pack contents)
+- [ ] `npm pack --dry-run --json --ignore-scripts` and confirm files include `extensions/openclaw-ikentic-plugin/**`
+- [ ] Runtime smoke without token:
+  - `NODE_AUTH_TOKEN= node openclaw.mjs plugins list` and confirm `openclaw-ikentic-plugin` is discoverable
+- [ ] Security checks:
+  - Verify no read token value appears in packed npm tarball contents
+  - Verify no read token value appears in Docker image filesystem/history
 - [ ] `OPENCLAW_INSTALL_SMOKE_SKIP_NONROOT=1 pnpm test:install:smoke` (Docker install smoke test, fast path; required before release)
   - If the immediate previous npm release is known broken, set `OPENCLAW_INSTALL_SMOKE_PREVIOUS=<last-good-version>` or `OPENCLAW_INSTALL_SMOKE_SKIP_PREVIOUS=1` for the preinstall step.
 - [ ] (Optional) Full installer smoke (adds non-root + CLI coverage): `pnpm test:install:smoke`
@@ -89,6 +103,13 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - [ ] Commit the updated `appcast.xml` and push it (Sparkle feeds from main).
 - [ ] From a clean temp directory (no `package.json`), run `npx -y openclaw@X.Y.Z send --help` to confirm install/CLI entrypoints work.
 - [ ] Announce/share release notes.
+
+## IKENTIC build-time bundling policy
+
+- IKENTIC is bundled at build time in release workflows (npm package + Docker image).
+- End users do not need runtime registry access or `NODE_AUTH_TOKEN` to load the bundled IKENTIC plugin.
+- Do not pass registry tokens into Docker build args or image layers; bundle in the workspace before `docker build`.
+- Never commit secrets or token values to the repo, docs, or artifacts.
 
 ## Plugin publish scope (npm)
 
