@@ -216,3 +216,34 @@ Operational rules added for future runs:
 - Never stage generated bundle directory content (`extensions/openclaw-ikentic-plugin/*`).
 - For GitHub Packages with fork policy, keep package identity override in publish step instead of
   renaming root workspace package metadata.
+
+### 2026-02-18 plugin sync and packaging readiness update
+
+Run objective: unblock `ike-agents` PR sanity and ensure `openclaw` packaging path bundles the latest
+published IKENTIC plugin.
+
+Plan vs actual adjustments from this run:
+
+- `ike-agents` Sanity Check failure (`22123974784` then `22124036771`) moved from lockfile failure
+  to formatter failure; fixed by applying repo formatter and pushing:
+  - commit `d9104f4` on `codex/ikentic-plugin-gpr-publish-on-main`.
+- Verification: subsequent Sanity Check run `22124113369` completed successfully.
+- `openclaw` publish flow was still using a stale fallback plugin spec in
+  `scripts/release/bundle-ikentic.ts`.
+- Added workflow-level latest resolution in `.github/workflows/npm-publish.yml`:
+  - if `IKENTIC_BUNDLE_SPEC` is set, use it as explicit override.
+  - if unset, resolve `@locusai/openclaw-ikentic-plugin@<latest>` via `npm view` against
+    `npm.pkg.github.com` using the existing read token.
+- Updated local fallback constant to `@locusai/openclaw-ikentic-plugin@0.1.0-test.20260218.0`.
+
+Validation performed locally (integration lane):
+
+- `pnpm check:publish:ikentic` (after formatting `extensions/openclaw-ikentic-plugin` files)
+- `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@0.1.0-test.20260218.0 pnpm bundle:ikentic`
+- `pnpm build`
+- `pnpm release:check`
+
+Result:
+
+- `integration/ikentic` now includes commit `0c1e1fcf6` with latest-plugin resolution and fallback
+  update, pushed to `origin/integration/ikentic`.
