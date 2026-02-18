@@ -9,10 +9,6 @@ permissions:
   contents: read
   packages: write
 
-env:
-  IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
-  NPM_PUBLISH_TAG: ${{ vars.NPM_PUBLISH_TAG }}
-
 jobs:
   publish:
     name: Publish to GitHub Packages
@@ -50,26 +46,19 @@ jobs:
       - name: Resolve IKENTIC bundle spec
         id: resolve-ikentic-spec
         shell: bash
-        env:
-          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
         run: |
           set -euo pipefail
-          if [ -n "${IKENTIC_BUNDLE_SPEC:-}" ]; then
-            SPEC="${IKENTIC_BUNDLE_SPEC}"
-            echo "Using IKENTIC_BUNDLE_SPEC override: ${SPEC}"
-          else
-            TAG_VERSION="${GITHUB_REF_NAME#v}"
-            DIST_TAG="latest"
-            if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
-              DIST_TAG="beta"
-            elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
-              DIST_TAG="rc"
-            elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
-              DIST_TAG="dev"
-            fi
-            SPEC="@locusai/openclaw-ikentic-plugin@${DIST_TAG}"
-            echo "IKENTIC_BUNDLE_SPEC unset; derived plugin channel from tag ${GITHUB_REF_NAME}: ${SPEC}"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CHANNEL="latest"
+          if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+            CHANNEL="beta"
+          elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+            CHANNEL="rc"
+          elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+            CHANNEL="dev"
           fi
+          SPEC="@locusai/openclaw-ikentic-plugin@${CHANNEL}"
+          echo "Resolved IKENTIC bundle spec from tag ${GITHUB_REF_NAME}: ${SPEC}"
           echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
 
       - name: Bundle IKENTIC plugin
@@ -144,15 +133,22 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")"
-          PRERELEASE="$(printf '%s' "$PACKAGE_VERSION" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-([^+]+)(\+.*)?$/\1/p')"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PRERELEASE="$(printf '%s' "$TAG_VERSION" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-([^+]+)(\+.*)?$/\1/p')"
           if [ -z "$PRERELEASE" ]; then
             echo "dist_tag=" >> "$GITHUB_OUTPUT"
             echo "No prerelease suffix detected; publishing with npm default tag."
             exit 0
           fi
-          DEFAULT_TAG="${PRERELEASE%%.*}"
-          DIST_TAG="${NPM_PUBLISH_TAG:-$DEFAULT_TAG}"
+          if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+            DIST_TAG="beta"
+          elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+            DIST_TAG="rc"
+          elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+            DIST_TAG="dev"
+          else
+            DIST_TAG="${PRERELEASE%%.*}"
+          fi
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
           echo "Using npm dist-tag: $DIST_TAG"
 
