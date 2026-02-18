@@ -160,11 +160,27 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          OWNER_SCOPE="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          TARGET_NAME="@${OWNER_SCOPE}/openclaw"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const target = process.env.TARGET_NAME;
+            const path = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+            if (pkg.name !== target) {
+              pkg.name = target;
+              fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+              console.log(`Publish override: package name set to ${target}`);
+            } else {
+              console.log(`Publish override: package name already ${target}`);
+            }
+          '
           if [ -n "${NPM_PUBLISH_DIST_TAG:-}" ]; then
-            npm publish --tag "$NPM_PUBLISH_DIST_TAG"
+            npm publish --tag "$NPM_PUBLISH_DIST_TAG" --registry "https://npm.pkg.github.com"
           else
-            npm publish
+            npm publish --registry "https://npm.pkg.github.com"
           fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_PUBLISH_DIST_TAG: ${{ steps.resolve-publish-tag.outputs.dist_tag }}
+          TARGET_NAME: "@${{ github.repository_owner }}/openclaw"

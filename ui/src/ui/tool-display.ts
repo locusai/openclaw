@@ -16,6 +16,11 @@ import rawConfig from "./tool-display.json" with { type: "json" };
 
 type ToolDisplaySpec = ToolDisplaySpecBase & {
   icon?: string;
+  title?: string;
+  label?: string;
+  detailKeys?: string[];
+  actions?: Record<string, ToolDisplayActionSpec>;
+  suppressWhenNoOutput?: boolean;
 };
 
 type ToolDisplayConfig = {
@@ -126,6 +131,11 @@ export function resolveToolDisplay(params: {
     verb,
     detail,
   };
+}
+
+export function shouldSuppressToolCardWhenNoOutput(name?: string): boolean {
+  const key = normalizeToolName(name).toLowerCase();
+  return TOOL_MAP[key]?.suppressWhenNoOutput === true;
 }
 
 export function formatToolDetail(display: ToolDisplay): string | undefined {

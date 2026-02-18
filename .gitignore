@@ -54,6 +54,7 @@ vendor/a2ui/renderers/lit/dist/
 src/canvas-host/a2ui/*.bundle.js
 src/canvas-host/a2ui/*.map
 .bundle.hash
+extensions/openclaw-ikentic-plugin/
 
 # fastlane (iOS)
 apps/ios/fastlane/README.md
@@ -88,3 +89,6 @@ USER.md
 !.agent/workflows/
 /local/
 package-lock.json
+
+# Local iOS signing overrides
+apps/ios/LocalSigning.xcconfig

@@ -6,6 +6,7 @@ import type { OpenClawConfig } from "../config/config.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveUserPath } from "../utils.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import { clearPluginCommands } from "./commands.js";
 import {
   applyTestPluginDefaults,
@@ -165,6 +166,7 @@ function createPluginRecord(params: {
     cliCommands: [],
     services: [],
     commands: [],
+    commandOptions: [],
     httpHandlers: 0,
     hookCount: 0,
     configSchema: params.configSchema,
@@ -199,6 +201,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
 
   // Clear previously registered plugin commands before reloading
   clearPluginCommands();
+  clearPluginCommandOptions();
 
   const runtime = createPluginRuntime();
   const { registry, createApi } = createPluginRegistry({

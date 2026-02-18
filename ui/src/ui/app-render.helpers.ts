@@ -47,7 +47,16 @@ function resetChatStateForSessionSwitch(state: AppViewState, sessionKey: string)
   });
 }
 
-export function renderTab(state: AppViewState, tab: Tab) {
+type RenderTabMeta = {
+  icon?: IconName;
+  label?: string;
+  title?: string;
+};
+
+export function renderTab(state: AppViewState, tab: Tab, meta?: RenderTabMeta) {
+  const label = meta?.label ?? titleForTab(tab);
+  const iconName = meta?.icon ?? iconForTab(tab);
+  const title = meta?.title ?? label;
   const href = pathForTab(tab, state.basePath);
   return html`
     <a
@@ -74,10 +83,10 @@ export function renderTab(state: AppViewState, tab: Tab) {
         }
         state.setTab(tab);
       }}
-      title=${titleForTab(tab)}
+      title=${title}
     >
-      <span class="nav-item__icon" aria-hidden="true">${icons[iconForTab(tab)]}</span>
-      <span class="nav-item__text">${titleForTab(tab)}</span>
+      <span class="nav-item__icon" aria-hidden="true">${icons[iconName]}</span>
+      <span class="nav-item__text">${label}</span>
     </a>
   `;
 }
@@ -332,11 +341,19 @@ export function resolveSessionDisplayName(
   const displayName = row?.displayName?.trim() || "";
   const { prefix, fallbackName } = parseSessionKey(key);
 
+  const applyTypedPrefix = (name: string): string => {
+    if (!prefix) {
+      return name;
+    }
+    const prefixPattern = new RegExp(`^${prefix.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")}\\s*`, "i");
+    return prefixPattern.test(name) ? name : `${prefix} ${name}`;
+  };
+
   if (label && label !== key) {
-    return prefix ? `${prefix} ${label}` : label;
+    return applyTypedPrefix(label);
   }
   if (displayName && displayName !== key) {
-    return prefix ? `${prefix} ${displayName}` : displayName;
+    return applyTypedPrefix(displayName);
   }
   return fallbackName;
 }

@@ -4,10 +4,14 @@ import path from "node:path";
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildModelAliasIndex } from "../../agents/model-selection.js";
 import type { OpenClawConfig } from "../../config/config.js";
-import { saveSessionStore } from "../../config/sessions.js";
 import type { SessionEntry } from "../../config/sessions.js";
+import { saveSessionStore } from "../../config/sessions.js";
 import { formatZonedTimestamp } from "../../infra/format-time/format-datetime.ts";
 import { enqueueSystemEvent, resetSystemEventsForTest } from "../../infra/system-events.js";
+import {
+  clearPluginCommandOptions,
+  registerPluginCommandOption,
+} from "../../plugins/command-options.js";
 import { applyResetModelOverride } from "./session-reset-model.js";
 import { prependSystemEvents } from "./session-updates.js";
 import { persistSessionUsageUpdate } from "./session-usage.js";
@@ -282,6 +286,66 @@ describe("initSessionState RawBody", () => {
     } finally {
       vi.unstubAllEnvs();
     }
+  });
+});
+
+describe("initSessionState reset trigger metadata stripping", () => {
+  it("strips registered plugin command options from /new body", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona marketing-assistant hello there",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello there");
+    clearPluginCommandOptions();
+  });
+
+  it("strips registered plugin command options with equals syntax", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-eq-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona=marketing-assistant hello",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello");
+    clearPluginCommandOptions();
   });
 });
 

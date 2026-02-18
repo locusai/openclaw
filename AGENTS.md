@@ -37,6 +37,15 @@
 - See `docs/.i18n/README.md`.
 - The pipeline can be slow/inefficient; if it’s dragging, ping @jospalmbier on Discord instead of hacking around it.
 
+## Ikentic Overlay Flow (Fork)
+
+- Strategy doc: `docs/ikentic/overlay-flow.md` (keep it updated).
+- Consolidation changelog: update `docs/ikentic/overlay-changelog.md` with a brief summary for each
+  merged branch, including functionality, bead, and upstream PR reference.
+- No direct commits to `wip/*` or `integration/*`; merge topic branches only.
+- Prefer `integration/*` for promotion branches (legacy `e2e/*` should be replaced).
+- `integration/*` must be fast-forwarded from WIP only after E2E passes.
+
 ## exe.dev VM ops (general)
 
 - Access: stable path is `ssh exe.dev` then `ssh vm-name` (assume SSH key already set).
@@ -114,6 +123,7 @@
 ## Git Notes
 
 - If `git branch -d/-D <branch>` is policy-blocked, delete the local ref directly: `git update-ref -d refs/heads/<branch>`.
+- Bulk PR close/reopen safety: if a close action would affect more than 5 PRs, first ask for explicit user confirmation with the exact PR count and target scope/query.
 
 ## Security & Configuration Tips
 
@@ -217,7 +227,7 @@
   - skip if package is missing on npm or version already matches.
 - Keep `openclaw` untouched: never run publish from repo root unless explicitly requested.
 - Post-check for each release:
-  - per-plugin: `npm view @openclaw/<name> version --userconfig "$(mktemp)"` should be `2026.2.16`
+  - per-plugin: `npm view @openclaw/<name> version --userconfig "$(mktemp)"` should be `2026.2.17`
   - core guard: `npm view openclaw version --userconfig "$(mktemp)"` should stay at previous version unless explicitly requested.
 
 ## Changelog Release Notes

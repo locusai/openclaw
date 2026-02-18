@@ -1,5 +1,41 @@
 # Changelog
 
+## 2026.2.17-ike.4
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
+## 2026.2.17-ike.3
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
+## 2026.2.17-ike.2
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
+## 2026.2.17-ike.1
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
+## 2026.2.17-ike.0
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
+## 2026.2.17
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
 ## 2026.2.16
 
 ### Changes
