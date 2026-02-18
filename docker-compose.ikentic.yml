@@ -1,0 +1,36 @@
+# Docker Compose for OpenClaw + IKENTIC plugin
+#
+# NPM mode (production):
+#   1. cp .env.ikentic.example .env.ikentic
+#   2. Set NODE_AUTH_TOKEN in .env.ikentic (GitHub PAT with read:packages)
+#   3. docker compose -f docker-compose.ikentic.yml up --build
+#
+# Dev mode (volume mount):
+#   1. cp .env.ikentic.example .env.ikentic
+#   2. Set IKENTIC_PLUGIN_HOST_DIR in .env.ikentic
+#   3. docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic.dev.yml up --build
+#
+# The gateway URL (with auth token) will be printed in the startup logs.
+
+services:
+  openclaw:
+    build: .
+    env_file:
+      - .env.ikentic
+    environment:
+      HOME: /home/node
+      TERM: xterm-256color
+    volumes:
+      - openclaw-config:/home/node/.openclaw
+    ports:
+      - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
+    extra_hosts:
+      # Required for host.docker.internal on Linux; harmless on macOS
+      - "host.docker.internal:host-gateway"
+    user: "0"
+    init: true
+    restart: unless-stopped
+    entrypoint: ["bash", "/app/scripts/docker-ikentic-entrypoint.sh"]
+
+volumes:
+  openclaw-config:

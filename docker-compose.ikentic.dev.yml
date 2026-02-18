@@ -1,0 +1,12 @@
+# Dev override — mounts local IKENTIC plugin source into the container.
+#
+# Usage:
+#   docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic.dev.yml up --build
+#
+# Set IKENTIC_PLUGIN_HOST_DIR in .env.ikentic to the host path of the plugin,
+# e.g.: IKENTIC_PLUGIN_HOST_DIR=../ike-agents/packages/openclaw-ikentic-plugin
+
+services:
+  openclaw:
+    volumes:
+      - ${IKENTIC_PLUGIN_HOST_DIR}:/mnt/ikentic-plugin
