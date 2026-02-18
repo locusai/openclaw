@@ -194,7 +194,7 @@ type ManifestPluginRecord = ReturnType<typeof loadPluginManifestRegistry>["plugi
 
 type PluginLoadState = {
   seenIds: Map<string, PluginRecord["origin"]>;
-  memorySlot: string | undefined;
+  memorySlot: string | null | undefined;
   selectedMemoryPluginId: string | null;
   memorySlotMatched: boolean;
 };
@@ -261,7 +261,7 @@ function finalizePluginLoad(params: {
   registry: PluginRegistry;
   cacheEnabled: boolean;
   cacheKey: string;
-  memorySlot: string | undefined;
+  memorySlot: string | null | undefined;
   memorySlotMatched: boolean;
 }): PluginRegistry {
   if (typeof params.memorySlot === "string" && !params.memorySlotMatched) {
@@ -582,7 +582,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
 
   const state: PluginLoadState = {
     seenIds: new Map<string, PluginRecord["origin"]>(),
-    memorySlot: normalized.slots.memory ?? undefined,
+    memorySlot: normalized.slots.memory,
     selectedMemoryPluginId: null,
     memorySlotMatched: false,
   };
@@ -673,7 +673,7 @@ export async function loadOpenClawPluginsAsync(
 
   const state: PluginLoadState = {
     seenIds: new Map<string, PluginRecord["origin"]>(),
-    memorySlot: normalized.slots.memory ?? undefined,
+    memorySlot: normalized.slots.memory,
     selectedMemoryPluginId: null,
     memorySlotMatched: false,
   };
