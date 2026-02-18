@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { GatewayRequestHandlerOptions } from "./types.js";
 import { pluginUiHandlers } from "./plugin-ui.js";
+import type { GatewayRequestHandlerOptions } from "./types.js";
 
 const mocks = vi.hoisted(() => ({
   getActivePluginRegistry: vi.fn(),

@@ -19,10 +19,17 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - Load env from `~/.profile` and confirm `SPARKLE_PRIVATE_KEY_FILE` + App Store Connect vars are set (SPARKLE_PRIVATE_KEY_FILE should live in `~/.profile`).
 - Use Sparkle keys from `~/Library/CloudStorage/Dropbox/Backup/Sparkle` if needed.
 - Confirm release CI has:
-  - `IKENTIC_BUNDLE_SPEC` (repo variable, pinned full npm spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
+  - `IKENTIC_BUNDLE_SPEC` (optional repo variable override; if set, use exact npm spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
   - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps)
   - `NPM_PUBLISH_TAG` (optional repo variable override for npm dist-tag; otherwise prerelease identifier is used)
   - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages
+  - IKENTIC npm publish workflow tags:
+    - runs only on `v*-ike*`
+    - when `IKENTIC_BUNDLE_SPEC` is unset, plugin spec is derived from release tag:
+      - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
+      - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
+      - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
+      - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
 
 1. **Version & metadata**
 
@@ -48,9 +55,11 @@ When the operator says “release”, immediately do this preflight (no extra qu
 4. **Validation**
 
 - [ ] `pnpm bundle:ikentic` with:
-  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@x.y.z` (pinned exact version)
+  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@x.y.z` (optional exact override)
   - `NODE_AUTH_TOKEN=<read-packages-token>`
   - `NPM_CONFIG_USERCONFIG=$PWD/.npmrc`
+  - if `IKENTIC_BUNDLE_SPEC` is unset, fallback defaults to stable:
+    - `@locusai/openclaw-ikentic-plugin@latest`
 - [ ] `pnpm build`
 - [ ] `pnpm check`
 - [ ] `pnpm test` (or `pnpm test:coverage` if you need coverage output)

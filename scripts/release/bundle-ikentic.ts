@@ -5,7 +5,7 @@ import path from "node:path";
 import { installPluginFromNpmSpec } from "../../src/plugins/install.js";
 
 const IKENTIC_PLUGIN_ID = "openclaw-ikentic-plugin";
-const DEFAULT_IKENTIC_BUNDLE_SPEC = "@locusai/openclaw-ikentic-plugin@0.1.0-test.20260218.0";
+const DEFAULT_IKENTIC_BUNDLE_SPEC = "@locusai/openclaw-ikentic-plugin@latest";
 
 function fail(message: string): never {
   console.error(`bundle:ikentic: ${message}`);

@@ -1,13 +1,13 @@
 import type { ReplyPayload } from "../auto-reply/types.js";
 import type { ChannelId } from "../channels/plugins/types.js";
 import type { OpenClawConfig } from "../config/config.js";
+import { logVerbose } from "../globals.js";
 import type {
   OpenClawPluginCommandOptionDefinition,
   PluginCommandOptionContext,
   PluginCommandOptionHandlerResult,
   PluginCommandOptionInvocation,
 } from "./types.js";
-import { logVerbose } from "../globals.js";
 
 type RegisteredPluginCommandOption = {
   pluginId: string;

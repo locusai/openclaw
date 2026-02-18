@@ -56,10 +56,16 @@ Release workflows bundle IKENTIC before build (not at runtime):
 
 - `pnpm bundle:ikentic` runs before `pnpm build` in `npm-publish.yml` and `docker-release.yml`.
 - Required CI inputs:
-  - `IKENTIC_BUNDLE_SPEC` (repo variable, pinned full spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
+  - `IKENTIC_BUNDLE_SPEC` (optional repo variable override for exact spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
   - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret, read access for `npm.pkg.github.com` for IKENTIC and its transitive `@locusai/*` runtime deps)
   - `NPM_PUBLISH_TAG` (optional repo variable override for npm dist-tag selection in `npm-publish.yml`)
   - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` for bundle steps (ensures `@locusai` scope uses GitHub Packages when install runs inside `extensions/...`)
-- npm publish supports semver prereleases (for example `2026.2.16-ike.0`) and derives the default dist-tag from the prerelease identifier (`ike` for `-ike.0`) unless `NPM_PUBLISH_TAG` overrides it.
+- IKENTIC npm publish workflow runs only on tags matching `v*-ike*`.
+- If `IKENTIC_BUNDLE_SPEC` is unset in `npm-publish.yml`, plugin spec is derived from release tag:
+  - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
+  - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
+  - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
+  - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
+- OpenClaw npm publish still derives package dist-tag from prerelease identifier unless `NPM_PUBLISH_TAG` overrides it.
 - Release workflows also run smoke checks without `NODE_AUTH_TOKEN` and fail if the token value appears in npm tarballs or Docker image filesystem/history.
 - Tokens are used only in CI bundle/security-check steps and are not passed into Docker build args/layers.

@@ -3,7 +3,7 @@ name: NPM Publish
 on:
   push:
     tags:
-      - "v*"
+      - "v*-ike*"
 
 permissions:
   contents: read
@@ -52,17 +52,23 @@ jobs:
         shell: bash
         env:
           IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
-          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
-          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
         run: |
           set -euo pipefail
           if [ -n "${IKENTIC_BUNDLE_SPEC:-}" ]; then
             SPEC="${IKENTIC_BUNDLE_SPEC}"
             echo "Using IKENTIC_BUNDLE_SPEC override: ${SPEC}"
           else
-            VERSION="$(npm view @locusai/openclaw-ikentic-plugin version --registry https://npm.pkg.github.com)"
-            SPEC="@locusai/openclaw-ikentic-plugin@${VERSION}"
-            echo "IKENTIC_BUNDLE_SPEC unset; resolved latest plugin: ${SPEC}"
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            DIST_TAG="latest"
+            if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+              DIST_TAG="beta"
+            elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+              DIST_TAG="rc"
+            elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+              DIST_TAG="dev"
+            fi
+            SPEC="@locusai/openclaw-ikentic-plugin@${DIST_TAG}"
+            echo "IKENTIC_BUNDLE_SPEC unset; derived plugin channel from tag ${GITHUB_REF_NAME}: ${SPEC}"
           fi
           echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
 

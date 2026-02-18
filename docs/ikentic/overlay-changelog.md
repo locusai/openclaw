@@ -7,6 +7,7 @@ source branch.
 ## Consolidation Entries
 
 ### pr/control-ui-plugin-extensions
+
 - Functionality: Added gateway + UI support for plugin-provided UI panels (new plugin UI
   loader/runtime, controller wiring, view, and navigation changes).
 - Functionality: Added server methods and registry support for plugin UI metadata.
@@ -15,6 +16,7 @@ source branch.
 - Upstream PR: Not submitted (pending).
 
 ### pr/internal-hooks-clear-before-plugins
+
 - Functionality: Clear internal hook registry once before plugin registration so plugin-registered
   hooks (e.g., session:start) are not wiped during hook discovery.
 - Functionality: Adds regression coverage ensuring plugin-registered internal hooks survive gateway
@@ -23,6 +25,7 @@ source branch.
 - Upstream PR: https://github.com/openclaw/openclaw/pull/13709
 
 ### pr/docker-uidgid-persistent-bin
+
 - Functionality: Docker image now tolerates existing UID/GID collisions by remapping node user/group
   and hardens docker-setup behavior (including updated tests and tooling path handling).
 - Functionality: Adds IRC channel extension (plugin, config schema, onboarding, and docs).
@@ -33,12 +36,14 @@ source branch.
 - Upstream PR: https://github.com/openclaw/openclaw/pull/13737
 
 ### pr/ui-hide-noop-tool-cards
+
 - Functionality: Suppress tool cards for configured tools when the tool result has no output.
 - Functionality: Adds tool display metadata to drive suppression and coverage tests for tool cards.
 - Bead: `ikeagent-9879` (PR submitted: openclaw/openclaw#14189).
 - Upstream PR: https://github.com/openclaw/openclaw/pull/14189
 
 ### feat/command-hook-options
+
 - Functionality: Adds a generic plugin command-option extension framework for core slash commands
   (including `/new`), with option parsing and dispatch to plugin handlers.
 - Functionality: Ensures `/new` reset/session handling respects plugin-provided options and avoids
@@ -47,17 +52,20 @@ source branch.
 - Upstream PR: Not submitted (pending).
 
 ### feat/slug-generator-overrides
+
 - Functionality: Slug generation now respects session model/provider overrides when generating
   LLM-backed slugs, with debug logging for resolved model selection.
 - Bead: `ikeagent-9882` (PR pending: feat/slug-generator-overrides).
 - Upstream PR: Not submitted (pending).
 
 ### pr/docker-compose-healthcheck-clean
+
 - Functionality: Adds gateway healthcheck to the default docker-compose service.
 - Bead: `ikeagent-9883` (PR pending: pr/docker-compose-healthcheck-clean).
 - Upstream PR: Not submitted (pending).
 
 ### ike-overlay/docker-compose
+
 - Functionality: Adds Ikentic overlay compose files for ephemeral and host-mounted setups.
 - Functionality: Adds `.env.ikentic.example` to document Ikentic overlay environment variables.
 - Functionality: Overlay compose files now load environment variables via `env_file: .env`.
