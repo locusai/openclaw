@@ -19,6 +19,31 @@ jobs:
         with:
           submodules: false
 
+      - name: Enforce carry/integration release lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_SHA="${GITHUB_SHA}"
+          git fetch --no-tags origin \
+            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
+            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
+          CARRY_SHA="$(git rev-parse origin/carry/publish)"
+          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
+          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
+          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
+            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
+            exit 1
+          fi
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
+            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
+            exit 1
+          fi
+
       - name: Setup Node environment
         uses: ./.github/actions/setup-node-env
         with:
