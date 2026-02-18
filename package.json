@@ -67,7 +67,7 @@
     "format": "oxfmt --write",
     "format:all": "pnpm format && pnpm format:swift",
     "format:check": "oxfmt --check",
-    "format:check:publish:ikentic": "pnpm exec oxfmt --check .github/workflows/npm-publish.yml scripts/release src/gateway/server-methods/plugin-ui.ts src/gateway/server-plugins.ts src/gateway/server.impl.ts ui/src/ui/app.ts ui/src/ui/app-render.ts ui/src/ui/plugin-ui extensions/openclaw-ikentic-extension",
+    "format:check:publish:ikentic": "pnpm exec oxfmt --check .github/workflows/npm-publish.yml scripts/release src/gateway/server-methods/plugin-ui.ts src/gateway/server-plugins.ts src/gateway/server.impl.ts ui/src/ui/app.ts ui/src/ui/app-render.ts ui/src/ui/plugin-ui extensions/openclaw-ikentic-plugin",
     "format:docs": "git ls-files 'docs/**/*.md' 'docs/**/*.mdx' 'README.md' | xargs oxfmt --write",
     "format:docs:check": "git ls-files 'docs/**/*.md' 'docs/**/*.mdx' 'README.md' | xargs oxfmt --check",
     "format:swift": "swiftformat --lint --config .swiftformat apps/macos/Sources apps/ios/Sources apps/shared/OpenClawKit/Sources",

@@ -67,7 +67,7 @@ jobs:
             elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
               DIST_TAG="dev"
             fi
-            SPEC="@locusai/openclaw-ikentic-extension@${DIST_TAG}"
+            SPEC="@locusai/openclaw-ikentic-plugin@${DIST_TAG}"
             echo "IKENTIC_BUNDLE_SPEC unset; derived plugin channel from tag ${GITHUB_REF_NAME}: ${SPEC}"
           fi
           echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
@@ -96,8 +96,8 @@ jobs:
             const files = parsed.flatMap((entry) => entry.files ?? []);
             const hasIkentic = files.some((entry) =>
               typeof entry.path === "string" &&
-              (entry.path === "extensions/openclaw-ikentic-extension/package.json" ||
-                entry.path.startsWith("extensions/openclaw-ikentic-extension/")),
+              (entry.path === "extensions/openclaw-ikentic-plugin/package.json" ||
+                entry.path.startsWith("extensions/openclaw-ikentic-plugin/")),
             );
             if (!hasIkentic) {
               console.error("IKENTIC plugin files are missing from npm pack output.");
@@ -112,7 +112,7 @@ jobs:
           set -euo pipefail
           OUTPUT="$(NODE_AUTH_TOKEN= node openclaw.mjs plugins list)"
           echo "$OUTPUT"
-          if ! grep -q "openclaw-ikentic-extension" <<< "$OUTPUT"; then
+          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
             echo "IKENTIC plugin is not discoverable without NODE_AUTH_TOKEN."
             exit 1
           fi

@@ -48,7 +48,7 @@ Retired:
   - publish trigger `v*-ike*`
   - override precedence: `IKENTIC_BUNDLE_SPEC` first
   - tag-channel mapping: `-ike.` => `latest`, `-ike.beta.` => `beta`, `-ike.rc.` => `rc`, `-ike.dev.` => `dev`
-  - default fallback spec: `@locusai/openclaw-ikentic-extension@latest`
+  - default fallback spec: `@locusai/openclaw-ikentic-plugin@latest`
 
 4. Validation sequence in carry worktree
 
@@ -59,7 +59,7 @@ Retired:
 
 ## Current publish blocker
 
-- Latest required base package for `@locusai/openclaw-ikentic-extension` is not yet published.
+- Latest required base package for `@locusai/openclaw-ikentic-plugin` is not yet published.
 - Until publish exists, no real bundle pull test can complete against that target.
 - All non-pull workflow and release gates are prepared.
 
