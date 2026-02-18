@@ -3,7 +3,7 @@ name: NPM Publish
 on:
   push:
     tags:
-      - "v*"
+      - "v*-ike*"
 
 permissions:
   contents: read
@@ -47,10 +47,35 @@ jobs:
       - name: Pre-publish sanity (IKENTIC scope)
         run: pnpm check:publish:ikentic
 
+      - name: Resolve IKENTIC bundle spec
+        id: resolve-ikentic-spec
+        shell: bash
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+        run: |
+          set -euo pipefail
+          if [ -n "${IKENTIC_BUNDLE_SPEC:-}" ]; then
+            SPEC="${IKENTIC_BUNDLE_SPEC}"
+            echo "Using IKENTIC_BUNDLE_SPEC override: ${SPEC}"
+          else
+            TAG_VERSION="${GITHUB_REF_NAME#v}"
+            DIST_TAG="latest"
+            if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+              DIST_TAG="beta"
+            elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+              DIST_TAG="rc"
+            elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+              DIST_TAG="dev"
+            fi
+            SPEC="@locusai/openclaw-ikentic-extension@${DIST_TAG}"
+            echo "IKENTIC_BUNDLE_SPEC unset; derived plugin channel from tag ${GITHUB_REF_NAME}: ${SPEC}"
+          fi
+          echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
+
       - name: Bundle IKENTIC plugin
         run: pnpm bundle:ikentic
         env:
-          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          IKENTIC_BUNDLE_SPEC: ${{ steps.resolve-ikentic-spec.outputs.ikentic_bundle_spec }}
           NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
           NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -71,8 +96,8 @@ jobs:
             const files = parsed.flatMap((entry) => entry.files ?? []);
             const hasIkentic = files.some((entry) =>
               typeof entry.path === "string" &&
-              (entry.path === "extensions/openclaw-ikentic-plugin/package.json" ||
-                entry.path.startsWith("extensions/openclaw-ikentic-plugin/")),
+              (entry.path === "extensions/openclaw-ikentic-extension/package.json" ||
+                entry.path.startsWith("extensions/openclaw-ikentic-extension/")),
             );
             if (!hasIkentic) {
               console.error("IKENTIC plugin files are missing from npm pack output.");
@@ -87,7 +112,7 @@ jobs:
           set -euo pipefail
           OUTPUT="$(NODE_AUTH_TOKEN= node openclaw.mjs plugins list)"
           echo "$OUTPUT"
-          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
+          if ! grep -q "openclaw-ikentic-extension" <<< "$OUTPUT"; then
             echo "IKENTIC plugin is not discoverable without NODE_AUTH_TOKEN."
             exit 1
           fi
