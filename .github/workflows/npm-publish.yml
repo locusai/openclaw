@@ -47,10 +47,29 @@ jobs:
       - name: Pre-publish sanity (IKENTIC scope)
         run: pnpm check:publish:ikentic
 
+      - name: Resolve IKENTIC bundle spec
+        id: resolve-ikentic-spec
+        shell: bash
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
+        run: |
+          set -euo pipefail
+          if [ -n "${IKENTIC_BUNDLE_SPEC:-}" ]; then
+            SPEC="${IKENTIC_BUNDLE_SPEC}"
+            echo "Using IKENTIC_BUNDLE_SPEC override: ${SPEC}"
+          else
+            VERSION="$(npm view @locusai/openclaw-ikentic-plugin version --registry https://npm.pkg.github.com)"
+            SPEC="@locusai/openclaw-ikentic-plugin@${VERSION}"
+            echo "IKENTIC_BUNDLE_SPEC unset; resolved latest plugin: ${SPEC}"
+          fi
+          echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
+
       - name: Bundle IKENTIC plugin
         run: pnpm bundle:ikentic
         env:
-          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          IKENTIC_BUNDLE_SPEC: ${{ steps.resolve-ikentic-spec.outputs.ikentic_bundle_spec }}
           NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
           NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
