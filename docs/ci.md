@@ -49,3 +49,17 @@ pnpm test           # vitest tests
 pnpm check:docs     # docs format + lint + broken links
 pnpm release:check  # validate npm pack
 ```
+
+## Ikentic Fork Release Workflow Notes
+
+For `locusai/openclaw` Ikentic releases, CI governance is carry-first:
+
+- Promote changes in order: `topic/* -> carry/publish -> integration/ikentic`.
+- Keep `carry/publish` long-lived; never delete it after merge.
+- Release tags must be pushed from a commit that is already promoted to both `carry/publish` and `integration/ikentic`.
+
+If Docker release is not used:
+
+- Disable `docker-release.yml` in GitHub Actions settings/API.
+- Do not modify workflow YAML only to disable it operationally.
+- Keep npm publish flow (`npm-publish.yml`) as the required release gate.

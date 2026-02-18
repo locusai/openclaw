@@ -52,6 +52,11 @@
 
 - Runtime baseline: Node **22+** (keep Node + Bun paths working).
 - Install deps: `pnpm install`
+- New worktree bootstrap is mandatory (no exceptions):
+  - `printf '%s\n' 'source_up' > .envrc` (or ensure `.envrc` contains `source_up`)
+  - `direnv allow .`
+  - `direnv exec . pnpm install`
+  - Run project commands as `direnv exec . <command>` directly; do not prepend manual `export ...` when using `direnv exec`.
 - If deps are missing (for example `node_modules` missing, `vitest not found`, or `command not found`), run the repo’s package-manager install command (prefer lockfile/README-defined PM), then rerun the exact requested command once. Apply this to test/build/lint/typecheck/dev commands; if retry still fails, report the command and first actionable error.
 - Pre-commit hooks: `prek install` (runs same checks as CI)
 - Also supported: `bun install` (keep `pnpm-lock.yaml` + Bun patching in sync when touching deps/patches).
