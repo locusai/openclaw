@@ -19,17 +19,21 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - Load env from `~/.profile` and confirm `SPARKLE_PRIVATE_KEY_FILE` + App Store Connect vars are set (SPARKLE_PRIVATE_KEY_FILE should live in `~/.profile`).
 - Use Sparkle keys from `~/Library/CloudStorage/Dropbox/Backup/Sparkle` if needed.
 - Confirm release CI has:
-  - `IKENTIC_BUNDLE_SPEC` (optional repo variable override; if set, use exact npm spec like `@locusai/openclaw-ikentic-plugin@x.y.z`)
   - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps)
-  - `NPM_PUBLISH_TAG` (optional repo variable override for npm dist-tag; otherwise prerelease identifier is used)
   - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages
   - IKENTIC npm publish workflow tags:
     - runs only on `v*-ike*`
-    - when `IKENTIC_BUNDLE_SPEC` is unset, plugin spec is derived from release tag:
+    - plugin spec is derived from release tag:
       - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
       - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
       - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
       - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
+    - npm dist-tag is derived from release tag:
+      - `-ike.N` -> `ike`
+      - `-ike.beta.N` -> `beta`
+      - `-ike.rc.N` -> `rc`
+      - `-ike.dev.N` -> `dev`
+    - lineage gate enforces tagged commit reachability from both `origin/carry/publish` and `origin/integration/ikentic`
 
 1. **Version & metadata**
 
@@ -55,10 +59,10 @@ When the operator says “release”, immediately do this preflight (no extra qu
 4. **Validation**
 
 - [ ] `pnpm bundle:ikentic` with:
-  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@x.y.z` (optional exact override)
+  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@<channel-or-version>` (set explicitly for local verification)
   - `NODE_AUTH_TOKEN=<read-packages-token>`
   - `NPM_CONFIG_USERCONFIG=$PWD/.npmrc`
-  - if `IKENTIC_BUNDLE_SPEC` is unset, fallback defaults to stable:
+  - if `IKENTIC_BUNDLE_SPEC` is unset locally, fallback defaults to stable:
     - `@locusai/openclaw-ikentic-plugin@latest`
 - [ ] `pnpm build`
 - [ ] `pnpm check`
@@ -92,7 +96,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 - [ ] Confirm git status is clean; commit and push as needed.
 - [ ] `npm login` (verify 2FA) if needed.
-- [ ] `npm publish --access public` (workflow equivalent: publish to GitHub Packages; prerelease versions auto-publish to the prerelease dist-tag, e.g. `-ike.0` -> `ike`, unless overridden by `NPM_PUBLISH_TAG`).
+- [ ] `npm publish --access public` (workflow equivalent: publish to GitHub Packages; prerelease versions auto-publish to dist-tag derived from release tag, e.g. `-ike.0` -> `ike`, `-ike.dev.0` -> `dev`).
 - [ ] Verify the registry: `npm view openclaw version`, `npm view openclaw dist-tags`, and `npx -y openclaw@X.Y.Z --version` (or `--help`).
 
 ### Troubleshooting (notes from 2.0.0-beta2 release)
@@ -107,7 +111,9 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 7. **GitHub release + appcast**
 
+- [ ] Promote carry before tagging: merge `carry/publish` -> `integration/ikentic`, then tag from integration head.
 - [ ] Tag and push: `git tag vX.Y.Z && git push origin vX.Y.Z` (or `git push --tags`). Tag must exactly match `package.json` version with a `v` prefix, including prerelease suffixes (example: `v2026.2.16-ike.0`).
+- [ ] Confirm lineage gate context in workflow logs includes reachable refs for both `origin/carry/publish` and `origin/integration/ikentic`.
 - [ ] Create/refresh the GitHub release for `vX.Y.Z` with **title `openclaw X.Y.Z`** (not just the tag); body should include the **full** changelog section for that version (Highlights + Changes + Fixes), inline (no bare links), and **must not repeat the title inside the body**.
 - [ ] Attach artifacts: `npm pack` tarball (optional), `OpenClaw-X.Y.Z.zip`, and `OpenClaw-X.Y.Z.dSYM.zip` (if generated).
 - [ ] Commit the updated `appcast.xml` and push it (Sparkle feeds from main).
