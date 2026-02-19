@@ -92,6 +92,41 @@ If a lane uses a different strategy for a specific change, document why in the P
 `pr/*` branches are `main`-lineage and should not be merged directly into `integration/ikentic`.
 Port patches, not branch lineage.
 
+### Mechanical sync requirement
+
+Every sync cycle must split into:
+
+1. Mechanical sync update (merge-first):
+   - `main` mirror merge,
+   - deterministic conflict-class handling only,
+   - conflict-free patch ports from open main-based PR snapshot.
+2. Final review update:
+   - only unresolved/manual/conflict-bearing ports and intentional integration deltas.
+
+Do not create the final review branch before the mechanical sync branch is merged into
+`integration/ikentic`.
+
+### Open PR snapshot requirement
+
+Before mechanical porting, capture a snapshot of open upstream PR heads:
+
+- include `number`, `headRefName`, `baseRefName`, and `headRefOid`,
+- include only `baseRefName == main` and `headRefName` in `pr/*`,
+- freeze this snapshot for the cycle.
+
+Before porting each snapshot branch, verify `origin/<headRefName>` still matches `headRefOid`.
+If any branch head moved, stop the cycle and regenerate a fresh snapshot before continuing.
+
+### Mechanical determinism requirement
+
+Mechanical sync branches must not include manual conflict edits.
+
+- allowed: deterministic class resolution rules from this spec,
+- allowed: clean `cherry-pick -x` ports that apply without manual edits,
+- not allowed: hand-edited conflict resolutions for code/config paths.
+
+Branches requiring manual resolution move to the final review branch by design.
+
 ### Required flow
 
 1. Create sync branch from integration:
@@ -205,3 +240,8 @@ Treat `carry/publish` scope as enforceable policy, not convention.
 - `carry/publish` is release-only.
 - Internal PRs remain on `integration/ikentic`.
 - Main-based upstream PR branches are ported via `topic/sync-*` + `cherry-pick -x`.
+- Open main-based PR heads are snapshotted and pinned before mechanical ports.
+- Final review branch is created only after mechanical sync merge lands.
+- Mechanical sync branches contain deterministic-only edits; manual conflict resolution is review-lane work.
+- Ikentic-specific documentation content lives under `docs/ikentic/**`.
+- Non-Ikentic docs (for example `docs/reference/*`, `docs/ci.md`) must stay free of Ikentic policy/process content and Ikentic-specific cross-links.
