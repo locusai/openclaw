@@ -34,7 +34,11 @@ Commands:
     Default output-dir: mktemp under /tmp (ikentic-cli-XXXXXX)
 
   ledger-refresh [<base-ref> [<head-ref> [<output-tsv>]]]
-    Build first-parent ledger with lane classification.
+    Build first-parent ledger with lane classification and automatic supersession pruning.
+    Writes:
+      - effective ledger to <output-tsv>
+      - raw ledger to <output-tsv>.raw.tsv
+      - dropped entries to <output-tsv>.dropped.tsv
     Default: origin/main..origin/integration/ikentic -> .ikentic/ledger/first-parent.tsv
 
   ledger-validate [<ledger-tsv> [<allow-unknown-file>]]
@@ -126,9 +130,13 @@ cmd_ledger_refresh() {
   local out="${3:-.ikentic/ledger/first-parent.tsv}"
   mkdir -p "$(dirname "$out")"
 
+  local raw_out dropped_out
+  raw_out="${out}.raw.tsv"
+  dropped_out="${out}.dropped.tsv"
+  rm -f "$out" "$dropped_out"
+
   local tmp
   tmp="$(mktemp)"
-
   git log --first-parent --reverse --format='%H%x09%P%x09%s' "${base_ref}..${head_ref}" | \
     while IFS=$'\t' read -r commit parents subject; do
       [[ -n "$commit" ]] || continue
@@ -136,10 +144,80 @@ cmd_ledger_refresh() {
       printf '%s\t%s\t%s\t%s\n' "$commit" "$parents" "$subject" "$lane"
     done > "$tmp"
 
-  mv "$tmp" "$out"
+  mv "$tmp" "$raw_out"
 
-  local total mechanical review_pr release docs unknown
-  total="$(wc -l < "$out" | tr -d ' ')"
+  # Prune superseded entries into effective replay ledger.
+  # Rules:
+  # - drop review_pr entries that occur before first mechanical marker
+  # - keep only newest review_pr entry per key (pr/<name>, feat/<name>, fallback subject)
+  # - drop release entries older than the newest integration promotion from carry/publish
+  awk -F '\t' -v OFS='\t' -v out="$out" -v dropped="$dropped_out" '
+    function review_key(s) {
+      if (match(s, /pr\/[A-Za-z0-9._-]+/)) return substr(s, RSTART, RLENGTH)
+      if (match(s, /feat\/[A-Za-z0-9._-]+/)) return substr(s, RSTART, RLENGTH)
+      return "subject:" s
+    }
+
+    {
+      n++
+      c[n]=$1
+      p[n]=$2
+      s[n]=$3
+      l[n]=$4
+    }
+
+    END {
+      first_mechanical=0
+      latest_integration_promotion=0
+
+      for (i = 1; i <= n; i++) {
+        if (first_mechanical == 0 && l[i] == "mechanical") {
+          first_mechanical = i
+        }
+        if (l[i] == "release" && (s[i] ~ /^merge: promote carry\/publish into integration\/ikentic/ || s[i] ~ /^promote carry\/publish into integration\/ikentic/)) {
+          latest_integration_promotion = i
+        }
+      }
+
+      for (i = n; i >= 1; i--) {
+        reason = ""
+
+        if (l[i] == "review_pr" && first_mechanical > 0 && i < first_mechanical) {
+          reason = "legacy_review_pre_mechanical"
+        } else if (l[i] == "review_pr") {
+          key = review_key(s[i])
+          if (seen_review[key]++ > 0) {
+            reason = "superseded_review_key:" key
+          }
+        } else if (l[i] == "release" && latest_integration_promotion > 0 && i < latest_integration_promotion) {
+          reason = "covered_by_latest_integration_promotion"
+        }
+
+        if (reason == "") {
+          keep[i] = 1
+        } else {
+          drop_reason[i] = reason
+          drop_count++
+        }
+      }
+
+      for (i = 1; i <= n; i++) {
+        if (keep[i]) {
+          print c[i], p[i], s[i], l[i] > out
+        } else {
+          print c[i], p[i], s[i], l[i], drop_reason[i] > dropped
+        }
+      }
+    }
+  ' "$raw_out"
+
+  local total kept dropped mechanical review_pr release docs unknown
+  total="$(wc -l < "$raw_out" | tr -d ' ')"
+  kept="$(wc -l < "$out" | tr -d ' ')"
+  dropped=0
+  if [[ -f "$dropped_out" ]]; then
+    dropped="$(wc -l < "$dropped_out" | tr -d ' ')"
+  fi
   mechanical="$(awk -F '\t' '$4=="mechanical"{c++} END{print c+0}' "$out")"
   review_pr="$(awk -F '\t' '$4=="review_pr"{c++} END{print c+0}' "$out")"
   release="$(awk -F '\t' '$4=="release"{c++} END{print c+0}' "$out")"
@@ -147,7 +225,13 @@ cmd_ledger_refresh() {
   unknown="$(awk -F '\t' '$4=="unknown"{c++} END{print c+0}' "$out")"
 
   echo "ledger: ${out}"
-  echo "summary: total=${total} mechanical=${mechanical} review_pr=${review_pr} release=${release} docs=${docs} unknown=${unknown}"
+  echo "raw_ledger: ${raw_out}"
+  echo "dropped_ledger: ${dropped_out}"
+  echo "summary: total=${total} kept=${kept} dropped=${dropped} mechanical=${mechanical} review_pr=${review_pr} release=${release} docs=${docs} unknown=${unknown}"
+  if [[ -f "$dropped_out" && "$dropped" -gt 0 ]]; then
+    echo "drop_reasons:"
+    awk -F '\t' '{r[$5]++} END {for (k in r) printf "  %s=%d\n", k, r[k]}' "$dropped_out" | sort
+  fi
 }
 
 cmd_ledger_validate() {

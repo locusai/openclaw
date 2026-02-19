@@ -48,6 +48,7 @@ Phase A: Session truth load
 - Refresh first-parent ledger and validate coverage/ordering:
   - `scripts/ikentic/cli.sh ledger-refresh`
   - `scripts/ikentic/cli.sh ledger-validate`
+  - `ledger-refresh` writes effective replay ledger plus `.raw.tsv` and `.dropped.tsv` artifacts.
 - Snapshot open main-based PR heads for this cycle (pin SHAs):
   - `scripts/ikentic/cli.sh snapshot-open-prs .ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
 

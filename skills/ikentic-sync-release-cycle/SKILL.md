@@ -51,6 +51,7 @@ Read these files before branch-management actions:
     - `stage-tools`
     - `ledger-refresh`
     - `ledger-validate`
+- `ledger-refresh` now emits the effective replay ledger by default and auto-drops superseded entries into `<ledger>.dropped.tsv` (raw history remains in `<ledger>.raw.tsv`).
 - `scripts/ikentic/sync-main-into-integration.sh`
   - Fetch/prune refs, fast-forward `main` from `upstream/main`, push mirror, create `topic/sync-main-*`, merge `origin/main`, and run deterministic conflict pass.
 - `scripts/ikentic/classify-conflicts.sh`

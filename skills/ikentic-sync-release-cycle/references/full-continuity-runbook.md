@@ -80,6 +80,7 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 - `direnv exec . gh pr list --repo locusai/openclaw --state open --limit 100 --json number,title,headRefName,baseRefName,headRefOid,url`
 - `scripts/ikentic/cli.sh ledger-refresh`
 - `scripts/ikentic/cli.sh ledger-validate`
+- `ledger-refresh` outputs effective replay ledger and writes `.raw.tsv` + `.dropped.tsv` artifacts.
 - `SNAP=.ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
 - `scripts/ikentic/cli.sh snapshot-open-prs "$SNAP"`
 
