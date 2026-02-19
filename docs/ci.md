@@ -53,6 +53,8 @@ pnpm release:check  # validate npm pack
 
 Ikentic branch governance is defined in
 [`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+Canonical upstream-port tracking is in
+[`/ikentic/upstream-port-ledger`](/ikentic/upstream-port-ledger).
 This CI page only covers workflow execution behavior.
 
 Release workflows bundle IKENTIC before build (not at runtime):
@@ -81,3 +83,4 @@ If Docker release is not used:
 - Disable `docker-release.yml` in GitHub Actions settings/API.
 - Do not modify workflow YAML only to disable it operationally.
 - Keep npm publish flow (`npm-publish.yml`) as the required release gate.
+- Plugin version lockstep enforcement in `npm-publish.yml` is stable-channel only (`-ike.N`); prerelease tags (`dev|beta|rc`) do not enforce lockstep.
