@@ -15,6 +15,8 @@ Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tag
 
 Branch governance rules are defined in
 [`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+Canonical upstream-port tracking is in
+[`/ikentic/upstream-port-ledger`](/ikentic/upstream-port-ledger).
 
 This release checklist only documents release execution steps.
 

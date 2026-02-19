@@ -54,6 +54,8 @@ pnpm release:check  # validate npm pack
 
 Ikentic branch governance is defined in
 [`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+Canonical upstream-port tracking is in
+[`/ikentic/upstream-port-ledger`](/ikentic/upstream-port-ledger).
 This CI page only covers workflow execution behavior.
 
 If Docker release is not used:
