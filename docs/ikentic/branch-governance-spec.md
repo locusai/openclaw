@@ -24,7 +24,7 @@ For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Ha
 - `integration/ikentic`
   - Canonical internal integration/deploy branch.
   - Base for internal feature/fix/test work.
-  - Merge-based; no force-push.
+  - Merge-based; no force-push except explicit one-time governance exceptions.
 - `carry/*`
   - Long-lived internal patch lanes.
   - Merge into `integration/ikentic`.
@@ -52,6 +52,9 @@ For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Ha
    - `carry/publish` must only contain release-scope commits.
 4. Force-push invariant:
    - no force-push to `integration/ikentic`, `carry/publish`, or persistent `carry/*`.
+   - Exception: a name-preserving clean-baseline cutover may use `--force-with-lease`
+     exactly once when operator-approved and fully documented (backup refs + exception
+     record required). See `CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)` below.
 5. PR safety invariant:
    - active-review PR branches are additive-update by default (no history rewrite unless explicit maintainer override).
 
@@ -127,6 +130,36 @@ Mechanical sync branches must not include manual conflict edits.
 
 Branches requiring manual resolution move to the final review branch by design.
 
+### Mechanical promotion policy
+
+Mechanical sync is merged first and promoted directly to `integration/ikentic` without PR when
+the change set is deterministic-only.
+
+Required gates before direct promotion:
+
+1. conflict state is clean (no unresolved files),
+2. only deterministic conflict classes were applied (`A`, `B`, `C`),
+3. lockfile/manifest gates pass (`check-lockfile-gates` / frozen lockfile install).
+
+If any manual `D`-class edits are required, stop mechanical promotion and move that work to the
+review branch.
+
+### Post-mechanical review separation
+
+After mechanical promotion lands on `integration/ikentic`:
+
+1. create a review branch from the new integration head,
+2. apply only manual/conflict-bearing intentional deltas,
+3. apply docs/ops updates in a separate review lane,
+4. open PRs only for these review-lane changes.
+
+Do not include mechanical merge payload files in review PRs.
+
+When restoring Ikentic docs from another branch, use path-scoped apply:
+
+- `git checkout <source-branch> -- docs/ikentic`
+- keep `docs/ci.md` and `docs/reference/RELEASING.md` out of this step.
+
 ### Required flow
 
 1. Create sync branch from integration:
@@ -135,14 +168,31 @@ Branches requiring manual resolution move to the final review branch by design.
 2. Port upstream PR commits:
    - `git cherry-pick -x <sha1> <sha2> ...`
 3. Resolve conflicts and validate targeted tests.
-4. Open internal PR:
-   - `topic/sync-<pr-topic> -> integration/ikentic`
-5. When upstream PR updates:
+4. If deterministic-only, promote directly to `integration/ikentic` (no PR).
+5. If review-lane deltas remain, open internal PR from review branch:
+   - `topic/sync-<pr-topic>-review -> integration/ikentic`
+6. When upstream PR updates:
    - cherry-pick only new upstream commits onto the same sync branch.
-6. If the sync PR is already merged:
+7. If the sync PR is already merged:
    - create `topic/sync-<pr-topic>-2` from current `integration/ikentic`,
    - cherry-pick only new upstream commits,
    - open a follow-up internal PR.
+
+### CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)
+
+> Not part of normal sync/release flow.
+> Use only when rebuilding the integration baseline and preserving the
+> `integration/ikentic` branch name is required.
+
+If integration baseline reconstruction requires keeping branch name `integration/ikentic`:
+
+1. resolve and verify the replacement baseline branch head,
+2. create remote backup branch + annotated tag at current `origin/integration/ikentic`,
+3. push replacement branch to origin,
+4. move `integration/ikentic` with
+   `git push --force-with-lease=integration/ikentic:<old-sha> origin <new-branch>:integration/ikentic`,
+5. verify remote head SHA and record the exception in `docs/ikentic/CHANGELOG.md`,
+6. re-enable/confirm branch protections immediately after the cutover window.
 
 ### Equivalence checks
 
