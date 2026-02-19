@@ -50,7 +50,11 @@ pnpm check:docs     # docs format + lint + broken links
 pnpm release:check  # validate npm pack
 ```
 
-## Release Workflow Note (IKENTIC)
+## Ikentic Fork Release Workflow Notes
+
+Ikentic branch governance is defined in
+[`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+This CI page only covers workflow execution behavior.
 
 Release workflows bundle IKENTIC before build (not at runtime):
 
@@ -72,3 +76,9 @@ Release workflows bundle IKENTIC before build (not at runtime):
 - Release tag lineage gate enforces that `GITHUB_SHA` is reachable from both `origin/carry/publish` and `origin/integration/ikentic` before publish/build steps proceed.
 - Release workflows also run smoke checks without `NODE_AUTH_TOKEN` and fail if the token value appears in npm tarballs or Docker image filesystem/history.
 - Tokens are used only in CI bundle/security-check steps and are not passed into Docker build args/layers.
+
+If Docker release is not used:
+
+- Disable `docker-release.yml` in GitHub Actions settings/API.
+- Do not modify workflow YAML only to disable it operationally.
+- Keep npm publish flow (`npm-publish.yml`) as the required release gate.
