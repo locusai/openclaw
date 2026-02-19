@@ -15,10 +15,13 @@ import {
 import { loadOpenClawPluginsAsync } from "../loader.js";
 
 const OPENCLAW_BUNDLED_PLUGINS_DIR_FALLBACK = "/nonexistent/bundled/plugins";
-const DEFAULT_IKENTIC_PLUGIN_ROOT =
-  "/Volumes/devel/openclaw-work/openclaw/codex-ikentic-plugin-test-scaffolding/extensions/openclaw-ikentic-plugin";
 const REDIRECT_URI = "http://127.0.0.1:18789/oauth/callback";
 const MODULE_EXTENSIONS = [".js", ".mjs", ".cjs", ".ts", ".mts", ".cts"] as const;
+const IKENTIC_PLUGIN_ROOT_CANDIDATES = [
+  "extensions/openclaw-ikentic-plugin",
+  "../codex-ikentic-plugin-test-scaffolding/extensions/openclaw-ikentic-plugin",
+  "../integration-ikentic/extensions/openclaw-ikentic-plugin",
+] as const;
 
 type PersonaSelectionStoreApi = {
   upsert: (value: {
@@ -207,7 +210,22 @@ async function createIkenticLoaderFixture(
 export function resolveIkenticPluginRoot(
   envValue = process.env.OPENCLAW_IKENTIC_PLUGIN_ROOT,
 ): string {
-  const rawRoot = envValue?.trim() || DEFAULT_IKENTIC_PLUGIN_ROOT;
+  const discoverDefaultRoot = () => {
+    for (const candidate of IKENTIC_PLUGIN_ROOT_CANDIDATES) {
+      const resolved = path.resolve(process.cwd(), candidate);
+      if (fs.existsSync(resolved)) {
+        return resolved;
+      }
+    }
+    return "";
+  };
+
+  const rawRoot = envValue?.trim() || discoverDefaultRoot();
+  if (!rawRoot) {
+    throw new Error(
+      "IKENTIC plugin root not found. Set OPENCLAW_IKENTIC_PLUGIN_ROOT to a plugin package root.",
+    );
+  }
   const resolvedRoot = path.resolve(rawRoot);
 
   if (!fs.existsSync(resolvedRoot)) {

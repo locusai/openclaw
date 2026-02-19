@@ -2,7 +2,7 @@
 
 This document is the single-source governance spec for Ikentic branch strategy in `locusai/openclaw`.
 
-For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Hardening`).
+For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hardening`).
 
 ## Scope
 
@@ -54,6 +54,9 @@ For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Ha
    - no force-push to `integration/ikentic`, `carry/publish`, or persistent `carry/*`.
 5. PR safety invariant:
    - active-review PR branches are additive-update by default (no history rewrite unless explicit maintainer override).
+6. Required lane completeness invariant:
+   - all lanes listed in `docs/ikentic/required-lanes.txt` must have `right=0` versus
+     `origin/integration/ikentic` before cutover or replay sign-off.
 
 ## PR Routing Rules
 
@@ -177,12 +180,55 @@ Long-lived `carry/*` branches must be kept current to reduce conflict debt.
    - `git rev-list --left-right --count refs/remotes/origin/main...refs/remotes/upstream/main`
 2. Integration ancestry:
    - `git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/integration/ikentic`
-3. Carry publish scope:
+3. Integration equivalence:
+   - Compare integration targets directly when validating a rebuild/cutover candidate.
+   - This check is necessary but not sufficient.
+4. Required carry lane completeness (blocking):
+   - `node --import tsx scripts/ikentic-branch-gap-audit.ts`
+   - default policy file: `docs/ikentic/required-lanes.txt`
+   - Exit codes:
+     - `0` no blocking gaps
+     - `2` blocking gaps found in required lanes
+     - `3` config/execution error (for example malformed lane names or missing required lane ref)
+5. Advisory carry lane deltas (non-blocking):
+   - reported by the same audit command as `ADVISORY_MISSING`.
+6. Carry publish scope:
    - `git log --oneline refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
    - `git diff --name-only refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
-4. Note:
+7. Note:
    - Non-zero divergence between `carry/publish` and `integration/ikentic` is expected.
    - Do not auto-equalize by merging all integration commits into `carry/publish`.
+
+## Session-Start Truth Protocol
+
+Run this sequence at the start of every sync/replay/cutover session:
+
+1. Environment bootstrap:
+   - `direnv allow .`
+   - `direnv exec . pnpm install`
+2. Ref truth refresh:
+   - `git fetch origin --prune`
+   - `git fetch upstream --prune`
+3. Branch truth checks:
+   - mirror divergence and integration ancestry checks from the Alignment section.
+4. Required lane completeness gate:
+   - run `scripts/ikentic-branch-gap-audit.ts` before any replay sign-off or cutover planning.
+5. Open PR head snapshot and workflow/tag truth checks:
+   - capture current open PR heads and workflow/tag status into the run report.
+
+## Cutover Readiness Package
+
+Every cutover/readiness report must include all sections below:
+
+1. Integration Equivalence
+   - target integration comparison (candidate vs destination integration lane).
+2. Required Lane Completeness (blocking)
+   - branch-gap audit output for lanes in `docs/ikentic/required-lanes.txt`.
+   - any `BLOCKING_MISSING` entry is a no-go.
+3. Advisory Lane Deltas (non-blocking backlog)
+   - `ADVISORY_MISSING` lanes tracked for follow-up.
+4. Release Safety Gates
+   - manifest/lockfile consistency and frozen-lockfile result.
 
 ## Carry/Publish Enforcement Controls
 

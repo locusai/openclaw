@@ -5,6 +5,17 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 
 ## Unreleased
 
+### Source: `governance/required-lane-completeness-gate`
+
+- Added `scripts/ikentic-branch-gap-audit.ts` to audit `origin/carry/*` divergence against
+  `origin/integration/ikentic`, classify missing commits, and return stable exit codes (`0/2/3`).
+- Added `docs/ikentic/required-lanes.txt` as the blocking-policy source of truth for required carry
+  lanes.
+- Updated governance docs to require both integration equivalence and required-lane completeness in
+  session-start and cutover readiness checks.
+- Added portable IKENTIC test-fixture plugin-root resolution (`OPENCLAW_IKENTIC_PLUGIN_ROOT` first,
+  then repo-relative discovery) to remove machine-local path assumptions.
+
 ### Source: `pr/control-ui-plugin-extensions`
 
 - Added gateway and UI support for plugin-provided UI panels (plugin UI loader/runtime, controller
