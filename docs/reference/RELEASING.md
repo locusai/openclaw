@@ -27,8 +27,7 @@ Operational setup for new worktrees:
 
 Versioning and tag rules:
 
-- `pnpm plugins:sync` updates workspace extension package versions/changelogs to match the root release version.
-- Ikentic lane: use `pnpm plugins:sync:ikentic` to sync extension versions while preserving extension changelog history (Ikentic release notes are tracked separately).
+- `pnpm plugins:sync` intentionally updates workspace extension package versions/changelogs to match the root release version.
 - Tag version and `package.json` version must match exactly.
 - If a pushed tag does not trigger publish workflows, keep it as history and cut the next version tag from the same promoted carry/integration commit line.
 
@@ -65,7 +64,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 1. **Version & metadata**
 
 - [ ] Bump `package.json` version (e.g., `2026.1.29`; fork prerelease example: `2026.2.16-ike.0`).
-- [ ] Run `pnpm plugins:sync:ikentic` to align extension package versions without rewriting extension changelog files.
+- [ ] Run `pnpm plugins:sync` to align extension package versions + changelogs.
 - [ ] Update CLI/version strings: [`src/cli/program.ts`](https://github.com/openclaw/openclaw/blob/main/src/cli/program.ts) and the Baileys user agent in [`src/provider-web.ts`](https://github.com/openclaw/openclaw/blob/main/src/provider-web.ts).
 - [ ] Confirm package metadata (name, description, repository, keywords, license) and `bin` map points to [`openclaw.mjs`](https://github.com/openclaw/openclaw/blob/main/openclaw.mjs) for `openclaw`.
 - [ ] If dependencies changed, run `pnpm install` so `pnpm-lock.yaml` is current.
