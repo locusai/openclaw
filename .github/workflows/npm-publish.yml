@@ -65,11 +65,8 @@ jobs:
             exit 1
           fi
 
-      - name: Pre-publish sanity (IKENTIC scope)
-        run: pnpm check:publish:ikentic
-
-      - name: Resolve IKENTIC bundle spec
-        id: resolve-ikentic-spec
+      - name: Resolve release channel policy
+        id: resolve-release-channel
         shell: bash
         run: |
           set -euo pipefail
@@ -82,6 +79,27 @@ jobs:
           elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
             CHANNEL="dev"
           fi
+          ENFORCE_PLUGIN_SYNC="0"
+          if [ "$CHANNEL" = "latest" ]; then
+            ENFORCE_PLUGIN_SYNC="1"
+          fi
+          echo "release_channel=$CHANNEL" >> "$GITHUB_OUTPUT"
+          echo "enforce_plugin_sync=$ENFORCE_PLUGIN_SYNC" >> "$GITHUB_OUTPUT"
+          if [ "$ENFORCE_PLUGIN_SYNC" = "1" ]; then
+            echo "Plugin version lockstep enabled for stable channel ($CHANNEL)."
+          else
+            echo "Plugin version lockstep disabled for prerelease channel ($CHANNEL)."
+          fi
+
+      - name: Pre-publish sanity (IKENTIC scope)
+        run: pnpm check:publish:ikentic
+
+      - name: Resolve IKENTIC bundle spec
+        id: resolve-ikentic-spec
+        shell: bash
+        run: |
+          set -euo pipefail
+          CHANNEL="${{ steps.resolve-release-channel.outputs.release_channel }}"
           SPEC="@locusai/openclaw-ikentic-plugin@${CHANNEL}"
           echo "Resolved IKENTIC bundle spec from tag ${GITHUB_REF_NAME}: ${SPEC}"
           echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
@@ -99,7 +117,7 @@ jobs:
       - name: Release check
         run: pnpm release:check
         env:
-          OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC: "1"
+          OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC: ${{ steps.resolve-release-channel.outputs.enforce_plugin_sync }}
 
       - name: Verify IKENTIC files are included in npm pack
         shell: bash

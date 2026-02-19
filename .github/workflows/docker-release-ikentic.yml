@@ -1,18 +1,10 @@
-name: Docker Release
+name: Docker Release (Ikentic)
 
 on:
   push:
-    branches:
-      - main
     tags:
-      - "v*"
-      - "!v*-ike*"
-    paths-ignore:
-      - "docs/**"
-      - "**/*.md"
-      - "**/*.mdx"
-      - ".agents/**"
-      - "skills/**"
+      - "v*-ike*"
+  workflow_dispatch:
 
 concurrency:
   group: docker-release-${{ github.workflow }}-${{ github.ref }}
