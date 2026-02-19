@@ -11,6 +11,32 @@ read_when:
 
 Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tagging/publishing.
 
+## Ikentic Fork Release Lane
+
+Branch governance rules are defined in
+[`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+
+This release checklist only documents release execution steps.
+
+Operational setup for new worktrees:
+
+- Create `.envrc` with `source_up`.
+- Run `direnv allow .` once.
+- Run `direnv exec . pnpm install`.
+- Execute release commands through `direnv exec . <command>`.
+
+Versioning and tag rules:
+
+- `pnpm plugins:sync` intentionally updates workspace extension package versions/changelogs to match the root release version.
+- Tag version and `package.json` version must match exactly.
+- If a pushed tag does not trigger publish workflows, keep it as history and cut the next version tag from the same promoted carry/integration commit line.
+
+Required npm publish evidence in logs:
+
+- `Resolved IKENTIC bundle spec ... @locusai/openclaw-ikentic-plugin@dev`
+- `Using npm dist-tag: dev`
+- `+ @locusai/openclaw@<version>`
+
 ## Operator trigger
 
 When the operator says “release”, immediately do this preflight (no extra questions unless blocked):
