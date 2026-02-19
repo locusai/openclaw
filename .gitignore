@@ -41,6 +41,7 @@ Core/
 apps/ios/*.xcodeproj/
 apps/ios/*.xcworkspace/
 apps/ios/.swiftpm/
+apps/ios/.derivedData/
 apps/ios/.local-signing.xcconfig
 vendor/
 apps/ios/Clawdbot.xcodeproj/
@@ -54,7 +55,6 @@ vendor/a2ui/renderers/lit/dist/
 src/canvas-host/a2ui/*.bundle.js
 src/canvas-host/a2ui/*.map
 .bundle.hash
-extensions/openclaw-ikentic-plugin/
 
 # fastlane (iOS)
 apps/ios/fastlane/README.md
@@ -89,6 +89,7 @@ USER.md
 !.agent/workflows/
 /local/
 package-lock.json
+.claude/settings.local.json
 
 # Local iOS signing overrides
 apps/ios/LocalSigning.xcconfig
