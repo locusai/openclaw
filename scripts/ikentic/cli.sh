@@ -59,11 +59,11 @@ classify_lane() {
       echo "mechanical"
       return
       ;;
-    "rebuild: replay pr/"*|"sync: port pr/"*)
+    "rebuild: replay "*|"sync: port pr/"*|"plugins: add async loader with shared candidate flow"|"plugins: preserve explicit memory slot none in loader")
       echo "review_pr"
       return
       ;;
-    "release:"*|"ci(release):"*|"apply carry patchset: publish"|"carry: semver prerelease support for npm publish"|"merge: promote "*|"promote carry/publish into integration/ikentic"*)
+    "release:"*|"ci(release):"*|"ci: add ikentic publish sanity gate and fix ui prepack blockers"|"ci: keep ikentic sanity check pre-build only"|"ci: disable docker-release auto triggers"|"apply carry patchset: publish"|"carry: semver prerelease support for npm publish"|"merge: promote "*|"promote carry/publish into integration/ikentic"*)
       echo "release"
       return
       ;;
