@@ -41,6 +41,15 @@ Read these files before branch-management actions:
 
 ## Deterministic Helpers
 
+- `scripts/ikentic/cli.sh`
+  - Single entrypoint for Ikentic cycle helpers:
+    - `sync-main`
+    - `classify-conflicts`
+    - `resolve-conflicts`
+    - `check-lockfile-gates`
+    - `snapshot-open-prs`
+    - `ledger-refresh`
+    - `ledger-validate`
 - `scripts/ikentic/sync-main-into-integration.sh`
   - Fetch/prune refs, fast-forward `main` from `upstream/main`, push mirror, create `topic/sync-main-*`, merge `origin/main`, and run deterministic conflict pass.
 - `scripts/ikentic/classify-conflicts.sh`
@@ -63,7 +72,7 @@ Use process-only mode for recurring cycles where the operator wants the reusable
 ## Execution Skeleton
 
 1. Load fresh session truth (env bootstrap, fetch/prune, divergence, refs, PRs, workflows, tags).
-2. Snapshot open main-based `pr/*` branches with pinned head SHAs for the cycle.
+2. Refresh/validate first-parent ledger and snapshot open main-based `pr/*` branches with pinned head SHAs for the cycle.
 3. Build and merge the mechanical sync branch (mirror merge + deterministic conflict handling + conflict-free snapshot PR ports).
 4. Build final review branch from post-mechanical `integration/ikentic` head for unresolved/manual/conflict-bearing ports only.
 5. Run release path `topic/release-* -> carry/publish -> integration/ikentic -> tag`.

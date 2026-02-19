@@ -43,10 +43,11 @@ Phase A: Session truth load
 - Bootstrap env (`pnpm install`, `.envrc` with `source_up`, `direnv allow .`).
 - Fetch origin/upstream with prune.
 - Capture divergence counts, branch heads, open PR list, workflow states/runs, and current remote tags.
+- Refresh first-parent ledger and validate coverage/ordering:
+  - `scripts/ikentic/cli.sh ledger-refresh`
+  - `scripts/ikentic/cli.sh ledger-validate`
 - Snapshot open main-based PR heads for this cycle (pin SHAs):
-  - `mkdir -p .ikentic/snapshots`
-  - `SNAP=.ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
-  - `direnv exec . gh pr list --repo locusai/openclaw --state open --search "base:main head:pr/" --limit 200 --json number,title,headRefName,baseRefName,headRefOid,url > "$SNAP"`
+  - `scripts/ikentic/cli.sh snapshot-open-prs .ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
 
 Phase B: Upstream mirror sync
 
@@ -58,15 +59,15 @@ Phase B: Upstream mirror sync
 Phase C: Mechanical sync branch (must merge first)
 
 - Preferred bootstrap (includes Phase B ff-only mirror step):
-  - `scripts/ikentic/sync-main-into-integration.sh`
+  - `scripts/ikentic/cli.sh sync-main`
 - Create mechanical branch from integration:
   - `git switch -c topic/sync-main-<stamp>-mechanical origin/integration/ikentic`
 - Merge mirror main into mechanical branch:
   - `git merge --no-ff origin/main -m "sync integration with mirror main"`
 - Classify conflicts:
-  - `scripts/ikentic/classify-conflicts.sh`
+  - `scripts/ikentic/cli.sh classify-conflicts`
 - Apply deterministic resolver pass:
-  - `scripts/ikentic/resolve-sync-conflicts.sh`
+  - `scripts/ikentic/cli.sh resolve-conflicts`
 - If Class D conflicts remain, stop and fail this mechanical attempt (do not hand-edit).
 - Port snapshot PR patches that cherry-pick cleanly:
   - For each entry in `$SNAP`, verify `git rev-parse origin/<headRefName> == <headRefOid>` before porting.
@@ -78,7 +79,7 @@ Phase C: Mechanical sync branch (must merge first)
 - Regenerate lockfile from resolved manifests:
   - `direnv exec . pnpm install --lockfile-only`
 - Validate lockfile/install gates:
-  - `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
+  - `scripts/ikentic/cli.sh check-lockfile-gates origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
 - Merge mechanical branch into `integration/ikentic` first (direct merge/push is allowed for mechanical lane).
 
 Phase D: Final review branch (post-mechanical only)
@@ -98,7 +99,7 @@ Phase E: Dev release publish
 - Merge release branch into `carry/publish`.
 - Promote `carry/publish` into `integration/ikentic`.
 - Before tagging, enforce lockfile gates on integration head:
-  - `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic HEAD`
+  - `scripts/ikentic/cli.sh check-lockfile-gates origin/integration/ikentic HEAD`
 - Tag from integration head and push tag.
 
 Phase F: Publish verification

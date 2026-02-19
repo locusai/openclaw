@@ -77,9 +77,10 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 4. PR truth:
 
 - `direnv exec . gh pr list --repo locusai/openclaw --state open --limit 100 --json number,title,headRefName,baseRefName,headRefOid,url`
-- `mkdir -p .ikentic/snapshots`
+- `scripts/ikentic/cli.sh ledger-refresh`
+- `scripts/ikentic/cli.sh ledger-validate`
 - `SNAP=.ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
-- `direnv exec . gh pr list --repo locusai/openclaw --state open --search "base:main head:pr/" --limit 200 --json number,title,headRefName,baseRefName,headRefOid,url > "$SNAP"`
+- `scripts/ikentic/cli.sh snapshot-open-prs "$SNAP"`
 
 5. Workflow truth:
 
@@ -97,7 +98,7 @@ Deterministic main->integration reconciliation protocol:
 
 0. Preferred bootstrap (includes mirror fast-forward + sync branch creation + deterministic auto-resolution):
 
-- `scripts/ikentic/sync-main-into-integration.sh`
+- `scripts/ikentic/cli.sh sync-main`
 
 1. Create mechanical sync branch:
 
@@ -109,11 +110,11 @@ Deterministic main->integration reconciliation protocol:
 
 3. Capture conflict-class summary:
 
-- `scripts/ikentic/classify-conflicts.sh`
+- `scripts/ikentic/cli.sh classify-conflicts`
 
 4. Apply deterministic resolver pass:
 
-- `scripts/ikentic/resolve-sync-conflicts.sh`
+- `scripts/ikentic/cli.sh resolve-conflicts`
 
 5. Mechanical guard:
 
@@ -133,7 +134,7 @@ Deterministic main->integration reconciliation protocol:
 
 8. Validate install deterministically:
 
-- `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
+- `scripts/ikentic/cli.sh check-lockfile-gates origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
 
 9. Merge mechanical branch into integration:
 
