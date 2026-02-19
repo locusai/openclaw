@@ -27,6 +27,25 @@ Read these files before branch-management actions:
 5. For main-based `pr/*` updates, port patches via `topic/sync-*` cherry-picks.
 6. Use `direnv exec . <command>` directly (no manual export shims).
 7. Use elevated permissions when required by this environment.
+8. Treat changelog maintenance as a separate lane; changelog conflicts must not drive dependency decisions.
+
+## Deterministic Conflict Classes
+
+1. Class A: dependency manifests (`package.json` files) -> upstream-first (`main`) baseline.
+2. Class B: lockfile (`pnpm-lock.yaml`) -> regenerate from resolved manifests every cycle.
+3. Class C: changelogs (`CHANGELOG.md`) -> integration-side maintenance lane; do not block dependency resolution.
+4. Class D: code/config conflicts -> explicit manual resolution with rationale captured in the sync PR.
+
+## Deterministic Helpers
+
+- `scripts/ikentic/classify-conflicts.sh`
+  - Classify unresolved files into Classes A/B/C/D.
+- `scripts/ikentic/resolve-sync-conflicts.sh`
+  - Auto-resolve Class A and C (and stage lockfile for later rebuild), then report remaining Class D conflicts.
+- `scripts/ikentic/check-lockfile-gates.sh [<base-ref> [<head-ref>]]`
+  - Fail if `package.json` changed without `pnpm-lock.yaml` change.
+  - Run `pnpm install --frozen-lockfile`.
+  - Defaults to `origin/integration/ikentic...HEAD`.
 
 ## Runbook References
 
