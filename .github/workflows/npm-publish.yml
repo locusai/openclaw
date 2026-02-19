@@ -98,6 +98,8 @@ jobs:
 
       - name: Release check
         run: pnpm release:check
+        env:
+          OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC: "1"
 
       - name: Verify IKENTIC files are included in npm pack
         shell: bash
