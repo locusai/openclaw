@@ -37,6 +37,15 @@
 - See `docs/.i18n/README.md`.
 - The pipeline can be slow/inefficient; if it’s dragging, ping @jospalmbier on Discord instead of hacking around it.
 
+## Ikentic Overlay Flow (Fork)
+
+- Strategy doc: `docs/ikentic/overlay-flow.md` (keep it updated).
+- Consolidation changelog: update `docs/ikentic/overlay-changelog.md` with a brief summary for each
+  merged branch, including functionality, bead, and upstream PR reference.
+- No direct commits to `wip/*` or `integration/*`; merge topic branches only.
+- Prefer `integration/*` for promotion branches (legacy `e2e/*` should be replaced).
+- `integration/*` must be fast-forwarded from WIP only after E2E passes.
+
 ## exe.dev VM ops (general)
 
 - Access: stable path is `ssh exe.dev` then `ssh vm-name` (assume SSH key already set).
@@ -52,6 +61,11 @@
 
 - Runtime baseline: Node **22+** (keep Node + Bun paths working).
 - Install deps: `pnpm install`
+- New worktree bootstrap is mandatory (no exceptions):
+  - `printf '%s\n' 'source_up' > .envrc` (or ensure `.envrc` contains `source_up`)
+  - `direnv allow .`
+  - `direnv exec . pnpm install`
+  - Run project commands as `direnv exec . <command>` directly; do not prepend manual `export ...` when using `direnv exec`.
 - If deps are missing (for example `node_modules` missing, `vitest not found`, or `command not found`), run the repo’s package-manager install command (prefer lockfile/README-defined PM), then rerun the exact requested command once. Apply this to test/build/lint/typecheck/dev commands; if retry still fails, report the command and first actionable error.
 - Pre-commit hooks: `prek install` (runs same checks as CI)
 - Also supported: `bun install` (keep `pnpm-lock.yaml` + Bun patching in sync when touching deps/patches).
@@ -192,6 +206,12 @@
   - launchd PATH is minimal; ensure the app’s launch agent PATH includes standard system paths plus your pnpm bin (typically `$HOME/Library/pnpm`) so `pnpm`/`openclaw` binaries resolve when invoked via `openclaw-mac`.
 - For manual `openclaw message send` messages that include `!`, use the heredoc pattern noted below to avoid the Bash tool’s escaping.
 - Release guardrails: do not change version numbers without operator’s explicit consent; always ask permission before running any npm publish/release step.
+
+## Ikentic Overlay Hardening
+
+- Governance source of truth: `docs/ikentic/branch-governance-spec.md`.
+- Before any branch-management action (`switch`, `rebase`, `merge`, `cherry-pick`, `push`, PR retargeting, branch cleanup), read the governance spec and follow it exactly.
+- If a requested action conflicts with the spec, stop and resolve the policy conflict first (update spec or get explicit operator direction).
 
 ## NPM + 1Password (publish/verify)
 

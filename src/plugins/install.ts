@@ -75,6 +75,20 @@ function validatePluginId(pluginId: string): string | null {
   return null;
 }
 
+function findUnsupportedNpmDependencySpecs(
+  dependencies: Record<string, string>,
+): Array<{ name: string; spec: string }> {
+  const unsupported: Array<{ name: string; spec: string }> = [];
+  for (const [name, spec] of Object.entries(dependencies)) {
+    if (
+      typeof spec === "string" &&
+      (spec.startsWith("catalog:") || spec.startsWith("workspace:"))
+    ) {
+      unsupported.push({ name, spec });
+    }
+  }
+  return unsupported;
+}
 async function ensureOpenClawExtensions(manifest: PackageManifest) {
   const extensions = manifest[MANIFEST_KEY]?.extensions;
   if (!Array.isArray(extensions)) {
@@ -264,6 +278,16 @@ async function installPluginFromPackageDir(params: {
 
   const deps = manifest.dependencies ?? {};
   const hasDeps = Object.keys(deps).length > 0;
+  if (hasDeps) {
+    const unsupportedSpecs = findUnsupportedNpmDependencySpecs(deps);
+    if (unsupportedSpecs.length > 0) {
+      const summary = unsupportedSpecs.map((entry) => `${entry.name}@${entry.spec}`).join(", ");
+      return {
+        ok: false,
+        error: `unsupported dependency spec for npm install: ${summary}. Replace with concrete versions before publishing.`,
+      };
+    }
+  }
   const installRes = await installPackageDir({
     sourceDir: params.packageDir,
     targetDir,
