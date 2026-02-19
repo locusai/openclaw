@@ -43,6 +43,8 @@ Phase A: Session truth load
 - Bootstrap env (`pnpm install`, `.envrc` with `source_up`, `direnv allow .`).
 - Fetch origin/upstream with prune.
 - Capture divergence counts, branch heads, open PR list, workflow states/runs, and current remote tags.
+- Stage current ikentic helper scripts into tmp before long replay/rebuild runs:
+  - `scripts/ikentic/cli.sh stage-tools`
 - Refresh first-parent ledger and validate coverage/ordering:
   - `scripts/ikentic/cli.sh ledger-refresh`
   - `scripts/ikentic/cli.sh ledger-validate`

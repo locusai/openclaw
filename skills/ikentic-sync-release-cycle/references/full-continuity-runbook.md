@@ -60,6 +60,7 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 
 - `git fetch origin --prune`
 - `git fetch upstream --prune`
+- `scripts/ikentic/cli.sh stage-tools`
 
 3. Branch/ref truth:
 

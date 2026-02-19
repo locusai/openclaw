@@ -48,6 +48,7 @@ Read these files before branch-management actions:
     - `resolve-conflicts`
     - `check-lockfile-gates`
     - `snapshot-open-prs`
+    - `stage-tools`
     - `ledger-refresh`
     - `ledger-validate`
 - `scripts/ikentic/sync-main-into-integration.sh`
