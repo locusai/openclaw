@@ -196,6 +196,46 @@
 - For manual `openclaw message send` messages that include `!`, use the heredoc pattern noted below to avoid the Bash tool’s escaping.
 - Release guardrails: do not change version numbers without operator’s explicit consent; always ask permission before running any npm publish/release step.
 
+## Ikentic Overlay Hardening
+
+- Governance source of truth: `docs/ikentic/branch-governance-spec.md`.
+- Governance quick rules (must follow):
+  - `main` is upstream mirror only (`ff-only` sync from `upstream/main`).
+  - `integration/ikentic` is the internal deploy lane (merge-based, no force-push).
+  - `pr/*` is upstream-only lineage (base on `main`), never merged directly into `integration/ikentic`.
+  - port upstream `pr/*` into integration via `topic/sync-*` + `git cherry-pick -x` (patches, not branch lineage).
+  - `carry/publish` is release-only (version/changelog/plugin packaging/release guard updates), never a catchall.
+  - internal feature/fix/test PRs target `integration/ikentic`; release-prep PRs target `carry/publish`, then promote to `integration/ikentic`.
+  - merge strategy:
+    - `topic/* -> integration/ikentic`: prefer squash,
+    - `carry/* -> integration/ikentic`: merge commit (`--no-ff`),
+    - `main -> integration/ikentic`: merge commit (`--no-ff`),
+    - release promotions through `carry/publish`: merge commit (`--no-ff`).
+- Changelog discipline for integration work:
+  - when merging or porting changes into `integration/ikentic`, update `docs/ikentic/CHANGELOG.md` in the same change set,
+  - each entry should include source branch (`pr/*`, `topic/*`, `carry/*`), practical impact, and upstream PR status (or `pending`),
+  - if integration keeps a local overlay delta on top of an upstream patch, record that delta explicitly in the changelog entry.
+- Worktree/operator baseline:
+  - keep repo `.envrc` with `source_up`,
+  - run `direnv allow .`,
+  - run commands via `direnv exec . <command>`.
+- Rebuild method when integration becomes risky/noisy:
+  - `git switch main`
+  - `git switch -c tmp/rebuild-integration-<stamp>`
+  - merge source branches in documented order, one at a time,
+  - resolve conflicts manually (no blanket `-X ours` / `-X theirs`),
+  - validate containment: `git merge-base --is-ancestor <source-branch> tmp/rebuild-integration-<stamp>`,
+  - replace integration only after review plus safety refs.
+- Validation checklist before replacing/retiring lanes:
+  - tree equivalence: `git rev-parse <old>^{tree}` and `git rev-parse <new>^{tree}`,
+  - source containment: `git merge-base --is-ancestor <source> <integration-candidate>`,
+  - patch traceability: `git log --oneline <base>..<candidate>` and `git diff --name-status <base>..<candidate>`,
+  - list intentionally omitted commits explicitly.
+- Cleanup policy:
+  - execute deletions one-by-one after containment checks,
+  - keep `archive/*` and `safety/*` for 14 days after milestone validation,
+  - keep `carry/*` long-lived by default.
+
 ## NPM + 1Password (publish/verify)
 
 - Use the 1password skill; all `op` commands must run inside a fresh tmux session.

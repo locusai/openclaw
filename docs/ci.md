@@ -52,13 +52,9 @@ pnpm release:check  # validate npm pack
 
 ## Ikentic Fork Release Workflow Notes
 
-For `locusai/openclaw` Ikentic releases, branch governance is split by scope:
-
-- Internal feature/fix/test PRs target `integration/ikentic`.
-- Release-scope changes promote in order: `topic/release-* -> carry/publish -> integration/ikentic`.
-- Keep `carry/publish` long-lived; never delete it after merge.
-- Keep `carry/publish` release-only (version/changelog/plugin packaging/release guard updates).
-- Release tags must be pushed from the promoted `integration/ikentic` release commit.
+Ikentic branch governance is defined in
+[`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
+This CI page only covers workflow execution behavior.
 
 If Docker release is not used:
 
