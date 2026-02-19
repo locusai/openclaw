@@ -18,6 +18,7 @@ USAGE
   exit 0
 fi
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
@@ -49,9 +50,9 @@ if ! run_cmd git merge --no-ff origin/main -m "sync integration with mirror main
   :
 fi
 
-"$repo_root/scripts/ikentic/classify-conflicts.sh" || true
+"$script_dir/classify-conflicts.sh" || true
 
-if "$repo_root/scripts/ikentic/resolve-sync-conflicts.sh"; then
+if "$script_dir/resolve-sync-conflicts.sh"; then
   echo "sync bootstrap complete: ${branch}"
   exit 0
 fi
