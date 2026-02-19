@@ -50,6 +50,8 @@ Phase B: Upstream mirror sync
 
 Phase C: Integration sync from mirror (deterministic reconciliation)
 
+- Preferred bootstrap (includes Phase B ff-only mirror step):
+  - `scripts/ikentic/sync-main-into-integration.sh`
 - Create sync branch from integration:
   - `git switch -c topic/sync-main-<stamp> origin/integration/ikentic`
 - Merge mirror main:

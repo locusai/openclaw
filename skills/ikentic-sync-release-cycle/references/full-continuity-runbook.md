@@ -89,6 +89,10 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 
 Deterministic main->integration reconciliation protocol:
 
+0. Preferred bootstrap (includes mirror fast-forward + sync branch creation + deterministic auto-resolution):
+
+- `scripts/ikentic/sync-main-into-integration.sh`
+
 1. Create sync branch:
 
 - `git switch -c topic/sync-main-<stamp> origin/integration/ikentic`

@@ -38,6 +38,8 @@ Read these files before branch-management actions:
 
 ## Deterministic Helpers
 
+- `scripts/ikentic/sync-main-into-integration.sh`
+  - Fetch/prune refs, fast-forward `main` from `upstream/main`, push mirror, create `topic/sync-main-*`, merge `origin/main`, and run deterministic conflict pass.
 - `scripts/ikentic/classify-conflicts.sh`
   - Classify unresolved files into Classes A/B/C/D.
 - `scripts/ikentic/resolve-sync-conflicts.sh`
