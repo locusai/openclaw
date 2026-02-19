@@ -1,0 +1,314 @@
+name: Docker Release (Ikentic)
+
+on:
+  push:
+    tags:
+      - "v*-ike*"
+  workflow_dispatch:
+
+concurrency:
+  group: docker-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
+
+jobs:
+  # Build amd64 image
+  build-amd64:
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce carry/integration release lineage
+        if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-ike')
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_SHA="${GITHUB_SHA}"
+          git fetch --no-tags origin \
+            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
+            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
+          CARRY_SHA="$(git rev-parse origin/carry/publish)"
+          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
+          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
+          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
+            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
+            exit 1
+          fi
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
+            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
+            exit 1
+          fi
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+
+      - name: Bundle IKENTIC plugin
+        run: pnpm bundle:ikentic
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags (amd64)
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main-amd64")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}-amd64")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No amd64 tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push amd64 image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          tags: ${{ steps.tags.outputs.value }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:amd64
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:amd64,mode=max
+          provenance: false
+          push: true
+
+      - name: Runtime smoke + token check (amd64)
+        shell: bash
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          TOKEN_TO_CHECK: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          OUTPUT="$(docker run --rm --env NODE_AUTH_TOKEN= "$IMAGE_REF" node openclaw.mjs plugins list)"
+          echo "$OUTPUT"
+          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
+            echo "IKENTIC plugin is not discoverable in amd64 image."
+            exit 1
+          fi
+          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker run --rm --env TOKEN_TO_CHECK="$TOKEN_TO_CHECK" "$IMAGE_REF" sh -lc 'grep -R --binary-files=without-match -F "$TOKEN_TO_CHECK" /app >/dev/null 2>&1'; then
+            echo "IKENTIC read token value found in amd64 image filesystem."
+            exit 1
+          fi
+          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker history --no-trunc "$IMAGE_REF" | grep -F --quiet "$TOKEN_TO_CHECK"; then
+            echo "IKENTIC read token value found in amd64 image history."
+            exit 1
+          fi
+
+  # Build arm64 image
+  build-arm64:
+    runs-on: blacksmith-16vcpu-ubuntu-2404-arm
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      image-digest: ${{ steps.build.outputs.digest }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Enforce carry/integration release lineage
+        if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-ike')
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_SHA="${GITHUB_SHA}"
+          git fetch --no-tags origin \
+            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
+            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
+          CARRY_SHA="$(git rev-parse origin/carry/publish)"
+          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
+          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
+          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
+            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
+            exit 1
+          fi
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
+            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
+            exit 1
+          fi
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+
+      - name: Bundle IKENTIC plugin
+        run: pnpm bundle:ikentic
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve image tags (arm64)
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main-arm64")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}-arm64")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No arm64 tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push arm64 image
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/arm64
+          tags: ${{ steps.tags.outputs.value }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:arm64
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:arm64,mode=max
+          provenance: false
+          push: true
+
+      - name: Runtime smoke + token check (arm64)
+        shell: bash
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
+          TOKEN_TO_CHECK: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          OUTPUT="$(docker run --rm --env NODE_AUTH_TOKEN= "$IMAGE_REF" node openclaw.mjs plugins list)"
+          echo "$OUTPUT"
+          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
+            echo "IKENTIC plugin is not discoverable in arm64 image."
+            exit 1
+          fi
+          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker run --rm --env TOKEN_TO_CHECK="$TOKEN_TO_CHECK" "$IMAGE_REF" sh -lc 'grep -R --binary-files=without-match -F "$TOKEN_TO_CHECK" /app >/dev/null 2>&1'; then
+            echo "IKENTIC read token value found in arm64 image filesystem."
+            exit 1
+          fi
+          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker history --no-trunc "$IMAGE_REF" | grep -F --quiet "$TOKEN_TO_CHECK"; then
+            echo "IKENTIC read token value found in arm64 image history."
+            exit 1
+          fi
+
+  # Create multi-platform manifest
+  create-manifest:
+    runs-on: blacksmith-16vcpu-ubuntu-2404
+    permissions:
+      packages: write
+      contents: read
+    needs: [build-amd64, build-arm64]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Resolve manifest tags
+        id: tags
+        shell: bash
+        env:
+          IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        run: |
+          set -euo pipefail
+          tags=()
+          if [[ "${GITHUB_REF}" == "refs/heads/main" ]]; then
+            tags+=("${IMAGE}:main")
+          fi
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            version="${GITHUB_REF#refs/tags/v}"
+            tags+=("${IMAGE}:${version}")
+          fi
+          if [[ ${#tags[@]} -eq 0 ]]; then
+            echo "::error::No manifest tags resolved for ref ${GITHUB_REF}"
+            exit 1
+          fi
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${tags[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Create and push manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mapfile -t tags <<< "${{ steps.tags.outputs.value }}"
+          args=()
+          for tag in "${tags[@]}"; do
+            [ -z "$tag" ] && continue
+            args+=("-t" "$tag")
+          done
+          docker buildx imagetools create "${args[@]}" \
+            ${{ needs.build-amd64.outputs.image-digest }} \
+            ${{ needs.build-arm64.outputs.image-digest }}

@@ -6,6 +6,7 @@ on:
       - main
     tags:
       - "v*"
+      - "!v*-ike*"
     paths-ignore:
       - "docs/**"
       - "**/*.md"
