@@ -1,44 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-usage() {
-  cat <<'EOF'
-Usage: docker-setup.sh [--build-only]
-
-Options:
-  --build-only   Build the Docker image and exit (skip onboarding + starting gateway).
-EOF
-}
-
-build_only=false
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --help|-h)
-      usage
-      exit 0
-      ;;
-    --build-only)
-      build_only=true
-      shift
-      ;;
-    --)
-      shift
-      break
-      ;;
-    *)
-      echo "Unknown argument: $1" >&2
-      usage >&2
-      exit 2
-      ;;
-  esac
-done
-
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
 EXTRA_COMPOSE_FILE="$ROOT_DIR/docker-compose.extra.yml"
 IMAGE_NAME="${OPENCLAW_IMAGE:-openclaw:local}"
 EXTRA_MOUNTS="${OPENCLAW_EXTRA_MOUNTS:-}"
 HOME_VOLUME_NAME="${OPENCLAW_HOME_VOLUME:-}"
+
+fail() {
+  echo "ERROR: $*" >&2
+  exit 1
+}
 
 require_cmd() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -47,37 +20,42 @@ require_cmd() {
   fi
 }
 
-is_uint() {
-  [[ "${1:-}" =~ ^[0-9]+$ ]]
+contains_disallowed_chars() {
+  local value="$1"
+  [[ "$value" == *$'\n'* || "$value" == *$'\r'* || "$value" == *$'\t'* ]]
 }
 
-resolve_numeric_id() {
-  local name="$1"
-  local default="$2"
-  local flag="$3"
-  local value="${!name-}"
-
-  if [[ -n "$value" ]]; then
-    if ! is_uint "$value"; then
-      echo "${name} must be a numeric id (got: ${value})" >&2
-      exit 2
-    fi
-    printf '%s' "$value"
-    return
+validate_mount_path_value() {
+  local label="$1"
+  local value="$2"
+  if [[ -z "$value" ]]; then
+    fail "$label cannot be empty."
   fi
-
-  value="$(id "$flag" 2>/dev/null || true)"
-  if is_uint "$value"; then
-    printf '%s' "$value"
-    return
+  if contains_disallowed_chars "$value"; then
+    fail "$label contains unsupported control characters."
   fi
-
-  if [[ -n "$value" ]]; then
-    echo "Warning: id ${flag} returned a non-numeric value (${value}); defaulting ${name}=${default}" >&2
-  else
-    echo "Warning: id ${flag} failed; defaulting ${name}=${default}" >&2
+  if [[ "$value" =~ [[:space:]] ]]; then
+    fail "$label cannot contain whitespace."
   fi
-  printf '%s' "$default"
+}
+
+validate_named_volume() {
+  local value="$1"
+  if [[ ! "$value" =~ ^[A-Za-z0-9][A-Za-z0-9_.-]*$ ]]; then
+    fail "OPENCLAW_HOME_VOLUME must match [A-Za-z0-9][A-Za-z0-9_.-]* when using a named volume."
+  fi
+}
+
+validate_mount_spec() {
+  local mount="$1"
+  if contains_disallowed_chars "$mount"; then
+    fail "OPENCLAW_EXTRA_MOUNTS entries cannot contain control characters."
+  fi
+  # Keep mount specs strict to avoid YAML structure injection.
+  # Expected format: source:target[:options]
+  if [[ ! "$mount" =~ ^[^[:space:],:]+:[^[:space:],:]+(:[^[:space:],:]+)?$ ]]; then
+    fail "Invalid mount format '$mount'. Expected source:target[:options] without spaces."
+  fi
 }
 
 require_cmd docker
@@ -88,6 +66,19 @@ fi
 
 OPENCLAW_CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-$HOME/.openclaw}"
 OPENCLAW_WORKSPACE_DIR="${OPENCLAW_WORKSPACE_DIR:-$HOME/.openclaw/workspace}"
+
+validate_mount_path_value "OPENCLAW_CONFIG_DIR" "$OPENCLAW_CONFIG_DIR"
+validate_mount_path_value "OPENCLAW_WORKSPACE_DIR" "$OPENCLAW_WORKSPACE_DIR"
+if [[ -n "$HOME_VOLUME_NAME" ]]; then
+  if [[ "$HOME_VOLUME_NAME" == *"/"* ]]; then
+    validate_mount_path_value "OPENCLAW_HOME_VOLUME" "$HOME_VOLUME_NAME"
+  else
+    validate_named_volume "$HOME_VOLUME_NAME"
+  fi
+fi
+if contains_disallowed_chars "$EXTRA_MOUNTS"; then
+  fail "OPENCLAW_EXTRA_MOUNTS cannot contain control characters."
+fi
 
 mkdir -p "$OPENCLAW_CONFIG_DIR"
 mkdir -p "$OPENCLAW_WORKSPACE_DIR"
@@ -101,10 +92,6 @@ export OPENCLAW_IMAGE="$IMAGE_NAME"
 export OPENCLAW_DOCKER_APT_PACKAGES="${OPENCLAW_DOCKER_APT_PACKAGES:-}"
 export OPENCLAW_EXTRA_MOUNTS="$EXTRA_MOUNTS"
 export OPENCLAW_HOME_VOLUME="$HOME_VOLUME_NAME"
-
-OPENCLAW_UID="$(resolve_numeric_id OPENCLAW_UID 1000 -u)"
-OPENCLAW_GID="$(resolve_numeric_id OPENCLAW_GID 1000 -g)"
-export OPENCLAW_UID OPENCLAW_GID
 
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   if command -v openssl >/dev/null 2>&1; then
@@ -126,6 +113,9 @@ write_extra_compose() {
   local home_volume="$1"
   shift
   local mount
+  local gateway_home_mount
+  local gateway_config_mount
+  local gateway_workspace_mount
 
   cat >"$EXTRA_COMPOSE_FILE" <<'YAML'
 services:
@@ -134,12 +124,19 @@ services:
 YAML
 
   if [[ -n "$home_volume" ]]; then
-    printf '      - %s:/home/node\n' "$home_volume" >>"$EXTRA_COMPOSE_FILE"
-    printf '      - %s:/home/node/.openclaw\n' "$OPENCLAW_CONFIG_DIR" >>"$EXTRA_COMPOSE_FILE"
-    printf '      - %s:/home/node/.openclaw/workspace\n' "$OPENCLAW_WORKSPACE_DIR" >>"$EXTRA_COMPOSE_FILE"
+    gateway_home_mount="${home_volume}:/home/node"
+    gateway_config_mount="${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw"
+    gateway_workspace_mount="${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace"
+    validate_mount_spec "$gateway_home_mount"
+    validate_mount_spec "$gateway_config_mount"
+    validate_mount_spec "$gateway_workspace_mount"
+    printf '      - %s\n' "$gateway_home_mount" >>"$EXTRA_COMPOSE_FILE"
+    printf '      - %s\n' "$gateway_config_mount" >>"$EXTRA_COMPOSE_FILE"
+    printf '      - %s\n' "$gateway_workspace_mount" >>"$EXTRA_COMPOSE_FILE"
   fi
 
   for mount in "$@"; do
+    validate_mount_spec "$mount"
     printf '      - %s\n' "$mount" >>"$EXTRA_COMPOSE_FILE"
   done
 
@@ -149,16 +146,18 @@ YAML
 YAML
 
   if [[ -n "$home_volume" ]]; then
-    printf '      - %s:/home/node\n' "$home_volume" >>"$EXTRA_COMPOSE_FILE"
-    printf '      - %s:/home/node/.openclaw\n' "$OPENCLAW_CONFIG_DIR" >>"$EXTRA_COMPOSE_FILE"
-    printf '      - %s:/home/node/.openclaw/workspace\n' "$OPENCLAW_WORKSPACE_DIR" >>"$EXTRA_COMPOSE_FILE"
+    printf '      - %s\n' "$gateway_home_mount" >>"$EXTRA_COMPOSE_FILE"
+    printf '      - %s\n' "$gateway_config_mount" >>"$EXTRA_COMPOSE_FILE"
+    printf '      - %s\n' "$gateway_workspace_mount" >>"$EXTRA_COMPOSE_FILE"
   fi
 
   for mount in "$@"; do
+    validate_mount_spec "$mount"
     printf '      - %s\n' "$mount" >>"$EXTRA_COMPOSE_FILE"
   done
 
   if [[ -n "$home_volume" && "$home_volume" != *"/"* ]]; then
+    validate_named_volume "$home_volume"
     cat >>"$EXTRA_COMPOSE_FILE" <<YAML
 volumes:
   ${home_volume}:
@@ -243,24 +242,14 @@ upsert_env "$ENV_FILE" \
   OPENCLAW_IMAGE \
   OPENCLAW_EXTRA_MOUNTS \
   OPENCLAW_HOME_VOLUME \
-  OPENCLAW_UID \
-  OPENCLAW_GID \
   OPENCLAW_DOCKER_APT_PACKAGES
 
 echo "==> Building Docker image: $IMAGE_NAME"
 docker build \
   --build-arg "OPENCLAW_DOCKER_APT_PACKAGES=${OPENCLAW_DOCKER_APT_PACKAGES}" \
-  --build-arg "OPENCLAW_UID=${OPENCLAW_UID}" \
-  --build-arg "OPENCLAW_GID=${OPENCLAW_GID}" \
   -t "$IMAGE_NAME" \
   -f "$ROOT_DIR/Dockerfile" \
   "$ROOT_DIR"
-
-if [[ "$build_only" == true ]]; then
-  echo ""
-  echo "==> Build-only mode: skipping onboarding and gateway start."
-  exit 0
-fi
 
 echo ""
 echo "==> Onboarding (interactive)"
