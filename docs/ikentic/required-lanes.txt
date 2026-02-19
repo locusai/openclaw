@@ -1,4 +1,8 @@
 # Required carry lanes for blocking completeness checks.
 # Format: one carry lane per line as carry/<name>.
 
+carry/docs
+carry/ikentic-dual-mode-docker
+carry/ops
+carry/publish
 carry/tests
