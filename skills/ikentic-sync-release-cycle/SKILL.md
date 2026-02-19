@@ -14,7 +14,7 @@ Read these files before branch-management actions:
 
 1. `docs/ikentic/branch-governance-spec.md`
 2. `AGENTS.md`
-3. `docs/reference/RELEASING.md`
+3. `docs/ikentic/RELEASING.md`
 4. `docs/ci.md`
 5. `docs/ikentic/CHANGELOG.md`
 
@@ -28,6 +28,9 @@ Read these files before branch-management actions:
 6. Use `direnv exec . <command>` directly (no manual export shims).
 7. Use elevated permissions when required by this environment.
 8. Treat changelog maintenance as a separate lane; changelog conflicts must not drive dependency decisions.
+9. Snapshot open main-based `pr/*` heads before mechanical porting and pin to captured SHAs for the cycle.
+10. Do not create the final review branch until the mechanical sync branch is merged into `integration/ikentic`.
+11. Mechanical sync branches must contain deterministic-only edits; manual conflict edits belong to the final review branch.
 
 ## Deterministic Conflict Classes
 
@@ -60,8 +63,9 @@ Use process-only mode for recurring cycles where the operator wants the reusable
 ## Execution Skeleton
 
 1. Load fresh session truth (env bootstrap, fetch/prune, divergence, refs, PRs, workflows, tags).
-2. Fast-forward mirror `main` from `upstream/main` when behind.
-3. Port selected `pr/*` deltas into `integration/ikentic` using `topic/sync-*` branches.
-4. Run release path `topic/release-* -> carry/publish -> integration/ikentic -> tag`.
-5. Verify npm publish evidence lines for bundle spec, dist-tag, and published version.
-6. Delete temporary `topic/sync-*` and `topic/release-*` branches after merge; keep long-lived lanes.
+2. Snapshot open main-based `pr/*` branches with pinned head SHAs for the cycle.
+3. Build and merge the mechanical sync branch (mirror merge + deterministic conflict handling + conflict-free snapshot PR ports).
+4. Build final review branch from post-mechanical `integration/ikentic` head for unresolved/manual/conflict-bearing ports only.
+5. Run release path `topic/release-* -> carry/publish -> integration/ikentic -> tag`.
+6. Verify npm publish evidence lines for bundle spec, dist-tag, and published version.
+7. Delete temporary `topic/sync-*` and `topic/release-*` branches after merge; keep long-lived lanes.

@@ -10,8 +10,8 @@ Mandatory docs and why:
    Why: defines canonical routing and merge policy by branch type.
 2. [AGENTS.md](AGENTS.md)
    Why: required branch-management safety rules and execution conventions.
-3. [Releasing Guide](docs/reference/RELEASING.md)
-   Why: exact release branch/tag/publish order and checks.
+3. [Ikentic Releasing Guide](docs/ikentic/RELEASING.md)
+   Why: fork release branch/tag/publish order and Ikentic-specific checks.
 4. [CI Guide](docs/ci.md)
    Why: confirms expected workflow triggers and gating behavior.
 
@@ -24,6 +24,9 @@ Invariant policy:
 - Main-based upstream PRs are integrated by cherry-picking missing commits into fresh `topic/sync-*` branches.
 - Dev release flow is always `topic/release -> carry/publish -> integration/ikentic -> tag`.
 - Changelog maintenance is separate from dependency reconciliation. Do not use changelog conflicts to choose dependency versions.
+- Snapshot open main-based PR heads before mechanical porting and pin to those SHAs for the cycle.
+- Do not create the final review branch before mechanical sync is merged into `integration/ikentic`.
+- Mechanical branches are deterministic-only; manual conflict edits are review-lane work.
 - Use `direnv exec . <command>` directly and elevated permissions when needed.
 
 Deterministic conflict classes:
@@ -40,6 +43,10 @@ Phase A: Session truth load
 - Bootstrap env (`pnpm install`, `.envrc` with `source_up`, `direnv allow .`).
 - Fetch origin/upstream with prune.
 - Capture divergence counts, branch heads, open PR list, workflow states/runs, and current remote tags.
+- Snapshot open main-based PR heads for this cycle (pin SHAs):
+  - `mkdir -p .ikentic/snapshots`
+  - `SNAP=.ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
+  - `direnv exec . gh pr list --repo locusai/openclaw --state open --search "base:main head:pr/" --limit 200 --json number,title,headRefName,baseRefName,headRefOid,url > "$SNAP"`
 
 Phase B: Upstream mirror sync
 
@@ -48,39 +55,40 @@ Phase B: Upstream mirror sync
   - `git merge --ff-only upstream/main`
   - `git push origin main`
 
-Phase C: Integration sync from mirror (deterministic reconciliation)
+Phase C: Mechanical sync branch (must merge first)
 
 - Preferred bootstrap (includes Phase B ff-only mirror step):
   - `scripts/ikentic/sync-main-into-integration.sh`
-- Create sync branch from integration:
-  - `git switch -c topic/sync-main-<stamp> origin/integration/ikentic`
-- Merge mirror main:
+- Create mechanical branch from integration:
+  - `git switch -c topic/sync-main-<stamp>-mechanical origin/integration/ikentic`
+- Merge mirror main into mechanical branch:
   - `git merge --no-ff origin/main -m "sync integration with mirror main"`
 - Classify conflicts:
   - `scripts/ikentic/classify-conflicts.sh`
 - Apply deterministic resolver pass:
   - `scripts/ikentic/resolve-sync-conflicts.sh`
-- Resolve any remaining Class D conflicts manually and capture rationale for PR body.
+- If Class D conflicts remain, stop and fail this mechanical attempt (do not hand-edit).
+- Port snapshot PR patches that cherry-pick cleanly:
+  - For each entry in `$SNAP`, verify `git rev-parse origin/<headRefName> == <headRefOid>` before porting.
+  - If any head SHA drift is detected, stop and regenerate snapshot.
+  - Use `git cherry -v HEAD origin/<headRefName>` to list missing commits.
+  - `git cherry-pick -x` only commits that apply cleanly.
+  - On conflict, `git cherry-pick --abort`, record branch/commit as manual backlog, and continue mechanical-only ports.
+- Mechanical branch must contain only deterministic edits (mirror merge, class-resolved files, clean cherry-picks).
 - Regenerate lockfile from resolved manifests:
   - `direnv exec . pnpm install --lockfile-only`
 - Validate lockfile/install gates:
-  - `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic HEAD`
-- Open/merge PR into `integration/ikentic`.
-- Delete temporary sync branch local+remote after merge.
+  - `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
+- Merge mechanical branch into `integration/ikentic` first (direct merge/push is allowed for mechanical lane).
 
-Phase D: Integration porting from main-based PRs
+Phase D: Final review branch (post-mechanical only)
 
-For each selected `origin/pr/*` branch:
-
-- Compute missing patch set relative to integration:
-  - `git cherry -v origin/integration/ikentic origin/pr/<branch>`
-- Create fresh port branch from integration:
-  - `git switch -c topic/sync-<name>-<n> origin/integration/ikentic`
-- Cherry-pick only missing commits (`-x`).
-- Reapply required integration-only overlay hunks if needed.
-- Validate tests/checks.
-- Open/merge PR into `integration/ikentic`.
-- Delete temporary sync branch local+remote after merge.
+- Create review branch from updated `origin/integration/ikentic` head:
+  - `git switch -c topic/sync-main-<stamp>-review origin/integration/ikentic`
+- Apply only:
+  - snapshot PR commits that required manual resolution,
+  - intentional integration-impacting deltas not safe for mechanical lane.
+- Open final review PR from this branch.
 
 Phase E: Dev release publish
 
@@ -110,7 +118,10 @@ Phase G: Documentation/governance hygiene
 
 Required sync PR evidence:
 
+- Snapshot artifact path and timestamp used for mechanical ports.
 - Conflict-class summary (Class A/B/C auto-resolved + Class D manual rationale).
+- Manual backlog list from snapshot branches (conflicted/skipped commits).
+- Mechanical merge commit SHA merged into `integration/ikentic` before review branch creation.
 - Lockfile regeneration command output.
 - Frozen-lockfile validation output.
 

@@ -12,6 +12,12 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 - Restored upstream release doc to generic baseline with no Ikentic-specific references.
 - Added governance rule that Ikentic-specific docs live under `docs/ikentic/**` to reduce future
   upstream-doc bleed.
+- Added deterministic sync safeguards:
+  - snapshot/pin open main-based PR heads before mechanical porting,
+  - require mechanical merge to land before final review branch creation,
+  - keep manual conflict edits out of mechanical lane.
+- Updated `ikentic-sync-release-cycle` skill runbooks to make the above safeguards mandatory in the
+  repeatable and full-continuity flows.
 
 ### Source: `pr/control-ui-plugin-extensions`
 

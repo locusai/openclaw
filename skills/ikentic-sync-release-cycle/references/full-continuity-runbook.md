@@ -19,8 +19,8 @@ Required docs to read first (with reason):
    Reason: single source of truth for branch routing, merge strategy, carry/publish scope, and upstream-port flow.
 2. [AGENTS.md](AGENTS.md)
    Reason: execution guardrails and mandatory pre-branch-management governance check.
-3. [Releasing Guide](docs/reference/RELEASING.md)
-   Reason: release/tag/publish operational sequence and release verification expectations.
+3. [Ikentic Releasing Guide](docs/ikentic/RELEASING.md)
+   Reason: fork release/tag/publish sequence and Ikentic-specific verification expectations.
 4. [CI Guide](docs/ci.md)
    Reason: workflow behavior, lineage gates, and expected CI release path behavior.
 5. [Ikentic Changelog](docs/ikentic/CHANGELOG.md)
@@ -34,6 +34,9 @@ Hard rules:
 - Do not treat `carry/publish` as catchall; release-scope changes only.
 - For main-based upstream PR updates, port patches into integration via `topic/sync-*`, not lineage merges.
 - Changelog maintenance is separate from dependency reconciliation.
+- Snapshot open main-based PR heads before mechanical porting and pin to those SHAs for the cycle.
+- Do not create the final review branch before mechanical sync merge lands in `integration/ikentic`.
+- Mechanical sync branches contain deterministic-only edits (no manual conflict edits).
 - Use elevated permissions when needed in this environment.
 - Use `direnv exec . <command>` directly (no manual export shims when using direnv exec).
 
@@ -73,7 +76,10 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 
 4. PR truth:
 
-- `direnv exec . gh pr list --repo locusai/openclaw --state open --limit 100 --json number,title,headRefName,baseRefName,url`
+- `direnv exec . gh pr list --repo locusai/openclaw --state open --limit 100 --json number,title,headRefName,baseRefName,headRefOid,url`
+- `mkdir -p .ikentic/snapshots`
+- `SNAP=.ikentic/snapshots/open-main-prs-$(date +%Y%m%d-%H%M%S).json`
+- `direnv exec . gh pr list --repo locusai/openclaw --state open --search "base:main head:pr/" --limit 200 --json number,title,headRefName,baseRefName,headRefOid,url > "$SNAP"`
 
 5. Workflow truth:
 
@@ -93,9 +99,9 @@ Deterministic main->integration reconciliation protocol:
 
 - `scripts/ikentic/sync-main-into-integration.sh`
 
-1. Create sync branch:
+1. Create mechanical sync branch:
 
-- `git switch -c topic/sync-main-<stamp> origin/integration/ikentic`
+- `git switch -c topic/sync-main-<stamp>-mechanical origin/integration/ikentic`
 
 2. Merge mirror main:
 
@@ -109,17 +115,36 @@ Deterministic main->integration reconciliation protocol:
 
 - `scripts/ikentic/resolve-sync-conflicts.sh`
 
-5. Resolve remaining Class D conflicts manually and note rationale for PR body.
+5. Mechanical guard:
 
-6. Regenerate lockfile from resolved manifests:
+- if Class D conflicts remain, stop and fail this mechanical attempt (no manual edits in mechanical lane).
+
+6. Port snapshot PR commits that cherry-pick cleanly:
+
+- for each snapshot row in `$SNAP`, verify `origin/<headRefName>` still equals `headRefOid`.
+- if any head SHA drift is detected, stop and regenerate snapshot before continuing.
+- compute missing commits via `git cherry -v HEAD origin/<headRefName>`.
+- `git cherry-pick -x` only cleanly applicable commits.
+- on conflict: `git cherry-pick --abort`, record branch/commit as manual backlog for review lane.
+
+7. Regenerate lockfile from resolved manifests:
 
 - `direnv exec . pnpm install --lockfile-only`
 
-7. Validate install deterministically:
+8. Validate install deterministically:
 
-- `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic HEAD`
+- `scripts/ikentic/check-lockfile-gates.sh origin/integration/ikentic topic/sync-main-<stamp>-mechanical`
 
-8. If validation fails:
+9. Merge mechanical branch into integration:
+
+- merge/push `topic/sync-main-<stamp>-mechanical` into `integration/ikentic` first.
+
+10. Create final review branch only after mechanical merge:
+
+- `git switch -c topic/sync-main-<stamp>-review origin/integration/ikentic`
+- apply only manual backlog and intentional integration-impacting deltas.
+
+11. If validation fails:
 
 - stop and fail the sync branch,
 - report concise file-level failure summary,
@@ -128,7 +153,7 @@ Deterministic main->integration reconciliation protocol:
 Execution objectives:
 
 1. Bring mirror `main` up to spec (ff-only from upstream) when behind.
-2. Bring `integration/ikentic` up to spec with deterministic reconciliation and selected `pr/*` patch ports.
+2. Bring `integration/ikentic` up to spec by merging mechanical sync first, then review-only deltas.
 3. Build/publish newest dev release on correct branch route: `topic/release -> carry/publish -> integration/ikentic -> tag`.
 4. Validate npm publish evidence lines for plugin spec, dist-tag, and published package version.
 5. Keep temporary sync/release branches cleaned up after merge; keep long-lived governance lanes intact.
