@@ -9,8 +9,7 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 
 - Moved Ikentic release-process body content out of `docs/reference/RELEASING.md` into
   `docs/ikentic/RELEASING.md`.
-- Kept upstream release doc as generic baseline and replaced fork-specific body content with a
-  pointer to Ikentic-local docs.
+- Restored upstream release doc to generic baseline with no Ikentic-specific references.
 - Added governance rule that Ikentic-specific docs live under `docs/ikentic/**` to reduce future
   upstream-doc bleed.
 

@@ -206,4 +206,4 @@ Treat `carry/publish` scope as enforceable policy, not convention.
 - Internal PRs remain on `integration/ikentic`.
 - Main-based upstream PR branches are ported via `topic/sync-*` + `cherry-pick -x`.
 - Ikentic-specific documentation content lives under `docs/ikentic/**`.
-- Non-Ikentic docs (for example `docs/reference/*`, `docs/ci.md`) may include pointer links to Ikentic docs, but should not carry Ikentic policy/process bodies.
+- Non-Ikentic docs (for example `docs/reference/*`, `docs/ci.md`) must stay free of Ikentic policy/process content and Ikentic-specific cross-links.

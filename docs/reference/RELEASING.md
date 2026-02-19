@@ -11,9 +11,6 @@ read_when:
 
 Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tagging/publishing.
 
-Fork-specific release guidance lives at
-[`/ikentic/RELEASING`](/ikentic/RELEASING).
-
 ## Operator trigger
 
 When the operator says “release”, immediately do this preflight (no extra questions unless blocked):
