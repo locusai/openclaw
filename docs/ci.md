@@ -34,12 +34,11 @@ Jobs are ordered so cheap checks fail before expensive ones run:
 
 ## Runners
 
-| Runner                          | Jobs                          |
-| ------------------------------- | ----------------------------- |
-| `blacksmith-4vcpu-ubuntu-2404`  | Most Linux jobs               |
-| `blacksmith-4vcpu-windows-2025` | `checks-windows`              |
-| `macos-latest`                  | `macos`, `ios`                |
-| `ubuntu-latest`                 | Scope detection (lightweight) |
+| Runner                           | Jobs                                       |
+| -------------------------------- | ------------------------------------------ |
+| `blacksmith-16vcpu-ubuntu-2404`  | Most Linux jobs, including scope detection |
+| `blacksmith-16vcpu-windows-2025` | `checks-windows`                           |
+| `macos-latest`                   | `macos`, `ios`                             |
 
 ## Local Equivalents
 
@@ -49,36 +48,3 @@ pnpm test           # vitest tests
 pnpm check:docs     # docs format + lint + broken links
 pnpm release:check  # validate npm pack
 ```
-
-## Ikentic Fork Release Workflow Notes
-
-Ikentic branch governance is defined in
-[`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
-This CI page only covers workflow execution behavior.
-
-Release workflows bundle IKENTIC before build (not at runtime):
-
-- `pnpm bundle:ikentic` runs before `pnpm build` in `npm-publish.yml` and `docker-release.yml`.
-- Required CI inputs:
-  - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret, read access for `npm.pkg.github.com` for IKENTIC and its transitive `@locusai/*` runtime deps)
-  - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` for bundle steps (ensures `@locusai` scope uses GitHub Packages when install runs inside `extensions/...`)
-- IKENTIC npm publish workflow runs only on tags matching `v*-ike*`.
-- In `npm-publish.yml`, plugin spec is derived from release tag:
-  - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
-  - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
-  - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
-  - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
-- In `npm-publish.yml`, npm dist-tag is derived from release tag:
-  - `-ike.N` -> `ike`
-  - `-ike.beta.N` -> `beta`
-  - `-ike.rc.N` -> `rc`
-  - `-ike.dev.N` -> `dev`
-- Release tag lineage gate enforces that `GITHUB_SHA` is reachable from both `origin/carry/publish` and `origin/integration/ikentic` before publish/build steps proceed.
-- Release workflows also run smoke checks without `NODE_AUTH_TOKEN` and fail if the token value appears in npm tarballs or Docker image filesystem/history.
-- Tokens are used only in CI bundle/security-check steps and are not passed into Docker build args/layers.
-
-If Docker release is not used:
-
-- Disable `docker-release.yml` in GitHub Actions settings/API.
-- Do not modify workflow YAML only to disable it operationally.
-- Keep npm publish flow (`npm-publish.yml`) as the required release gate.
