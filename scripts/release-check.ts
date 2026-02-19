@@ -21,6 +21,18 @@ type PackageJson = {
   version?: string;
 };
 
+const firstPartyExtensionScopes = ["@openclaw/"];
+const ENFORCE_PLUGIN_SYNC_ENV = "OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC";
+
+function envEnabled(name: string): boolean {
+  const raw = process.env[name];
+  if (!raw) {
+    return false;
+  }
+  const value = raw.trim().toLowerCase();
+  return value === "1" || value === "true" || value === "yes" || value === "on";
+}
+
 function runPackDry(): PackResult[] {
   const raw = execSync("npm pack --dry-run --json --ignore-scripts", {
     encoding: "utf8",
@@ -31,6 +43,10 @@ function runPackDry(): PackResult[] {
 }
 
 function checkPluginVersions() {
+  if (!envEnabled(ENFORCE_PLUGIN_SYNC_ENV)) {
+    return;
+  }
+
   const rootPackagePath = resolve("package.json");
   const rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8")) as PackageJson;
   const targetVersion = rootPackage.version;
@@ -60,17 +76,23 @@ function checkPluginVersions() {
       continue;
     }
 
+    const isFirstParty = firstPartyExtensionScopes.some((scope) => pkg.name.startsWith(scope));
+    if (!isFirstParty) {
+      continue;
+    }
+
     if (pkg.version !== targetVersion) {
       mismatches.push(`${pkg.name} (${pkg.version})`);
     }
   }
 
   if (mismatches.length > 0) {
-    console.error(`release-check: plugin versions must match ${targetVersion}:`);
+    console.error(`release-check: first-party plugin versions must match ${targetVersion}:`);
     for (const item of mismatches) {
       console.error(`  - ${item}`);
     }
     console.error("release-check: run `pnpm plugins:sync` to align plugin versions.");
+    console.error(`release-check: enforced by ${ENFORCE_PLUGIN_SYNC_ENV}=1.`);
     process.exit(1);
   }
 }

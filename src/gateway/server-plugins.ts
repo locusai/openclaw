@@ -17,12 +17,7 @@ export function loadGatewayPlugins(params: {
   const pluginRegistry = loadOpenClawPlugins({
     config: params.cfg,
     workspaceDir: params.workspaceDir,
-    logger: {
-      info: (msg) => params.log.info(msg),
-      warn: (msg) => params.log.warn(msg),
-      error: (msg) => params.log.error(msg),
-      debug: (msg) => params.log.debug(msg),
-    },
+    logger: params.log,
     coreGatewayHandlers: params.coreGatewayHandlers,
   });
   const pluginMethods = Object.keys(pluginRegistry.gatewayHandlers);

@@ -9,6 +9,7 @@ import type {
 import { registerInternalHook } from "../hooks/internal-hooks.js";
 import type { HookEntry } from "../hooks/types.js";
 import { resolveUserPath } from "../utils.js";
+import { registerPluginCommandOption } from "./command-options.js";
 import { registerPluginCommand } from "./commands.js";
 import { normalizePluginHttpPath } from "./http-path.js";
 import type { PluginRuntime } from "./runtime/types.js";
@@ -17,6 +18,8 @@ import type {
   OpenClawPluginChannelRegistration,
   OpenClawPluginCliRegistrar,
   OpenClawPluginCommandDefinition,
+  OpenClawPluginCommandOptionDefinition,
+  OpenClawPluginUiEntry,
   OpenClawPluginHttpHandler,
   OpenClawPluginHttpRouteHandler,
   OpenClawPluginHookOptions,
@@ -94,6 +97,18 @@ export type PluginCommandRegistration = {
   source: string;
 };
 
+export type PluginUiEntryRegistration = {
+  pluginId: string;
+  extension: OpenClawPluginUiEntry;
+  source: string;
+};
+
+export type PluginCommandOptionRegistration = {
+  pluginId: string;
+  definition: OpenClawPluginCommandOptionDefinition;
+  source: string;
+};
+
 export type PluginRecord = {
   id: string;
   name: string;
@@ -114,6 +129,7 @@ export type PluginRecord = {
   cliCommands: string[];
   services: string[];
   commands: string[];
+  commandOptions: string[];
   httpHandlers: number;
   hookCount: number;
   configSchema: boolean;
@@ -134,6 +150,8 @@ export type PluginRegistry = {
   cliRegistrars: PluginCliRegistration[];
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
+  pluginUiEntries?: PluginUiEntryRegistration[];
+  commandOptions: PluginCommandOptionRegistration[];
   diagnostics: PluginDiagnostic[];
 };
 
@@ -157,6 +175,8 @@ export function createEmptyPluginRegistry(): PluginRegistry {
     cliRegistrars: [],
     services: [],
     commands: [],
+    pluginUiEntries: [],
+    commandOptions: [],
     diagnostics: [],
   };
 }
@@ -446,6 +466,98 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
+  const registerPluginUi = (record: PluginRecord, extension: OpenClawPluginUiEntry) => {
+    const id = extension.id.trim();
+    const label = extension.label.trim();
+    const modulePath = extension.mount.modulePath.trim();
+    const tagName = extension.mount.tagName.trim().toLowerCase();
+    if (!id || !label) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: "plugin UI entry registration missing id or label",
+      });
+      return;
+    }
+    if (extension.mount.kind !== "web_component") {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `unsupported plugin UI entry mount kind: ${String(extension.mount.kind)}`,
+      });
+      return;
+    }
+    if (!modulePath || !modulePath.startsWith("/")) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `plugin UI entry modulePath must be an absolute path: ${modulePath || "(empty)"}`,
+      });
+      return;
+    }
+    if (!/^[a-z][a-z0-9._-]*-[a-z0-9._-]+$/.test(tagName)) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `invalid plugin UI entry tagName: ${tagName || "(empty)"}`,
+      });
+      return;
+    }
+    const list = registry.pluginUiEntries ?? [];
+    registry.pluginUiEntries = list;
+    const key = `${record.id}:${id}`;
+    if (list.some((entry) => `${entry.pluginId}:${entry.extension.id}` === key)) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `duplicate plugin UI entry id: ${id}`,
+      });
+      return;
+    }
+    list.push({
+      pluginId: record.id,
+      source: record.source,
+      extension: {
+        ...extension,
+        id,
+        label,
+        mount: {
+          ...extension.mount,
+          modulePath,
+          tagName,
+        },
+      },
+    });
+  };
+
+  const registerCommandOption = (
+    record: PluginRecord,
+    definition: OpenClawPluginCommandOptionDefinition,
+  ) => {
+    const result = registerPluginCommandOption(record.id, definition);
+    if (!result.ok) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `command option registration failed: ${result.error}`,
+      });
+      return;
+    }
+
+    record.commandOptions.push(`${definition.command}:${definition.option}`);
+    registry.commandOptions.push({
+      pluginId: record.id,
+      definition,
+      source: record.source,
+    });
+  };
+
   const registerTypedHook = <K extends PluginHookName>(
     record: PluginRecord,
     hookName: K,
@@ -469,6 +581,14 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     debug: logger.debug,
   });
 
+  const resolvePluginLogger = (record: PluginRecord): PluginLogger => {
+    const base = registryParams.logger as PluginLogger & {
+      child?: (name: string) => PluginLogger;
+    };
+    const childLogger = typeof base.child === "function" ? base.child(record.id) : base;
+    return normalizeLogger(childLogger);
+  };
+
   const createApi = (
     record: PluginRecord,
     params: {
@@ -485,7 +605,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       config: params.config,
       pluginConfig: params.pluginConfig,
       runtime: registryParams.runtime,
-      logger: normalizeLogger(registryParams.logger),
+      logger: resolvePluginLogger(record),
       registerTool: (tool, opts) => registerTool(record, tool, opts),
       registerHook: (events, handler, opts) =>
         registerHook(record, events, handler, opts, params.config),
@@ -496,7 +616,9 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       registerGatewayMethod: (method, handler) => registerGatewayMethod(record, method, handler),
       registerCli: (registrar, opts) => registerCli(record, registrar, opts),
       registerService: (service) => registerService(record, service),
+      registerPluginUi: (extension) => registerPluginUi(record, extension),
       registerCommand: (command) => registerCommand(record, command),
+      registerCommandOption: (definition) => registerCommandOption(record, definition),
       resolvePath: (input: string) => resolveUserPath(input),
       on: (hookName, handler, opts) => registerTypedHook(record, hookName, handler, opts),
     };
@@ -512,7 +634,9 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerGatewayMethod,
     registerCli,
     registerService,
+    registerPluginUi,
     registerCommand,
+    registerCommandOption,
     registerHook,
     registerTypedHook,
   };

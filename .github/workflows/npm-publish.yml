@@ -1,0 +1,209 @@
+name: NPM Publish
+
+on:
+  push:
+    tags:
+      - "v*-ike*"
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  publish:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Enforce carry/integration release lineage
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_SHA="${GITHUB_SHA}"
+          git fetch --no-tags origin \
+            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
+            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
+          CARRY_SHA="$(git rev-parse origin/carry/publish)"
+          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
+          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
+          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
+            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
+            exit 1
+          fi
+          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
+            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
+          else
+            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
+            exit 1
+          fi
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+
+      - name: Validate semver tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")"
+          SEMVER_REGEX='^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?(\+([0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*))?$'
+          if ! [[ "$PACKAGE_VERSION" =~ $SEMVER_REGEX ]]; then
+            echo "package.json version is not valid semver: $PACKAGE_VERSION"
+            exit 1
+          fi
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_VERSION)."
+            exit 1
+          fi
+
+      - name: Pre-publish sanity (IKENTIC scope)
+        run: pnpm check:publish:ikentic
+
+      - name: Resolve IKENTIC bundle spec
+        id: resolve-ikentic-spec
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          CHANNEL="latest"
+          if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+            CHANNEL="beta"
+          elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+            CHANNEL="rc"
+          elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+            CHANNEL="dev"
+          fi
+          SPEC="@locusai/openclaw-ikentic-plugin@${CHANNEL}"
+          echo "Resolved IKENTIC bundle spec from tag ${GITHUB_REF_NAME}: ${SPEC}"
+          echo "ikentic_bundle_spec=${SPEC}" >> "$GITHUB_OUTPUT"
+
+      - name: Bundle IKENTIC plugin
+        run: pnpm bundle:ikentic
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ steps.resolve-ikentic-spec.outputs.ikentic_bundle_spec }}
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: pnpm build
+
+      - name: Release check
+        run: pnpm release:check
+        env:
+          OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC: "1"
+
+      - name: Verify IKENTIC files are included in npm pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { execSync } from "node:child_process";
+            const raw = execSync("npm pack --dry-run --json --ignore-scripts", { encoding: "utf8" });
+            const parsed = JSON.parse(raw);
+            const files = parsed.flatMap((entry) => entry.files ?? []);
+            const hasIkentic = files.some((entry) =>
+              typeof entry.path === "string" &&
+              (entry.path === "extensions/openclaw-ikentic-plugin/package.json" ||
+                entry.path.startsWith("extensions/openclaw-ikentic-plugin/")),
+            );
+            if (!hasIkentic) {
+              console.error("IKENTIC plugin files are missing from npm pack output.");
+              process.exit(1);
+            }
+            console.log("IKENTIC plugin files detected in npm pack output.");
+          '
+
+      - name: Runtime smoke (no NODE_AUTH_TOKEN)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT="$(NODE_AUTH_TOKEN= node openclaw.mjs plugins list)"
+          echo "$OUTPUT"
+          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
+            echo "IKENTIC plugin is not discoverable without NODE_AUTH_TOKEN."
+            exit 1
+          fi
+
+      - name: Security check (no token value in npm tarball)
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          TARBALL="$(npm pack --ignore-scripts --pack-destination "$TMP_DIR" | tail -n 1)"
+          tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
+          if [ -n "${NODE_AUTH_TOKEN:-}" ] && rg --fixed-strings --quiet "$NODE_AUTH_TOKEN" "$TMP_DIR/package"; then
+            echo "IKENTIC read token value found in npm tarball contents."
+            exit 1
+          fi
+          echo "No IKENTIC read token value found in npm tarball contents."
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@locusai"
+
+      - name: Resolve publish dist-tag
+        id: resolve-publish-tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PRERELEASE="$(printf '%s' "$TAG_VERSION" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-([^+]+)(\+.*)?$/\1/p')"
+          if [ -z "$PRERELEASE" ]; then
+            echo "dist_tag=" >> "$GITHUB_OUTPUT"
+            echo "No prerelease suffix detected; publishing with npm default tag."
+            exit 0
+          fi
+          if [[ "$TAG_VERSION" =~ -ike\.beta\. ]]; then
+            DIST_TAG="beta"
+          elif [[ "$TAG_VERSION" =~ -ike\.rc\. ]]; then
+            DIST_TAG="rc"
+          elif [[ "$TAG_VERSION" =~ -ike\.dev\. ]]; then
+            DIST_TAG="dev"
+          else
+            DIST_TAG="${PRERELEASE%%.*}"
+          fi
+          echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "Using npm dist-tag: $DIST_TAG"
+
+      - name: Publish package
+        shell: bash
+        run: |
+          set -euo pipefail
+          OWNER_SCOPE="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
+          TARGET_NAME="@${OWNER_SCOPE}/openclaw"
+          node --input-type=module -e '
+            import fs from "node:fs";
+            const target = process.env.TARGET_NAME;
+            const path = "package.json";
+            const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+            if (pkg.name !== target) {
+              pkg.name = target;
+              fs.writeFileSync(path, `${JSON.stringify(pkg, null, 2)}\n`);
+              console.log(`Publish override: package name set to ${target}`);
+            } else {
+              console.log(`Publish override: package name already ${target}`);
+            }
+          '
+          if [ -n "${NPM_PUBLISH_DIST_TAG:-}" ]; then
+            npm publish --tag "$NPM_PUBLISH_DIST_TAG" --registry "https://npm.pkg.github.com"
+          else
+            npm publish --registry "https://npm.pkg.github.com"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_PUBLISH_DIST_TAG: ${{ steps.resolve-publish-tag.outputs.dist_tag }}
+          TARGET_NAME: "@${{ github.repository_owner }}/openclaw"

@@ -61,6 +61,7 @@ function setup(config: Record<string, unknown>): Registered {
     registerTool: (tool: unknown) => tools.push(tool),
     registerCli: () => {},
     registerService: () => {},
+    registerPluginUi: () => {},
     resolvePath: (p: string) => p,
   } as unknown as Parameters<typeof plugin.register>[0]);
   return { methods, tools };
