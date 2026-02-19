@@ -15,7 +15,7 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 - Added deterministic sync safeguards:
   - snapshot/pin open main-based PR heads before mechanical porting,
   - require mechanical merge to land before final review branch creation,
-  - keep manual conflict edits out of mechanical lane.
+- keep manual conflict edits out of mechanical lane.
 - Updated `ikentic-sync-release-cycle` skill runbooks to make the above safeguards mandatory in the
   repeatable and full-continuity flows.
 
