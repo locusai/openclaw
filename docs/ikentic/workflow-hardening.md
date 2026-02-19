@@ -19,6 +19,7 @@ without losing upstream compatibility.
 - Directional invariant: all internal promotion follows `topic/* -> carry/publish -> integration/ikentic`.
 - Carry invariant: every permanent internal change must live on an explicit `carry/*` or `carry/publish` commit lineage.
 - Protection invariant: never delete `carry/publish` after merge.
+- PR safety invariant: open PR branches should not be history-rewritten during active review unless explicitly approved by maintainer.
 - Safety invariant: create `archive/*` + annotated `safety/*` refs before branch rewrites/deletes.
 
 ## Operator Environment
@@ -41,7 +42,7 @@ without losing upstream compatibility.
    - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
    - `git push origin integration/ikentic`
 4. Verify promotion state:
-   - `git rev-list --left-right --count origin/carry/publish...origin/integration/ikentic`
+   - `git rev-list --left-right --count refs/remotes/origin/carry/publish...refs/remotes/origin/integration/ikentic`
    - expected `0 0` for an equalized promotion point.
 
 Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
@@ -53,9 +54,10 @@ Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
    - `git switch main`
    - `git merge --ff-only upstream/main`
    - `git push origin main`
-2. Sync integration:
-   - `git switch integration/ikentic`
-   - `git merge --no-ff main -m "sync integration with mirror main"`
+2. Sync `carry/publish` from mirror:
+   - `git switch carry/publish`
+   - `git merge --no-ff main -m "sync carry/publish with mirror main"`
+   - `git push origin carry/publish`
 3. Merge active carry branches into `carry/publish` one-by-one:
    - `git switch carry/publish`
    - `git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"`
@@ -64,6 +66,8 @@ Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
    - `git switch integration/ikentic`
    - `git merge --no-ff carry/publish -m "promote carry/publish after upstream sync"`
    - `git push origin integration/ikentic`
+
+This keeps upstream sync and internal carry changes on one source lane (`carry/publish`) and avoids integration-only drift.
 
 ## Carry Branch Lifecycle
 
@@ -99,6 +103,63 @@ Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
      - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
      - `git push origin integration/ikentic`
 4. Never merge internal changes directly into `main`.
+
+## Keeping PRs Stable When Updating Branches
+
+Use a two-phase policy so open PRs do not get destabilized:
+
+1. Draft phase (before review starts):
+   - `pr/*` branches may be rebased on their base branch.
+   - Allowed push: `git push --force-with-lease origin pr/<topic>`
+2. Active review phase (after reviewers are engaged):
+   - Do not rewrite PR branch history by default.
+   - Update by adding new commits or by merging the base branch into the PR branch.
+   - Allowed push: regular `git push origin pr/<topic>`.
+3. Maintainer override:
+   - If rebase is required during review (for example to satisfy merge policy), announce it, then use `--force-with-lease` only.
+4. Never force-push long-lived lanes:
+   - `carry/publish`, `integration/ikentic`, and persistent `carry/*` branches are merge-only.
+
+Reference update commands:
+
+- Upstream PR draft refresh:
+  - `git fetch upstream origin --prune`
+  - `git switch pr/<topic>`
+  - `git rebase upstream/main`
+  - `git push --force-with-lease origin pr/<topic>`
+- Carry PR review-safe refresh:
+  - `git fetch origin --prune`
+  - `git switch carry/<topic>`
+  - `git merge --no-ff carry/publish -m "refresh carry/<topic> from carry/publish"`
+  - `git push origin carry/<topic>`
+
+## Branch Realignment Procedure (When Lanes Drift)
+
+If `refs/remotes/origin/carry/publish` and `refs/remotes/origin/integration/ikentic` diverge from expected state:
+
+1. Measure drift:
+   - `git fetch origin --prune`
+   - `git rev-list --left-right --count refs/remotes/origin/carry/publish...refs/remotes/origin/integration/ikentic`
+2. If integration is ahead and carry is behind (`0 N`):
+   - recover missing lineage onto carry via topic branch:
+     - `git switch carry/publish`
+     - `git switch -c topic/realign-carry-<stamp>`
+     - `git merge --no-ff refs/remotes/origin/integration/ikentic -m "realign carry from integration snapshot"`
+     - `git switch carry/publish`
+     - `git merge --no-ff topic/realign-carry-<stamp> -m "promote realignment into carry/publish"`
+     - `git push origin carry/publish`
+   - then promote forward:
+     - `git switch integration/ikentic`
+     - `git merge --no-ff carry/publish -m "promote carry/publish after realignment"`
+     - `git push origin integration/ikentic`
+3. If carry is ahead and integration is behind (`N 0`):
+   - promote carry forward as normal:
+     - `git switch integration/ikentic`
+     - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
+     - `git push origin integration/ikentic`
+4. If both sides diverged (`N M` with `N>0` and `M>0`):
+   - do not force-push either lane.
+   - create a `topic/realign-<stamp>` branch from `carry/publish`, resolve merges there, then promote via `carry/publish -> integration/ikentic`.
 
 ## Release Tag Protocol (Ikentic Dev Line)
 
@@ -214,7 +275,7 @@ Next steps to complete phase 5 publish in the next pass:
 - Derive next version from highest upstream semver core + `-ike.N` policy.
 - Set `package.json` version and sync plugin versions.
 - Run pre-publish sanity checks (`check/lint/typecheck/release/prepack` subset we keep active).
-- Commit release bump on `integration/ikentic`, push branch, create/push `v<version>` tag.
+- Commit release bump on `topic/*` from `carry/publish`, merge to `carry/publish`, promote to `integration/ikentic`, then create/push `v<version>` tag from the promoted commit.
 - Watch `npm-publish.yml` run and confirm GitHub Packages publish + expected dist-tag.
 
 ### 2026-02-17 publish execution addendum (what actually happened)

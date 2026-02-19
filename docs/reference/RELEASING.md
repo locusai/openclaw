@@ -23,7 +23,7 @@ Operational setup for new worktrees:
 
 - Create `.envrc` with `source_up`.
 - Run `direnv allow .` once.
-- Run `pnpm install`.
+- Run `direnv exec . pnpm install`.
 - Execute release commands through `direnv exec . <command>`.
 
 Versioning and tag rules:
