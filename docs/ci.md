@@ -61,3 +61,4 @@ If Docker release is not used:
 - Disable `docker-release.yml` in GitHub Actions settings/API.
 - Do not modify workflow YAML only to disable it operationally.
 - Keep npm publish flow (`npm-publish.yml`) as the required release gate.
+- Plugin version lockstep enforcement in `npm-publish.yml` is stable-channel only (`-ike.N`); prerelease tags (`dev|beta|rc`) do not enforce lockstep.

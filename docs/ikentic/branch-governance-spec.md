@@ -132,6 +132,7 @@ When porting from upstream into integration, add trailers for auditability:
 4. Promote `carry/publish -> integration/ikentic`.
 5. Tag from promoted `integration/ikentic` commit with exact version match:
    - `package.json` version == tag version.
+   - plugin version lockstep enforcement is stable-channel only (`-ike.N` / latest channel), not `dev|beta|rc`.
 6. If tag push fails to trigger:
    - keep old tag as history,
    - cut next tag from next promoted release commit.
