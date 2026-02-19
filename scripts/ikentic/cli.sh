@@ -29,6 +29,10 @@ Commands:
     Snapshot open PR heads for main-based pr/* branches.
     Default output: .ikentic/ledger/open-main-prs.json
 
+  stage-tools [<output-dir>]
+    Copy current ikentic scripts into a stable tmp/tool directory and print path.
+    Default output-dir: mktemp under /tmp (ikentic-cli-XXXXXX)
+
   ledger-refresh [<base-ref> [<head-ref> [<output-tsv>]]]
     Build first-parent ledger with lane classification.
     Default: origin/main..origin/integration/ikentic -> .ikentic/ledger/first-parent.tsv
@@ -90,6 +94,30 @@ cmd_snapshot_open_prs() {
   local count
   count="$(jq 'length' "$out")"
   echo "snapshot: ${out} (${count} rows)"
+}
+
+cmd_stage_tools() {
+  local out_dir="${1:-}"
+  if [[ -z "$out_dir" ]]; then
+    out_dir="$(mktemp -d /tmp/ikentic-cli-XXXXXX)"
+  fi
+
+  mkdir -p "$out_dir"
+  local files=(
+    "cli.sh"
+    "sync-main-into-integration.sh"
+    "classify-conflicts.sh"
+    "resolve-sync-conflicts.sh"
+    "check-lockfile-gates.sh"
+  )
+
+  local f
+  for f in "${files[@]}"; do
+    cp "${script_dir}/${f}" "${out_dir}/${f}"
+    chmod +x "${out_dir}/${f}"
+  done
+
+  echo "staged tools: ${out_dir}"
 }
 
 cmd_ledger_refresh() {
@@ -222,6 +250,9 @@ case "$cmd" in
     ;;
   snapshot-open-prs)
     cmd_snapshot_open_prs "$@"
+    ;;
+  stage-tools)
+    cmd_stage_tools "$@"
     ;;
   ledger-refresh)
     cmd_ledger_refresh "$@"
