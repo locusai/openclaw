@@ -11,35 +11,6 @@ read_when:
 
 Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tagging/publishing.
 
-## Ikentic Fork Release Lane
-
-Branch governance rules are defined in
-[`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
-Canonical upstream-port tracking is in
-[`/ikentic/upstream-port-ledger`](/ikentic/upstream-port-ledger).
-
-This release checklist only documents release execution steps.
-
-Operational setup for new worktrees:
-
-- Create `.envrc` with `source_up`.
-- Run `direnv allow .` once.
-- Run `direnv exec . pnpm install`.
-- Execute release commands through `direnv exec . <command>`.
-
-Versioning and tag rules:
-
-- `pnpm plugins:sync` intentionally updates workspace extension package versions/changelogs to match the root release version.
-- Plugin version lockstep is enforced only for stable channel tags (`-ike.N` -> `latest` bundle channel) and disabled for `-ike.dev.N`, `-ike.beta.N`, and `-ike.rc.N`.
-- Tag version and `package.json` version must match exactly.
-- If a pushed tag does not trigger publish workflows, keep it as history and cut the next version tag from the same promoted carry/integration commit line.
-
-Required npm publish evidence in logs:
-
-- `Resolved IKENTIC bundle spec ... @locusai/openclaw-ikentic-plugin@dev`
-- `Using npm dist-tag: dev`
-- `+ @locusai/openclaw@<version>`
-
 ## Operator trigger
 
 When the operator says “release”, immediately do this preflight (no extra questions unless blocked):
@@ -51,7 +22,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 1. **Version & metadata**
 
 - [ ] Bump `package.json` version (e.g., `2026.1.29`).
-- [ ] Stable channel only (`-ike.N`): run `pnpm plugins:sync` to align extension package versions + changelogs.
+- [ ] Run `pnpm plugins:sync` to align extension package versions + changelogs.
 - [ ] Update CLI/version strings: [`src/cli/program.ts`](https://github.com/openclaw/openclaw/blob/main/src/cli/program.ts) and the Baileys user agent in [`src/provider-web.ts`](https://github.com/openclaw/openclaw/blob/main/src/provider-web.ts).
 - [ ] Confirm package metadata (name, description, repository, keywords, license) and `bin` map points to [`openclaw.mjs`](https://github.com/openclaw/openclaw/blob/main/openclaw.mjs) for `openclaw`.
 - [ ] If dependencies changed, run `pnpm install` so `pnpm-lock.yaml` is current.

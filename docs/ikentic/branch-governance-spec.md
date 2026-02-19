@@ -116,49 +116,12 @@ Port patches, not branch lineage.
 
 If all relevant patches are already present, close duplicate integration sync PRs.
 
-Because `integration/ikentic` uses squash merges for `topic/*`, patch-id checks can report false positives/negatives over time.
-Use the upstream port ledger as canonical history for what was intentionally ported:
-
-- `docs/ikentic/upstream-port-ledger.md`
-
-### Repeat Update Flow (for active upstream PRs)
-
-When upstream PR branches receive new commits, port updates incrementally:
-
-1. Confirm current heads:
-   - `git rev-parse origin/pr/<topic>`
-   - `git rev-parse origin/integration/ikentic`
-2. Check ledger entry for PR/topic in `docs/ikentic/upstream-port-ledger.md`.
-3. Create/refresh sync branch:
-   - open sync branch: update existing `topic/sync-<pr-topic>`
-   - already merged sync: create `topic/sync-<pr-topic>-2` from current `integration/ikentic`
-4. Port only untracked upstream commits with `git cherry-pick -x`.
-5. For commits that are empty/superseded/conflict-only (no net delta), record explicit disposition in ledger (do not silently drop).
-6. Validate targeted tests and merge sync branch into integration.
-7. Append integration commit SHA(s), result, and notes to the ledger.
-
-### Post-Upstream-Merge Behavior
-
-When the upstream PR is merged to `upstream/main`:
-
-1. Fast-forward mirror `origin/main` from `upstream/main`.
-2. Merge `main -> integration/ikentic` per lane policy.
-3. Resolve any overlap conflicts against already-ported integration deltas.
-4. Update ledger status to `merged-upstream` and record:
-   - upstream merge commit SHA (if known),
-   - integration merge commit SHA,
-   - any retained integration-only delta.
-
 ### Commit trailers (recommended)
 
 When porting from upstream into integration, add trailers for auditability:
 
 - `Upstream-Status: Pending|Merged|Rejected|Internal`
 - `Upstream-PR: <url>`
-
-Also update the canonical port ledger for every sync merge:
-
-- `docs/ikentic/upstream-port-ledger.md`
 
 ## Release Flow
 
@@ -169,7 +132,6 @@ Also update the canonical port ledger for every sync merge:
 4. Promote `carry/publish -> integration/ikentic`.
 5. Tag from promoted `integration/ikentic` commit with exact version match:
    - `package.json` version == tag version.
-   - plugin version lockstep enforcement is stable-channel only (`-ike.N` / latest channel), not `dev|beta|rc`.
 6. If tag push fails to trigger:
    - keep old tag as history,
    - cut next tag from next promoted release commit.
@@ -243,3 +205,5 @@ Treat `carry/publish` scope as enforceable policy, not convention.
 - `carry/publish` is release-only.
 - Internal PRs remain on `integration/ikentic`.
 - Main-based upstream PR branches are ported via `topic/sync-*` + `cherry-pick -x`.
+- Ikentic-specific documentation content lives under `docs/ikentic/**`.
+- Non-Ikentic docs (for example `docs/reference/*`, `docs/ci.md`) must stay free of Ikentic policy/process content and Ikentic-specific cross-links.
