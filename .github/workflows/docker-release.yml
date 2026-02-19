@@ -20,7 +20,6 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
-  IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
 
 jobs:
   # Build amd64 image
@@ -34,44 +33,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Enforce carry/integration release lineage
-        if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-ike')
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG_SHA="${GITHUB_SHA}"
-          git fetch --no-tags origin \
-            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
-            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
-          CARRY_SHA="$(git rev-parse origin/carry/publish)"
-          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
-          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
-          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
-            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
-          else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
-            exit 1
-          fi
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
-            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
-          else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
-            exit 1
-          fi
-
-      - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
-        with:
-          install-bun: "false"
-
-      - name: Bundle IKENTIC plugin
-        run: pnpm bundle:ikentic
-        env:
-          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
-          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
-          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -120,29 +81,6 @@ jobs:
           provenance: false
           push: true
 
-      - name: Runtime smoke + token check (amd64)
-        shell: bash
-        env:
-          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
-          TOKEN_TO_CHECK: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          docker pull "$IMAGE_REF"
-          OUTPUT="$(docker run --rm --env NODE_AUTH_TOKEN= "$IMAGE_REF" node openclaw.mjs plugins list)"
-          echo "$OUTPUT"
-          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
-            echo "IKENTIC plugin is not discoverable in amd64 image."
-            exit 1
-          fi
-          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker run --rm --env TOKEN_TO_CHECK="$TOKEN_TO_CHECK" "$IMAGE_REF" sh -lc 'grep -R --binary-files=without-match -F "$TOKEN_TO_CHECK" /app >/dev/null 2>&1'; then
-            echo "IKENTIC read token value found in amd64 image filesystem."
-            exit 1
-          fi
-          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker history --no-trunc "$IMAGE_REF" | grep -F --quiet "$TOKEN_TO_CHECK"; then
-            echo "IKENTIC read token value found in amd64 image history."
-            exit 1
-          fi
-
   # Build arm64 image
   build-arm64:
     runs-on: blacksmith-16vcpu-ubuntu-2404-arm
@@ -154,44 +92,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Enforce carry/integration release lineage
-        if: startsWith(github.ref, 'refs/tags/') && contains(github.ref_name, '-ike')
-        shell: bash
-        run: |
-          set -euo pipefail
-          TAG_SHA="${GITHUB_SHA}"
-          git fetch --no-tags origin \
-            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
-            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
-          CARRY_SHA="$(git rev-parse origin/carry/publish)"
-          INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
-          echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
-          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
-            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
-          else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
-            exit 1
-          fi
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
-            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
-          else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
-            exit 1
-          fi
-
-      - name: Setup Node environment
-        uses: ./.github/actions/setup-node-env
-        with:
-          install-bun: "false"
-
-      - name: Bundle IKENTIC plugin
-        run: pnpm bundle:ikentic
-        env:
-          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
-          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
-          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -239,29 +139,6 @@ jobs:
           cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:arm64,mode=max
           provenance: false
           push: true
-
-      - name: Runtime smoke + token check (arm64)
-        shell: bash
-        env:
-          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build.outputs.digest }}
-          TOKEN_TO_CHECK: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          docker pull "$IMAGE_REF"
-          OUTPUT="$(docker run --rm --env NODE_AUTH_TOKEN= "$IMAGE_REF" node openclaw.mjs plugins list)"
-          echo "$OUTPUT"
-          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
-            echo "IKENTIC plugin is not discoverable in arm64 image."
-            exit 1
-          fi
-          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker run --rm --env TOKEN_TO_CHECK="$TOKEN_TO_CHECK" "$IMAGE_REF" sh -lc 'grep -R --binary-files=without-match -F "$TOKEN_TO_CHECK" /app >/dev/null 2>&1'; then
-            echo "IKENTIC read token value found in arm64 image filesystem."
-            exit 1
-          fi
-          if [ -n "${TOKEN_TO_CHECK:-}" ] && docker history --no-trunc "$IMAGE_REF" | grep -F --quiet "$TOKEN_TO_CHECK"; then
-            echo "IKENTIC read token value found in arm64 image history."
-            exit 1
-          fi
 
   # Create multi-platform manifest
   create-manifest:
