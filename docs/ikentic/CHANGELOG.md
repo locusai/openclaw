@@ -5,6 +5,15 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 
 ## Unreleased
 
+### Source: `carry/docs`
+
+- Moved Ikentic release-process body content out of `docs/reference/RELEASING.md` into
+  `docs/ikentic/RELEASING.md`.
+- Kept upstream release doc as generic baseline and replaced fork-specific body content with a
+  pointer to Ikentic-local docs.
+- Added governance rule that Ikentic-specific docs live under `docs/ikentic/**` to reduce future
+  upstream-doc bleed.
+
 ### Source: `pr/control-ui-plugin-extensions`
 
 - Added gateway and UI support for plugin-provided UI panels (plugin UI loader/runtime, controller
