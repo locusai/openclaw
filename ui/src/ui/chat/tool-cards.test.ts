@@ -30,16 +30,37 @@ describe("extractToolCards", () => {
     expect(cards.map((card) => card.kind)).toEqual(["call", "result"]);
   });
 
-  it("does not suppress when any result has text", () => {
+  it("does not suppress suppressible tool cards when that tool result has text", () => {
     const message = {
       content: [
         { type: "tool_call", name: suppressedTool, arguments: {} },
+        { type: "tool_result", name: suppressedTool, content: "ok" },
+      ],
+    };
+
+    const cards = extractToolCards(message);
+
+    expect(cards.map((card) => `${card.kind}:${card.name}`)).toEqual([
+      `call:${suppressedTool}`,
+      `result:${suppressedTool}`,
+    ]);
+  });
+
+  it("suppresses empty suppressible tool even when other tools have output", () => {
+    const message = {
+      content: [
+        { type: "tool_call", name: suppressedTool, arguments: { taskId: "task-1" } },
+        { type: "tool_result", name: suppressedTool, content: "" },
+        { type: "tool_call", name: "search", arguments: { q: "test" } },
         { type: "tool_result", name: "search", content: "ok" },
       ],
     };
 
     const cards = extractToolCards(message);
 
-    expect(cards.some((card) => card.kind === "call" && card.name === suppressedTool)).toBe(true);
+    expect(cards.map((card) => `${card.kind}:${card.name}`)).toEqual([
+      "call:search",
+      "result:search",
+    ]);
   });
 });
