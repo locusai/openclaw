@@ -11,13 +11,14 @@ read_when:
 
 Use `pnpm` (Node 22+) from the repo root. Keep the working tree clean before tagging/publishing.
 
-## Ikentic Fork Release Lane (Carry-First)
+## Ikentic Fork Release Lane (Release-Scope Only)
 
-For `locusai/openclaw` Ikentic dev releases, use this promotion path only:
+For `locusai/openclaw` Ikentic dev release preparation, use this path:
 
-- `topic/* -> carry/publish -> integration/ikentic`
+- `topic/release-* -> carry/publish -> integration/ikentic`
 - `carry/publish` is long-lived and must never be deleted on merge.
-- Do not make release commits directly on `integration/ikentic`.
+- `carry/publish` is not a catchall branch; it should contain release-scope changes only.
+- Normal internal feature/fix/test PRs should target `integration/ikentic`.
 
 Operational setup for new worktrees:
 

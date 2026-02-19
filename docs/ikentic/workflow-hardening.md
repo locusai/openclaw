@@ -6,18 +6,19 @@ without losing upstream compatibility.
 ## Branch Model
 
 - `main`: exact mirror of `upstream/main` (fast-forward only; no internal commits).
-- `carry/publish`: canonical carry source lane for release promotion (long-lived, never deleted).
-- `integration/ikentic`: canonical promotion/deploy lane (merge-based updates only; no force-push).
+- `integration/ikentic`: canonical internal integration/deploy lane (merge-based updates only; no force-push).
+- `carry/publish`: release-only lane for version/changelog/plugin packaging updates (long-lived, never deleted).
 - `pr/*`: upstream-bound topic branches (short-lived; rebase allowed).
-- `carry/*`: long-lived internal-only patchsets that must land via `carry/publish`.
-- `topic/*`: short-lived implementation branches that feed `carry/publish`.
+- `carry/*`: long-lived internal-only patchsets that land on `integration/ikentic`.
+- `topic/*`: short-lived implementation branches.
 
 ## Required Invariants
 
 - Mirror invariant: `origin/main...upstream/main` must always be `0 0` before integration sync.
 - Integration invariant: `main` must always be an ancestor of `integration/ikentic`.
-- Directional invariant: all internal promotion follows `topic/* -> carry/publish -> integration/ikentic`.
-- Carry invariant: every permanent internal change must live on an explicit `carry/*` or `carry/publish` commit lineage.
+- Release invariant: release-scope commits follow `topic/release-* -> carry/publish -> integration/ikentic`.
+- Scope invariant: `carry/publish` contains release-scope changes only (versioning, changelogs, plugin packaging/release guard updates).
+- Carry invariant: every permanent non-upstream internal feature/fix/test change lands on `integration/ikentic` (directly or via `carry/*`).
 - Protection invariant: never delete `carry/publish` after merge.
 - PR safety invariant: open PR branches should not be history-rewritten during active review unless explicitly approved by maintainer.
 - Safety invariant: create `archive/*` + annotated `safety/*` refs before branch rewrites/deletes.
@@ -28,24 +29,24 @@ without losing upstream compatibility.
   - `source_up 2>/dev/null || true`
 - Run operational commands through `direnv exec . <command>` to ensure expected environment.
 
-## Promotion Protocol (Carry-First, Required)
+## Release Promotion Protocol (`carry/publish` Scope)
 
-1. Start implementation from `carry/publish`:
+Use `carry/publish` only for release-scope changes (version/changelog/plugin packaging/release guard updates).
+
+1. Start a release topic from `carry/publish`:
    - `git switch carry/publish`
-   - `git switch -c topic/<change>`
-2. Merge topic into `carry/publish` first:
+   - `git switch -c topic/release-<version>`
+2. Apply release-scope changes only.
+3. Merge into `carry/publish`:
    - `git switch carry/publish`
-   - `git merge --no-ff topic/<change> -m "merge topic/<change> into carry/publish"`
+   - `git merge --no-ff topic/release-<version> -m "release: <version> metadata updates"`
    - `git push origin carry/publish`
-3. Promote `carry/publish` into `integration/ikentic`:
+4. Promote release metadata into integration:
    - `git switch integration/ikentic`
-   - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
+   - `git merge --no-ff carry/publish -m "promote release metadata from carry/publish"`
    - `git push origin integration/ikentic`
-4. Verify promotion state:
-   - `git rev-list --left-right --count refs/remotes/origin/carry/publish...refs/remotes/origin/integration/ikentic`
-   - expected `0 0` for an equalized promotion point.
 
-Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
+Do not route normal feature/fix/test work through `carry/publish`.
 
 ## Integration Update (Merge-Based from Upstream Mirror)
 
@@ -54,55 +55,47 @@ Do not commit directly on `integration/ikentic`. Do not bypass `carry/publish`.
    - `git switch main`
    - `git merge --ff-only upstream/main`
    - `git push origin main`
-2. Sync `carry/publish` from mirror:
-   - `git switch carry/publish`
-   - `git merge --no-ff main -m "sync carry/publish with mirror main"`
-   - `git push origin carry/publish`
-3. Merge active carry branches into `carry/publish` one-by-one:
-   - `git switch carry/publish`
-   - `git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"`
-   - `git push origin carry/publish`
-4. Promote `carry/publish` to integration:
+2. Sync integration from mirror:
    - `git switch integration/ikentic`
-   - `git merge --no-ff carry/publish -m "promote carry/publish after upstream sync"`
+   - `git merge --no-ff main -m "sync integration with mirror main"`
+3. Merge active internal carry branches into integration:
+   - `git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"`
+4. Push integration:
    - `git push origin integration/ikentic`
 
-This keeps upstream sync and internal carry changes on one source lane (`carry/publish`) and avoids integration-only drift.
+`carry/publish` is a scoped release lane and is expected to diverge from `integration/ikentic` between release promotions.
 
 ## Carry Branch Lifecycle
 
-1. Create from `carry/publish` (or from `main` only when preparing explicit upstream-mirror carry work):
-   - `git switch carry/publish`
+1. Create internal carry branches from `integration/ikentic`:
+   - `git switch integration/ikentic`
    - `git switch -c carry/<topic>`
-2. Add internal-only commits (or cherry-pick from temporary integration branches).
-3. Merge into `carry/publish` with `--no-ff`.
-4. Promote `carry/publish` into `integration/ikentic`.
-5. Keep the branch after merge. Do not delete `carry/*` as routine cleanup.
-6. Only retire by explicit decision. Before retirement, verify:
+2. Add internal-only commits.
+3. Merge into `integration/ikentic` with `--no-ff`.
+4. Keep the branch after merge. Do not delete `carry/*` as routine cleanup.
+5. Only retire by explicit decision. Before retirement, verify:
    - `git cherry -v main carry/<topic>`
    - If no `+` commits remain and the patchset is intentionally upstreamed/obsolete, retire after
      safety-tag window.
+6. `carry/publish` is special:
+   - keep long-lived.
+   - keep release-scope only.
+   - never delete.
 
 ## PR Handling Model
 
 1. Classify every change first:
    - `upstream-pr`: intended for `openclaw/openclaw`.
-   - `carry`: internal-only, not intended for upstream.
-   - `hybrid`: split into two branches (`pr/*` and `carry/*`).
+   - `internal`: feature/fix/test/config for Ikentic fork behavior.
+   - `release`: version/changelog/plugin packaging/release guard updates.
 2. Base/head rules:
    - Upstream-bound: PR from `pr/<topic>` into upstream `main`.
-   - Internal carry: PR from `carry/<topic>` (or `topic/<change>`) into fork `carry/publish`.
-   - Promotion PR: `carry/publish` into `integration/ikentic`.
+   - Internal: PR from `topic/*` or `carry/*` into fork `integration/ikentic`.
+   - Release-scope: PR from `topic/release-*` into fork `carry/publish`.
+   - Release promotion PR: `carry/publish` into `integration/ikentic`.
 3. Merge behavior:
-   - Prefer GitHub PR merge with **Merge commit** for carry and promotion branches.
-   - Equivalent local merge:
-     - `git switch carry/publish`
-     - `git merge --no-ff carry/<topic> -m "apply carry patchset: <topic>"`
-     - `git push origin carry/publish`
-     - `git switch integration/ikentic`
-     - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
-     - `git push origin integration/ikentic`
-4. Never merge internal changes directly into `main`.
+   - Prefer GitHub PR merge with **Merge commit** for internal and release branches.
+4. Never merge internal non-release changes into `carry/publish` or `main`.
 
 ## Keeping PRs Stable When Updating Branches
 
@@ -113,10 +106,10 @@ Use a two-phase policy so open PRs do not get destabilized:
    - Allowed push: `git push --force-with-lease origin pr/<topic>`
 2. Active review phase (after reviewers are engaged):
    - Do not rewrite PR branch history by default.
-   - Update by adding new commits or by merging the base branch into the PR branch.
-   - Allowed push: regular `git push origin pr/<topic>`.
+   - Update by adding new commits or by merging the current base branch into the PR branch.
+   - Allowed push: regular `git push origin <branch>`.
 3. Maintainer override:
-   - If rebase is required during review (for example to satisfy merge policy), announce it, then use `--force-with-lease` only.
+   - If rebase is required during review, announce it, then use `--force-with-lease` only.
 4. Never force-push long-lived lanes:
    - `carry/publish`, `integration/ikentic`, and persistent `carry/*` branches are merge-only.
 
@@ -127,48 +120,40 @@ Reference update commands:
   - `git switch pr/<topic>`
   - `git rebase upstream/main`
   - `git push --force-with-lease origin pr/<topic>`
-- Carry PR review-safe refresh:
+- Internal PR review-safe refresh:
   - `git fetch origin --prune`
-  - `git switch carry/<topic>`
-  - `git merge --no-ff carry/publish -m "refresh carry/<topic> from carry/publish"`
-  - `git push origin carry/<topic>`
+  - `git switch <branch>`
+  - `git merge --no-ff refs/remotes/origin/integration/ikentic -m "refresh from integration/ikentic"`
+  - `git push origin <branch>`
+- Release PR review-safe refresh:
+  - `git fetch origin --prune`
+  - `git switch topic/release-<version>`
+  - `git merge --no-ff refs/remotes/origin/carry/publish -m "refresh from carry/publish"`
+  - `git push origin topic/release-<version>`
 
-## Branch Realignment Procedure (When Lanes Drift)
+## Branch Alignment Checks (Spec)
 
-If `refs/remotes/origin/carry/publish` and `refs/remotes/origin/integration/ikentic` diverge from expected state:
-
-1. Measure drift:
-   - `git fetch origin --prune`
-   - `git rev-list --left-right --count refs/remotes/origin/carry/publish...refs/remotes/origin/integration/ikentic`
-2. If integration is ahead and carry is behind (`0 N`):
-   - recover missing lineage onto carry via topic branch:
-     - `git switch carry/publish`
-     - `git switch -c topic/realign-carry-<stamp>`
-     - `git merge --no-ff refs/remotes/origin/integration/ikentic -m "realign carry from integration snapshot"`
-     - `git switch carry/publish`
-     - `git merge --no-ff topic/realign-carry-<stamp> -m "promote realignment into carry/publish"`
-     - `git push origin carry/publish`
-   - then promote forward:
-     - `git switch integration/ikentic`
-     - `git merge --no-ff carry/publish -m "promote carry/publish after realignment"`
-     - `git push origin integration/ikentic`
-3. If carry is ahead and integration is behind (`N 0`):
-   - promote carry forward as normal:
-     - `git switch integration/ikentic`
-     - `git merge --no-ff carry/publish -m "promote carry/publish into integration/ikentic"`
-     - `git push origin integration/ikentic`
-4. If both sides diverged (`N M` with `N>0` and `M>0`):
-   - do not force-push either lane.
-   - create a `topic/realign-<stamp>` branch from `carry/publish`, resolve merges there, then promote via `carry/publish -> integration/ikentic`.
+1. Mirror check:
+   - `git rev-list --left-right --count refs/remotes/origin/main...refs/remotes/upstream/main`
+   - expected `0 0`.
+2. Integration check:
+   - `git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/integration/ikentic`
+3. Carry publish scope check:
+   - `git log --oneline refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
+   - `git diff --name-only refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
+   - expected: only release-scope files/commits.
+4. Divergence expectation:
+   - non-zero divergence between `carry/publish` and `integration/ikentic` is normal.
+   - do not auto-equalize by merging all integration commits into `carry/publish`.
 
 ## Release Tag Protocol (Ikentic Dev Line)
 
-1. Cut release commits on the carry-first path only, then ensure carry/integration point to the same promoted commit.
+1. Cut release commits on `topic/release-* -> carry/publish -> integration/ikentic`, then tag from the promoted `integration/ikentic` commit.
 2. Tag from the promoted commit with matching version:
    - `package.json` version must equal tag version (for example, `package.json: 2026.2.17-ike.dev.9` and tag `v2026.2.17-ike.dev.9`).
 3. If a tag push does not trigger workflows, do not rewrite published history:
    - keep existing tag as historical record.
-   - cut the next tag from the same carry/integration line with a fresh version bump commit.
+   - cut the next tag from the next promoted release commit with a fresh version bump commit.
 4. NPM publish verification must include:
    - `Resolved IKENTIC bundle spec ... @locusai/openclaw-ikentic-plugin@dev`
    - `Using npm dist-tag: dev`
