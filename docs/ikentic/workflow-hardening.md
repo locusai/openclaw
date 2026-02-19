@@ -93,9 +93,36 @@ Do not route normal feature/fix/test work through `carry/publish`.
    - Internal: PR from `topic/*` or `carry/*` into fork `integration/ikentic`.
    - Release-scope: PR from `topic/release-*` into fork `carry/publish`.
    - Release promotion PR: `carry/publish` into `integration/ikentic`.
+   - Do not open integration PRs directly from `pr/*` branches, because `pr/*` is `main`-based lineage.
 3. Merge behavior:
    - Prefer GitHub PR merge with **Merge commit** for internal and release branches.
 4. Never merge internal non-release changes into `carry/publish` or `main`.
+
+## Porting Main-Based PR Work Into Integration
+
+`pr/*` branches are expected to be based on `main` for upstream review. Integration should consume the
+patches, not the branch lineage.
+
+1. Start from integration:
+   - `git fetch upstream origin --prune`
+   - `git switch integration/ikentic`
+   - `git switch -c topic/sync-<pr-topic>`
+2. Bring in upstream PR commits as patches:
+   - `git cherry-pick -x <commit1> <commit2> ...`
+   - Use `-x` so commit messages retain source SHA traceability.
+3. Resolve conflicts manually and run targeted checks.
+4. Open an internal PR:
+   - `topic/sync-<pr-topic> -> integration/ikentic`
+5. Keep upstream and integration in sync incrementally:
+   - when upstream PR adds commits, cherry-pick only the new commits onto the same integration sync branch.
+
+Equivalence checks (preferred over SHA matching):
+
+- `git cherry refs/remotes/origin/integration/ikentic refs/remotes/origin/pr/<topic>`
+- `git range-diff refs/remotes/origin/integration/ikentic...refs/remotes/origin/pr/<topic>`
+
+If all relevant patches are already present in integration, close duplicate integration sync PRs rather
+than merging redundant branches.
 
 ## Keeping PRs Stable When Updating Branches
 
