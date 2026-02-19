@@ -2,7 +2,7 @@
 # Format: one carry lane per line as carry/<name>.
 
 carry/docs
-carry/ikentic-dual-mode-docker
+carry/docker
 carry/ops
 carry/publish
 carry/tests
