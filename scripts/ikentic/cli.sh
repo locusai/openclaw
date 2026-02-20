@@ -29,6 +29,13 @@ Commands:
     Snapshot open PR heads for main-based pr/* branches.
     Default output: .ikentic/ledger/open-main-prs.json
 
+  snapshot-pr-refs [<output-tsv>]
+    Snapshot origin/pr/* refs (git source of truth).
+    Default output: .ikentic/snapshots/origin-pr-refs-<stamp>.tsv
+
+  refresh-pr-refs [--snapshot <tsv>] [--dry-run]
+    Rebase origin/pr/* branches onto origin/main (conflict-free only) and push back to origin.
+
   stage-tools [<output-dir>]
     Copy current ikentic scripts into a stable tmp/tool directory and print path.
     Default output-dir: mktemp under /tmp (ikentic-cli-XXXXXX)
@@ -90,14 +97,22 @@ cmd_snapshot_open_prs() {
   local out="${1:-.ikentic/ledger/open-main-prs.json}"
   mkdir -p "$(dirname "$out")"
   run_cmd gh pr list \
-    --repo locusai/openclaw \
+    --repo openclaw/openclaw \
     --state open \
-    --search "base:main head:pr/" \
+    --search "base:main head:locusai:pr/" \
     --limit 200 \
     --json number,title,headRefName,baseRefName,headRefOid,url > "$out"
   local count
   count="$(jq 'length' "$out")"
   echo "snapshot: ${out} (${count} rows)"
+}
+
+cmd_snapshot_pr_refs() {
+  exec "$script_dir/snapshot-pr-refs.sh" "$@"
+}
+
+cmd_refresh_pr_refs() {
+  exec "$script_dir/refresh-pr-refs-with-main.sh" "$@"
 }
 
 cmd_stage_tools() {
@@ -113,6 +128,9 @@ cmd_stage_tools() {
     "classify-conflicts.sh"
     "resolve-sync-conflicts.sh"
     "check-lockfile-gates.sh"
+    "snapshot-pr-refs.sh"
+    "refresh-pr-refs-with-main.sh"
+    "port-pr-refs.sh"
   )
 
   local f
@@ -334,6 +352,12 @@ case "$cmd" in
     ;;
   snapshot-open-prs)
     cmd_snapshot_open_prs "$@"
+    ;;
+  snapshot-pr-refs)
+    cmd_snapshot_pr_refs "$@"
+    ;;
+  refresh-pr-refs)
+    cmd_refresh_pr_refs "$@"
     ;;
   stage-tools)
     cmd_stage_tools "$@"

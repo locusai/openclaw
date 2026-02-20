@@ -55,6 +55,12 @@ fi
 git merge --ff-only upstream/main
 git push origin main
 
+# Snapshot + refresh origin/pr/* branches against updated main so they stay current.
+# If a branch has rebase conflicts, it is left unchanged and recorded as NEEDS_MANUAL.
+pr_snap_out="$("$script_dir/snapshot-pr-refs.sh")"
+pr_snap_path="$(echo "$pr_snap_out" | awk '{print $2}')"
+"$script_dir/refresh-pr-refs-with-main.sh" --snapshot "$pr_snap_path" || true
+
 stamp="$(date +%Y%m%d-%H%M%S)"
 branch="codex/sync-main-${stamp}"
 
@@ -80,8 +86,10 @@ fi
 # Finalize the merge commit (mechanical lane marker subject).
 git commit -m "sync integration with mirror main"
 
+# Attempt clean ports of origin/pr/* commits (no manual conflict edits). Conflicts are reported and skipped.
+"$script_dir/port-pr-refs.sh" --base origin/main || true
+
 # Lockfile gates: dependency-aware manifest/lock coupling + frozen install.
 "$script_dir/check-lockfile-gates.sh" origin/integration/ikentic HEAD
 
 echo "created sync branch: ${branch}"
-
