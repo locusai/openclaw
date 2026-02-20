@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { decideNpmRefresh } from "../../scripts/ikentic/npm-refresh-policy.mjs";
+import { decideNpmRefresh } from "../../ikentic/scripts/npm-refresh-policy.mjs";
 
 describe("decideNpmRefresh", () => {
   /**
