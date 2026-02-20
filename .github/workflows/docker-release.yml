@@ -149,6 +149,8 @@ jobs:
           build-args: |
             SANDBOX_BASE_IMAGE=${{ env.SANDBOX_BASE_IMAGE }}
             OPENCLAW_DOCKER_NPM_PACKAGES=${{ vars.OPENCLAW_DOCKER_NPM_PACKAGES }}
+          secrets: |
+            node_auth_token=${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
           platforms: linux/amd64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.sandbox-tags.outputs.value }}
@@ -310,6 +312,8 @@ jobs:
           build-args: |
             SANDBOX_BASE_IMAGE=${{ env.SANDBOX_BASE_IMAGE }}
             OPENCLAW_DOCKER_NPM_PACKAGES=${{ vars.OPENCLAW_DOCKER_NPM_PACKAGES }}
+          secrets: |
+            node_auth_token=${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
           platforms: linux/arm64
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.sandbox-tags.outputs.value }}
