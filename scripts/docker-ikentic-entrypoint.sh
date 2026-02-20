@@ -446,9 +446,12 @@ sanitize_legacy_plugin_refs() {
 
 generate_ikentic_config() {
   echo "$TAG Generating IKENTIC config..."
-  IKENTIC_PLUGIN_ID="$IKENTIC_PLUGIN_ID" \
-    node "$IKENTIC_PLUGIN_PATH/scripts/gen-config.mjs" \
-      --config /home/node/.openclaw/openclaw.json
+  IKENTIC_ENABLED="true" \
+    OPENCLAW_ROOT="/app" \
+    OPENCLAW_CONFIG_PATH="/home/node/.openclaw/openclaw.json" \
+    IKENTIC_PLUGIN_PATH="$IKENTIC_PLUGIN_PATH" \
+    IKENTIC_PLUGIN_ID="$IKENTIC_PLUGIN_ID" \
+    bash /app/scripts/cloudflare-sandbox/ikentic-init.sh
   sanitize_legacy_plugin_refs
 }
 
@@ -524,9 +527,6 @@ NPMRC
   resolve_plugin_id_from_path "$IKENTIC_PLUGIN_PATH"
 
   generate_ikentic_config
-
-  echo "$TAG Enabling $IKENTIC_PLUGIN_ID plugin..."
-  node openclaw.mjs plugins enable "$IKENTIC_PLUGIN_ID" 2>/dev/null || true
 
 elif [ -d "$NPM_CACHE_DIR" ]; then
   echo "$TAG Mode: npm (cached install found at $NPM_CACHE_DIR)"

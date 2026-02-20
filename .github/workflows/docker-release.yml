@@ -21,6 +21,11 @@ env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
   IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
+  # Cloudflare Sandbox base for the `cloudflare-sandbox` Docker target.
+  # Set this as a GitHub repo variable, e.g.:
+  #   - docker.io/cloudflare/sandbox:0.7.0
+  #   - ghcr.io/locusai/moltworker:<stock-tag> (MVP-only)
+  SANDBOX_BASE_IMAGE: ${{ vars.SANDBOX_BASE_IMAGE }}
 
 jobs:
   # Build amd64 image
@@ -31,6 +36,7 @@ jobs:
       contents: read
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
+      sandbox-image-digest: ${{ steps.build-sandbox.outputs.digest }}
       image-metadata: ${{ steps.meta.outputs.json }}
     steps:
       - name: Checkout
@@ -110,6 +116,56 @@ jobs:
           provenance: false
           push: true
 
+      - name: Resolve sandbox tags (amd64)
+        id: sandbox-tags
+        shell: bash
+        env:
+          META_JSON: ${{ steps.meta.outputs.json }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t tags < <(jq -r '.tags[]' <<<"$META_JSON")
+          out=()
+          for t in "${tags[@]}"; do
+            case "$t" in
+              *-arm64) continue ;;
+              *-amd64) base="${t%-amd64}"; out+=("${base}-cloudflare-sandbox-amd64") ;;
+              *) out+=("${t}-cloudflare-sandbox-amd64") ;;
+            esac
+          done
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${out[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push amd64 cloudflare-sandbox image
+        id: build-sandbox
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.ikentic
+          target: cloudflare-sandbox
+          build-args: |
+            SANDBOX_BASE_IMAGE=${{ env.SANDBOX_BASE_IMAGE }}
+            OPENCLAW_DOCKER_NPM_PACKAGES=${{ vars.OPENCLAW_DOCKER_NPM_PACKAGES }}
+          platforms: linux/amd64
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.sandbox-tags.outputs.value }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:amd64
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:amd64,mode=max
+          provenance: false
+          push: true
+
+      - name: Runtime smoke (cloudflare-sandbox, amd64)
+        shell: bash
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-sandbox.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          docker run --rm --entrypoint sh "$IMAGE_REF" -lc 'test -x /sandbox; /usr/local/bin/openclaw --version >/dev/null; test -x /usr/local/bin/start-openclaw.sh'
+
       - name: Runtime smoke + token check (amd64)
         shell: bash
         env:
@@ -141,6 +197,7 @@ jobs:
       contents: read
     outputs:
       image-digest: ${{ steps.build.outputs.digest }}
+      sandbox-image-digest: ${{ steps.build-sandbox.outputs.digest }}
       image-metadata: ${{ steps.meta.outputs.json }}
     steps:
       - name: Checkout
@@ -220,6 +277,56 @@ jobs:
           provenance: false
           push: true
 
+      - name: Resolve sandbox tags (arm64)
+        id: sandbox-tags
+        shell: bash
+        env:
+          META_JSON: ${{ steps.meta.outputs.json }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t tags < <(jq -r '.tags[]' <<<"$META_JSON")
+          out=()
+          for t in "${tags[@]}"; do
+            case "$t" in
+              *-amd64) continue ;;
+              *-arm64) base="${t%-arm64}"; out+=("${base}-cloudflare-sandbox-arm64") ;;
+              *) out+=("${t}-cloudflare-sandbox-arm64") ;;
+            esac
+          done
+          {
+            echo "value<<EOF"
+            printf "%s\n" "${out[@]}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Build and push arm64 cloudflare-sandbox image
+        id: build-sandbox
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.ikentic
+          target: cloudflare-sandbox
+          build-args: |
+            SANDBOX_BASE_IMAGE=${{ env.SANDBOX_BASE_IMAGE }}
+            OPENCLAW_DOCKER_NPM_PACKAGES=${{ vars.OPENCLAW_DOCKER_NPM_PACKAGES }}
+          platforms: linux/arm64
+          labels: ${{ steps.meta.outputs.labels }}
+          tags: ${{ steps.sandbox-tags.outputs.value }}
+          cache-from: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:arm64
+          cache-to: type=registry,ref=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}-cache:arm64,mode=max
+          provenance: false
+          push: true
+
+      - name: Runtime smoke (cloudflare-sandbox, arm64)
+        shell: bash
+        env:
+          IMAGE_REF: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}@${{ steps.build-sandbox.outputs.digest }}
+        run: |
+          set -euo pipefail
+          docker pull "$IMAGE_REF"
+          docker run --rm --entrypoint sh "$IMAGE_REF" -lc 'test -x /sandbox; /usr/local/bin/openclaw --version >/dev/null; test -x /usr/local/bin/start-openclaw.sh'
+
       - name: Runtime smoke + token check (arm64)
         shell: bash
         env:
@@ -274,3 +381,20 @@ jobs:
             ${{ needs.build-arm64.outputs.image-digest }}
         env:
           DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta.outputs.json }}
+
+      - name: Extract metadata for sandbox manifest
+        id: meta-sandbox
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch,suffix=-cloudflare-sandbox
+            type=semver,pattern={{version}},suffix=-cloudflare-sandbox
+
+      - name: Create and push sandbox manifest
+        run: |
+          docker buildx imagetools create $(jq -cr '.tags | map("-t " + .) | join(" ")' <<< "$DOCKER_METADATA_OUTPUT_JSON") \
+            ${{ needs.build-amd64.outputs.sandbox-image-digest }} \
+            ${{ needs.build-arm64.outputs.sandbox-image-digest }}
+        env:
+          DOCKER_METADATA_OUTPUT_JSON: ${{ steps.meta-sandbox.outputs.json }}
