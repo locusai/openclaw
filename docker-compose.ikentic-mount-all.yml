@@ -1,0 +1,27 @@
+# IKENTIC overlay: mount-all (host state/workspace + host plugin source).
+#
+# Usage:
+#   docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic-mount-all.yml up --build
+#
+# Equivalent to:
+#   docker compose -f docker-compose.ikentic.yml \
+#     -f docker-compose.ikentic-mount-state.yml \
+#     -f docker-compose.ikentic-mount-plugin.yml up --build
+#
+# Set IKENTIC_PLUGIN_HOST_DIR in .env to the host path of the plugin,
+# e.g.: IKENTIC_PLUGIN_HOST_DIR=../ike-agents/packages/openclaw-ikentic-plugin
+
+services:
+  openclaw:
+    environment:
+      IKENTIC_DEV_MOUNT_MODE: "1"
+    volumes:
+      - type: bind
+        source: ${OPENCLAW_CONFIG_DIR:?Set OPENCLAW_CONFIG_DIR in .env}
+        target: /home/node/.openclaw
+      - type: bind
+        source: ${OPENCLAW_WORKSPACE_DIR:?Set OPENCLAW_WORKSPACE_DIR in .env}
+        target: /home/node/.openclaw/workspace
+      - type: bind
+        source: ${IKENTIC_PLUGIN_HOST_DIR:?Set IKENTIC_PLUGIN_HOST_DIR in .env}
+        target: ${IKENTIC_DEV_MOUNT_PATH:-/home/node/.openclaw/extensions/openclaw-ikentic-plugin}

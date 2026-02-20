@@ -1,0 +1,12 @@
+# IKENTIC overlay: host-mounted OpenClaw state/workspace.
+# Use with docker-compose.ikentic.yml when you want installed/cached plugin mode
+# with host-persisted config and workspace directories.
+services:
+  openclaw:
+    volumes:
+      - type: bind
+        source: ${OPENCLAW_CONFIG_DIR:?Set OPENCLAW_CONFIG_DIR in .env}
+        target: /home/node/.openclaw
+      - type: bind
+        source: ${OPENCLAW_WORKSPACE_DIR:?Set OPENCLAW_WORKSPACE_DIR in .env}
+        target: /home/node/.openclaw/workspace

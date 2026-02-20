@@ -1,0 +1,10 @@
+# IKENTIC overlay: host-mounted plugin source.
+# Use with docker-compose.ikentic.yml when developing the plugin locally.
+services:
+  openclaw:
+    environment:
+      IKENTIC_DEV_MOUNT_MODE: "1"
+    volumes:
+      - type: bind
+        source: ${IKENTIC_PLUGIN_HOST_DIR:?Set IKENTIC_PLUGIN_HOST_DIR in .env}
+        target: ${IKENTIC_DEV_MOUNT_PATH:-/home/node/.openclaw/extensions/openclaw-ikentic-plugin}
