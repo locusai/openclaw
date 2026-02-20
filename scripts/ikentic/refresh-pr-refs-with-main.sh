@@ -52,7 +52,7 @@ done
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-if [[ -n "$(git status --porcelain)" ]]; then
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "working tree is dirty; commit/stash before refresh" >&2
   git status --porcelain >&2 || true
   exit 1
@@ -135,4 +135,3 @@ echo "pr refresh report: ${report}"
 if [[ "$failed" -ne 0 ]]; then
   exit 2
 fi
-

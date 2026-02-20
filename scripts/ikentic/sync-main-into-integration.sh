@@ -36,7 +36,7 @@ run_cmd() {
   fi
 }
 
-if [[ -n "$(git status --porcelain)" ]]; then
+if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "working tree is dirty; commit/stash before sync" >&2
   git status --porcelain >&2 || true
   exit 1
