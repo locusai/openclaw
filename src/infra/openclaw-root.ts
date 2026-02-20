@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-const CORE_PACKAGE_NAMES = new Set(["openclaw"]);
+import { isCoreOpenClawPackageName } from "./core-package-name.js";
 
 async function readPackageName(dir: string): Promise<string | null> {
   try {
@@ -28,7 +28,7 @@ function readPackageNameSync(dir: string): string | null {
 async function findPackageRoot(startDir: string, maxDepth = 12): Promise<string | null> {
   for (const current of iterAncestorDirs(startDir, maxDepth)) {
     const name = await readPackageName(current);
-    if (name && CORE_PACKAGE_NAMES.has(name)) {
+    if (isCoreOpenClawPackageName(name)) {
       return current;
     }
   }
@@ -38,7 +38,7 @@ async function findPackageRoot(startDir: string, maxDepth = 12): Promise<string 
 function findPackageRootSync(startDir: string, maxDepth = 12): string | null {
   for (const current of iterAncestorDirs(startDir, maxDepth)) {
     const name = readPackageNameSync(current);
-    if (name && CORE_PACKAGE_NAMES.has(name)) {
+    if (isCoreOpenClawPackageName(name)) {
       return current;
     }
   }
