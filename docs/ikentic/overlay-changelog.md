@@ -6,6 +6,13 @@ source branch.
 
 ## Consolidation Entries
 
+### codex/ikentic-docker-determinism
+
+- Functionality: Canonicalizes compose to base + `mount-state` + `mount-plugin` + `mount-all` overlays.
+- Functionality: Base compose remains ephemeral (no bind mounts/volumes) and mounts `node_auth_token` as runtime secret file.
+- Functionality: Entrypoint now reads runtime token from `/run/secrets/node_auth_token` for npm view/install auth and removes temporary `.npmrc` after use.
+- Functionality: Refresh logic is idempotent and skips reinstall churn when requested spec and resolved version match installed plugin.
+
 ### pr/control-ui-plugin-extensions
 
 - Functionality: Added gateway + UI support for plugin-provided UI panels (new plugin UI
