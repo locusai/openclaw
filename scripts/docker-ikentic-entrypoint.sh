@@ -107,10 +107,10 @@ load_node_auth_token() {
 
   NODE_AUTH_TOKEN="$(
     node -e "
-      const fs = require('node:fs');
+      const fs = require(\"node:fs\");
       const p = process.argv[1];
       try {
-        const raw = fs.readFileSync(p, 'utf8');
+        const raw = fs.readFileSync(p, \"utf8\");
         const token = raw.trim();
         if (token) process.stdout.write(token);
       } catch {}
@@ -134,20 +134,20 @@ read_plugin_version_from_path() {
   fi
 
   node -e "
-    const fs = require('node:fs');
+    const fs = require(\"node:fs\");
     const packagePath = process.argv[1];
     const pluginPath = process.argv[2];
 
     const readVersion = (p) => {
-      if (!p || !fs.existsSync(p)) return '';
+      if (!p || !fs.existsSync(p)) return \"\";
       try {
-        const raw = fs.readFileSync(p, 'utf8');
+        const raw = fs.readFileSync(p, \"utf8\");
         const parsed = JSON.parse(raw);
-        if (parsed && typeof parsed.version === 'string' && parsed.version.trim()) {
+        if (parsed && typeof parsed.version === \"string\" && parsed.version.trim()) {
           return parsed.version.trim();
         }
       } catch {}
-      return '';
+      return \"\";
     };
 
     const packageVersion = readVersion(packagePath);
@@ -169,7 +169,7 @@ evaluate_refresh_decision() {
   local previous_requested_spec="$3"
   local resolved_target_version="$4"
 
-  node /app/scripts/ikentic/npm-refresh-policy.mjs \
+  node /app/ikentic/scripts/npm-refresh-policy.mjs \
     --installed-version "$installed_version" \
     --requested-spec "$requested_spec" \
     --previous-requested-spec "$previous_requested_spec" \
@@ -199,14 +199,14 @@ read_recorded_install_spec_from_config() {
   fi
 
   node -e "
-    const fs = require('node:fs');
+    const fs = require(\"node:fs\");
     const p = process.argv[1];
     const pluginId = process.argv[2];
     try {
-      const raw = fs.readFileSync(p, 'utf8');
-      const cfg = JSON.parse(raw || '{}') || {};
+      const raw = fs.readFileSync(p, \"utf8\");
+      const cfg = JSON.parse(raw || \"{}\") || {};
       const spec = cfg?.plugins?.installs?.[pluginId]?.spec;
-      if (typeof spec === 'string' && spec.trim()) {
+      if (typeof spec === \"string\" && spec.trim()) {
         process.stdout.write(spec.trim());
       }
     } catch {}
@@ -219,7 +219,7 @@ split_npm_spec() {
     const spec = process.argv[1];
     const match = spec.match(/^(@[^/]+\\/[^@]+|[^@]+)(?:@(.+))?$/);
     if (!match) process.exit(1);
-    process.stdout.write((match[1] || '') + '\\n' + (match[2] || '') + '\\n');
+    process.stdout.write((match[1] || \"\") + '\\n' + (match[2] || \"\") + '\\n');
   " "$spec"
 }
 
@@ -245,14 +245,14 @@ NPMRC
   NPM_CONFIG_USERCONFIG="$npmrc_path" \
     npm view --registry=https://npm.pkg.github.com "${package_name}@${selector_to_query}" version --json 2>/tmp/ikentic-npm-view.err \
     | node -e "
-      const fs = require('node:fs');
-      const raw = fs.readFileSync(0, 'utf8').trim();
+      const fs = require(\"node:fs\");
+      const raw = fs.readFileSync(0, \"utf8\").trim();
       if (!raw) process.exit(1);
       let parsed = raw;
       try { parsed = JSON.parse(raw); } catch {}
       let version = parsed;
       if (Array.isArray(version)) version = version[version.length - 1];
-      if (typeof version !== 'string' || !version.trim()) process.exit(1);
+      if (typeof version !== \"string\" || !version.trim()) process.exit(1);
       process.stdout.write(version.trim());
     " 2>/dev/null || {
       rm -f "$npmrc_path"
@@ -391,7 +391,7 @@ sanitize_legacy_plugin_refs() {
   fi
 
   node -e "
-    const fs = require('node:fs');
+    const fs = require(\"node:fs\");
     const p = process.argv[1];
     const legacyId = process.argv[2];
     const targetId = process.argv[3];
@@ -399,12 +399,12 @@ sanitize_legacy_plugin_refs() {
 
     let cfg = {};
     try {
-      cfg = JSON.parse(fs.readFileSync(p, 'utf8') || '{}') || {};
+      cfg = JSON.parse(fs.readFileSync(p, \"utf8\") || \"{}\") || {};
     } catch {
       process.exit(0);
     }
-    if (!cfg.plugins || typeof cfg.plugins !== 'object') cfg.plugins = {};
-    if (!cfg.plugins.entries || typeof cfg.plugins.entries !== 'object') {
+    if (!cfg.plugins || typeof cfg.plugins !== \"object\") cfg.plugins = {};
+    if (!cfg.plugins.entries || typeof cfg.plugins.entries !== \"object\") {
       cfg.plugins.entries = {};
     }
 
@@ -422,19 +422,19 @@ sanitize_legacy_plugin_refs() {
     if (Array.isArray(cfg.plugins.allow)) {
       const normalized = [];
       for (const id of cfg.plugins.allow) {
-        if (typeof id !== 'string') continue;
+        if (typeof id !== \"string\") continue;
         const mapped = id === legacyId ? targetId : id;
         if (!normalized.includes(mapped)) normalized.push(mapped);
       }
-      if (normalized.join(',') !== cfg.plugins.allow.join(',')) {
+      if (normalized.join(\",\") !== cfg.plugins.allow.join(\",\")) {
         cfg.plugins.allow = normalized;
         changed = true;
       }
     }
 
     if (changed) {
-      fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + '\\n', 'utf8');
-      process.stdout.write('sanitized');
+      fs.writeFileSync(p, JSON.stringify(cfg, null, 2) + '\\n', \"utf8\");
+      process.stdout.write(\"sanitized\");
     }
   " "$config_path" "${IKENTIC_LEGACY_PLUGIN_ID:-ikentic}" "$IKENTIC_PLUGIN_ID_DEFAULT" >/tmp/ikentic-sanitize.out 2>/dev/null || true
 
@@ -477,7 +477,7 @@ if [ "$DEV_MODE_ACTIVE" = "true" ]; then
   echo "$TAG Dev mode detected at $DEV_MOUNT; skipping legacy npm migration."
 else
   MIGRATION_OUT="$(
-    node /app/scripts/migrate-legacy-plugin.mjs \
+    node /app/ikentic/scripts/migrate-legacy-plugin.mjs \
       --log-prefix "$TAG" \
       --config /home/node/.openclaw/openclaw.json \
       --extensions-dir "$EXTENSIONS_DIR" \

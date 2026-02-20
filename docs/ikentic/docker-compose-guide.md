@@ -119,14 +119,29 @@ Edit `.env` before starting.
 
 ### Gateway
 
-| Variable                 | Default                         | Description                                                                        |
-| ------------------------ | ------------------------------- | ---------------------------------------------------------------------------------- |
-| `OPENCLAW_GATEWAY_PORT`  | `18789`                         | Port exposed on the host.                                                          |
-| `OPENCLAW_GATEWAY_TOKEN` | _(auto-generated)_              | Gateway auth token. Leave empty to auto-generate (printed in logs).                |
-| `OPENCLAW_CONFIG_DIR`    | _(required in mount-state/all)_ | Host directory mapped to `/home/node/.openclaw` in mount-state/all mode.           |
-| `OPENCLAW_WORKSPACE_DIR` | _(required in mount-state/all)_ | Host directory mapped to `/home/node/.openclaw/workspace` in mount-state/all mode. |
-| `IKENTIC_PLUGINS_ALLOW`  | `openclaw-ikentic-plugin`       | Comma-separated plugin allowlist.                                                  |
-| `IKENTIC_TOOLS_ALLOW`    | `group:plugins`                 | Comma-separated tool allowlist.                                                    |
+| Variable                   | Default                         | Description                                                                        |
+| -------------------------- | ------------------------------- | ---------------------------------------------------------------------------------- |
+| `OPENCLAW_GATEWAY_PORT`    | `18789`                         | Port exposed on the host.                                                          |
+| `OPENCLAW_GATEWAY_TOKEN`   | _(auto-generated)_              | Gateway auth token. Leave empty to auto-generate (printed in logs).                |
+| `OPENCLAW_DOCKER_PLATFORM` | _(unset)_                       | Optional platform override for build/run (example: `linux/amd64` in VM setups).    |
+| `OPENCLAW_CONFIG_DIR`      | _(required in mount-state/all)_ | Host directory mapped to `/home/node/.openclaw` in mount-state/all mode.           |
+| `OPENCLAW_WORKSPACE_DIR`   | _(required in mount-state/all)_ | Host directory mapped to `/home/node/.openclaw/workspace` in mount-state/all mode. |
+| `IKENTIC_PLUGINS_ALLOW`    | `openclaw-ikentic-plugin`       | Comma-separated plugin allowlist.                                                  |
+| `IKENTIC_TOOLS_ALLOW`      | `group:plugins`                 | Comma-separated tool allowlist.                                                    |
+
+### Platform Override (VM / Multi-Arch)
+
+If Docker picks the wrong architecture in your VM, set:
+
+```bash
+OPENCLAW_DOCKER_PLATFORM=linux/amd64
+```
+
+You can set it in `.env` or inline:
+
+```bash
+OPENCLAW_DOCKER_PLATFORM=linux/amd64 docker compose -f docker-compose.ikentic.yml up --build
+```
 
 ## Common Operations
 
@@ -192,13 +207,26 @@ Use these commands from the repo root:
 
 ```bash
 # Regenerate Dockerfile.ikentic from Dockerfile
-bash scripts/sync-ikentic-dockerfile.sh
+bash ikentic/scripts/sync-dockerfile.sh
 
-# Verify Dockerfile.ikentic is still in sync (CI-style check)
-bash scripts/check-ikentic-dockerfile-sync.sh
+# Verify Dockerfile.ikentic is still in sync (CI-style check, no file writes)
+bash ikentic/scripts/sync-dockerfile.sh --check
 ```
 
-Run the sync script whenever the base `Dockerfile` changes. Run the check script before pushing Docker-related changes.
+Run the sync script whenever the base `Dockerfile` changes. Run the check mode before pushing Docker-related changes.
+
+## Docker IKENTIC E2E Tests
+
+The Docker test scaffold lives under `scripts/e2e`, with IKENTIC-specific logic in `ikentic/scripts/e2e`.
+
+```bash
+# Run both IKENTIC Docker checks
+pnpm test:docker:ikentic-managed
+
+# Or run scenarios individually
+pnpm test:docker:ikentic-managed-persistence
+pnpm test:docker:ikentic-managed-schema
+```
 
 ## Troubleshooting
 

@@ -24,6 +24,9 @@
 
 services:
   openclaw:
+    # Optional architecture override for VM/multi-arch setups.
+    # Example: OPENCLAW_DOCKER_PLATFORM=linux/amd64
+    platform: ${OPENCLAW_DOCKER_PLATFORM:-}
     build:
       context: .
       dockerfile: Dockerfile.ikentic

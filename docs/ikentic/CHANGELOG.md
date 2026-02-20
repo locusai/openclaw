@@ -11,7 +11,7 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
 - Base compose now mounts `node_auth_token` as a runtime secret file (`/run/secrets/node_auth_token`) and keeps `NODE_AUTH_TOKEN` out of container env.
 - Entrypoint refresh policy is idempotent: it compares requested spec/version against installed version and skips reinstall when unchanged.
 - Entrypoint version detection now prefers plugin `package.json` version and falls back to `openclaw.plugin.json`.
-- Added unit-tested npm refresh policy helper (`scripts/ikentic/npm-refresh-policy.mjs` + `src/ikentic/npm-refresh-policy.test.ts`).
+- Added unit-tested npm refresh policy helper (`ikentic/scripts/npm-refresh-policy.mjs` + `src/ikentic/npm-refresh-policy.test.ts`).
 
 ### Source: `pr/control-ui-plugin-extensions`
 
