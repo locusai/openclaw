@@ -14,6 +14,7 @@ import {
   type CommandRunner,
   type GlobalInstallManager,
 } from "../../infra/update-global.js";
+import { isCoreOpenClawPackageName } from "../../infra/core-package-name.js";
 import type { UpdateStepProgress, UpdateStepResult } from "../../infra/update-runner.js";
 import { runCommandWithTimeout } from "../../process/exec.js";
 import { defaultRuntime } from "../../runtime.js";
@@ -54,7 +55,6 @@ const OPENCLAW_REPO_URL = "https://github.com/openclaw/openclaw.git";
 const MAX_LOG_CHARS = 8000;
 
 export const DEFAULT_PACKAGE_NAME = "openclaw";
-const CORE_PACKAGE_NAMES = new Set([DEFAULT_PACKAGE_NAME]);
 
 export function normalizeTag(value?: string | null): string | null {
   if (!value) {
@@ -107,7 +107,7 @@ export async function isGitCheckout(root: string): Promise<boolean> {
 
 export async function isCorePackage(root: string): Promise<boolean> {
   const name = await readPackageName(root);
-  return Boolean(name && CORE_PACKAGE_NAMES.has(name));
+  return isCoreOpenClawPackageName(name);
 }
 
 export async function isEmptyDir(targetPath: string): Promise<boolean> {
