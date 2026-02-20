@@ -9,9 +9,11 @@ set -euo pipefail
 # 4) Run IKENTIC init when enabled (no gateway start in init)
 # 5) Start background sync loop + gateway
 
-if pgrep -f "openclaw gateway" >/dev/null 2>&1; then
-  echo "OpenClaw gateway is already running, exiting."
-  exit 0
+if command -v pgrep >/dev/null 2>&1; then
+  if pgrep -f "openclaw gateway" >/dev/null 2>&1; then
+    echo "OpenClaw gateway is already running, exiting."
+    exit 0
+  fi
 fi
 
 OPENCLAW_CONFIG_DIR="${OPENCLAW_CONFIG_DIR:-/root/.openclaw}"
@@ -213,4 +215,3 @@ background_sync &
 
 echo "Starting OpenClaw gateway..."
 exec openclaw gateway --allow-unconfigured --bind lan --port "$OPENCLAW_GATEWAY_PORT"
-
