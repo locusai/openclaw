@@ -29,10 +29,9 @@ mkdir -p "$(dirname "$out")"
 {
   printf 'ref\thead_oid\tsubject\n'
   git for-each-ref \
-    --format='%(refname:short)\t%(objectname)\t%(subject)' \
+    --format='%(refname:short)%09%(objectname)%09%(subject)' \
     refs/remotes/origin/pr | sort
 } > "$out"
 
 count="$(( $(wc -l < "$out") - 1 ))"
 echo "snapshot: ${out} (${count} refs)"
-
