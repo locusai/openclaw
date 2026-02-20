@@ -43,6 +43,21 @@ install_new = (
     "    pnpm install --frozen-lockfile"
 )
 
+extra_old = (
+    "RUN if [ -n \"$OPENCLAW_DOCKER_NPM_PACKAGES\" ]; then \\\n"
+    "      npm install --no-save $OPENCLAW_DOCKER_NPM_PACKAGES && \\\n"
+    "      npm cache clean --force; \\\n"
+    "    fi"
+)
+extra_new = (
+    "RUN --mount=type=secret,id=node_auth_token,required=false \\\n"
+    "    NODE_AUTH_TOKEN=\"$(cat /run/secrets/node_auth_token 2>/dev/null || true)\" \\\n"
+    "    if [ -n \"$OPENCLAW_DOCKER_NPM_PACKAGES\" ]; then \\\n"
+    "      npm install --no-save $OPENCLAW_DOCKER_NPM_PACKAGES && \\\n"
+    "      npm cache clean --force; \\\n"
+    "    fi"
+)
+
 copy_old = "COPY . .\nRUN pnpm build"
 copy_new = (
     "COPY . .\n"
@@ -58,6 +73,8 @@ if copy_old not in text:
     raise SystemExit("ikentic sync-dockerfile: expected COPY/build block not found")
 
 text = text.replace(install_old, install_new, 1)
+if extra_old in text:
+    text = text.replace(extra_old, extra_new, 1)
 text = text.replace(copy_old, copy_new, 1)
 path.write_text(text)
 PY
