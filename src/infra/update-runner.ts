@@ -17,6 +17,7 @@ import {
   isStableTag,
   type UpdateChannel,
 } from "./update-channels.js";
+import { isCoreOpenClawPackageName } from "./core-package-name.js";
 import { compareSemverStrings } from "./update-check.js";
 import {
   cleanupGlobalRenameDirs,
@@ -83,7 +84,6 @@ const MAX_LOG_CHARS = 8000;
 const PREFLIGHT_MAX_COMMITS = 10;
 const START_DIRS = ["cwd", "argv1", "process"];
 const DEFAULT_PACKAGE_NAME = "openclaw";
-const CORE_PACKAGE_NAMES = new Set([DEFAULT_PACKAGE_NAME]);
 
 function normalizeDir(value?: string | null) {
   if (!value) {
@@ -218,7 +218,7 @@ async function findPackageRoot(candidates: string[]) {
         const raw = await fs.readFile(pkgPath, "utf-8");
         const parsed = JSON.parse(raw) as { name?: string };
         const name = parsed?.name?.trim();
-        if (name && CORE_PACKAGE_NAMES.has(name)) {
+        if (isCoreOpenClawPackageName(name)) {
           return current;
         }
       } catch {
