@@ -27,8 +27,9 @@ Branch governance is defined in
 - Tag version and `package.json` version must match exactly.
 - If a pushed tag does not trigger publish workflows, keep it as history and cut the next version tag.
 - For Ikentic release prep, use:
-  - `pnpm plugins:sync:ikentic`
+  - `pnpm plugins:sync`
   - This syncs extension versions while preserving extension `CHANGELOG.md` content.
+  - If a `plugins:sync:ikentic` alias exists in your worktree, it should be equivalent to `plugins:sync`.
 
 ## CI prerequisites
 
