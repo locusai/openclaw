@@ -53,6 +53,8 @@ Ordering invariant (do not skip):
 - If the operator expectation is “only our changes are reviewable”, keep upstream-only churn isolated:
   - PR 1 (mechanical): merge `origin/main` into `integration/ikentic` + deterministic conflict handling + lockfile gates.
   - PR 2 (carry/review): promote `carry/*` lanes and any manual Class D ports after PR 1 lands.
+- For Ikentic release prep (and any time you intentionally align extension versions), run:
+  - `pnpm plugins:sync:ikentic`
 
 Session-start ground truth protocol (always run fresh; do not trust prior snapshots):
 
