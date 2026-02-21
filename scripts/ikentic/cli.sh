@@ -36,6 +36,9 @@ Commands:
   refresh-pr-refs [--snapshot <tsv>] [--dry-run]
     Rebase origin/pr/* branches onto origin/main (conflict-free only) and push back to origin.
 
+  daily-sync [--reports-dir <dir>] [--integration-ref <ref>] [--required-lanes-file <path>] [--run-sync]
+    Run deterministic daily governance checks and optionally run the mechanical sync bootstrap.
+
   stage-tools [<output-dir>]
     Copy current ikentic scripts into a stable tmp/tool directory and print path.
     Default output-dir: mktemp under /tmp (ikentic-cli-XXXXXX)
@@ -131,6 +134,7 @@ cmd_stage_tools() {
     "snapshot-pr-refs.sh"
     "refresh-pr-refs-with-main.sh"
     "port-pr-refs.sh"
+    "daily-deterministic-sync.sh"
   )
 
   local f
@@ -358,6 +362,9 @@ case "$cmd" in
     ;;
   refresh-pr-refs)
     cmd_refresh_pr_refs "$@"
+    ;;
+  daily-sync)
+    exec "$script_dir/daily-deterministic-sync.sh" "$@"
     ;;
   stage-tools)
     cmd_stage_tools "$@"
