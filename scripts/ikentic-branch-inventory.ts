@@ -5,7 +5,6 @@ import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
-
 import { runAudit, type AuditSummary } from "./ikentic-branch-gap-audit";
 
 export type OutputFormat = "table" | "json";
@@ -149,12 +148,96 @@ function listCandidateCommits(
   deps: Pick<CliDeps, "execGit">,
 ): string[] {
   const baseRef = category === "pr" ? "origin/main" : integrationRef;
-  const rawList = deps.execGit(["rev-list", "--reverse", "--no-merges", `${baseRef}..${branchRef}`]);
+  const rawList = deps.execGit([
+    "rev-list",
+    "--reverse",
+    "--no-merges",
+    `${baseRef}..${branchRef}`,
+  ]);
   if (!rawList.trim()) {
     return [];
   }
 
-  return rawList.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return rawList
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function isAncestorCommit(
+  ancestorSha: string,
+  descendantSha: string,
+  deps: Pick<CliDeps, "execGit">,
+): boolean {
+  try {
+    deps.execGit(["merge-base", "--is-ancestor", ancestorSha, descendantSha]);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function isSupersededByEquivalentCommit(params: {
+  missingSha: string;
+  equivalentShas: readonly string[];
+  deps: Pick<CliDeps, "execGit">;
+}): boolean {
+  for (const equivalentSha of params.equivalentShas) {
+    if (params.missingSha === equivalentSha) {
+      return true;
+    }
+    if (isAncestorCommit(params.missingSha, equivalentSha, params.deps)) {
+      return true;
+    }
+  }
+  return false;
+}
+
+function listTouchedPathsForCommit(sha: string, deps: Pick<CliDeps, "execGit">): string[] {
+  const raw = deps.execGit(["show", "--pretty=", "--name-only", sha]);
+  if (!raw.trim()) {
+    return [];
+  }
+  return raw
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+}
+
+function resolveBlobRef(
+  ref: string,
+  filePath: string,
+  deps: Pick<CliDeps, "execGit">,
+): string | null {
+  try {
+    return deps.execGit(["rev-parse", `${ref}:${filePath}`]).trim();
+  } catch {
+    return null;
+  }
+}
+
+function hasNoNetPathDiff(params: {
+  sha: string;
+  integrationRef: string;
+  deps: Pick<CliDeps, "execGit">;
+}): boolean {
+  let touchedPaths: string[];
+  try {
+    touchedPaths = listTouchedPathsForCommit(params.sha, params.deps);
+  } catch {
+    return false;
+  }
+  if (touchedPaths.length === 0) {
+    return true;
+  }
+  for (const filePath of touchedPaths) {
+    const commitBlob = resolveBlobRef(params.sha, filePath, params.deps);
+    const integrationBlob = resolveBlobRef(params.integrationRef, filePath, params.deps);
+    if (commitBlob !== integrationBlob) {
+      return false;
+    }
+  }
+  return true;
 }
 
 function detectPortability(
@@ -203,10 +286,25 @@ function buildBranchItems(
     const rawCherry = deps.execGit(["cherry", "-v", integrationRef, ref]);
     const cherryStateBySha = parseCherryStateBySha(rawCherry, deps);
     const candidates = listCandidateCommits(category, integrationRef, ref, deps);
+    const equivalentShas = candidates.filter((sha) => cherryStateBySha.get(sha)?.missing === false);
+    const noNetDiffCache = new Map<string, boolean>();
+    const supersededCache = new Map<string, boolean>();
     const orderedMissing: MissingCommit[] = [];
     for (const sha of candidates) {
       const state = cherryStateBySha.get(sha);
       if (!state || !state.missing) {
+        continue;
+      }
+      const superseded =
+        supersededCache.get(sha) ??
+        isSupersededByEquivalentCommit({ missingSha: sha, equivalentShas, deps });
+      supersededCache.set(sha, superseded);
+      if (superseded) {
+        continue;
+      }
+      const noNetDiff = noNetDiffCache.get(sha) ?? hasNoNetPathDiff({ sha, integrationRef, deps });
+      noNetDiffCache.set(sha, noNetDiff);
+      if (noNetDiff) {
         continue;
       }
       orderedMissing.push({

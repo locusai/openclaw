@@ -6,6 +6,9 @@ function createMockDeps(options?: {
   prCherryRaw?: string;
   prRevList?: string[];
   applyFailures?: Set<string>;
+  ancestryPairs?: Array<[string, string]>;
+  commitFilesBySha?: Record<string, string[]>;
+  blobByRefPath?: Record<string, string>;
 }) {
   const stdout: string[] = [];
   const stderr: string[] = [];
@@ -14,6 +17,9 @@ function createMockDeps(options?: {
   const prCherryRaw = options?.prCherryRaw ?? "";
   const prRevList = options?.prRevList ?? [];
   const applyFailures = options?.applyFailures ?? new Set<string>();
+  const ancestryPairs = new Set((options?.ancestryPairs ?? []).map(([a, b]) => `${a}->${b}`));
+  const commitFilesBySha = options?.commitFilesBySha ?? {};
+  const blobByRefPath = options?.blobByRefPath ?? {};
 
   const shaMap: Record<string, string> = {
     // Branch heads
@@ -24,6 +30,24 @@ function createMockDeps(options?: {
     abcdef1: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
     abcdef2: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
     c0ffee1: "cccccccccccccccccccccccccccccccccccccccc",
+  };
+
+  const defaultFilesBySha: Record<string, string[]> = {
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ["a.ts"],
+    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb: ["b.ts"],
+    cccccccccccccccccccccccccccccccccccccccc: ["c.ts"],
+  };
+
+  const defaultBlobByRefPath: Record<string, string> = {
+    "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:a.ts": "blob-a",
+    "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb:b.ts": "blob-b",
+    "cccccccccccccccccccccccccccccccccccccccc:c.ts": "blob-c",
+    "origin/integration/ikentic:a.ts": "blob-int-a",
+    "origin/integration/ikentic:b.ts": "blob-int-b",
+    "origin/integration/ikentic:c.ts": "blob-int-c",
+    "HEAD:a.ts": "blob-head-a",
+    "HEAD:b.ts": "blob-head-b",
+    "HEAD:c.ts": "blob-head-c",
   };
 
   const deps: CliDeps = {
@@ -48,7 +72,27 @@ function createMockDeps(options?: {
 
       if (args[0] === "rev-parse") {
         const value = args[1] ?? "";
+        if (value in blobByRefPath) {
+          return blobByRefPath[value];
+        }
+        if (value in defaultBlobByRefPath) {
+          return defaultBlobByRefPath[value];
+        }
         return shaMap[value] ?? `${value}${"0".repeat(Math.max(0, 40 - value.length))}`;
+      }
+
+      if (args[0] === "show" && args[1] === "--pretty=" && args[2] === "--name-only") {
+        const sha = args[3] ?? "";
+        return (commitFilesBySha[sha] ?? defaultFilesBySha[sha] ?? []).join("\n");
+      }
+
+      if (args[0] === "merge-base" && args[1] === "--is-ancestor") {
+        const ancestor = args[2] ?? "";
+        const descendant = args[3] ?? "";
+        if (ancestryPairs.has(`${ancestor}->${descendant}`)) {
+          return "";
+        }
+        throw new Error("not ancestor");
       }
 
       if (args[0] === "cherry") {
@@ -154,5 +198,45 @@ describe("ikentic branch inventory cli behavior", () => {
     expect(output).toContain("Missing PR commits: 1 across 1 branches");
     expect(output).toContain("aaaaaaaaaaaa");
     expect(output).not.toContain("cccccccccccc");
+  });
+
+  it("filters missing commits superseded by equivalent descendants", () => {
+    const prCherryRaw =
+      "+ abcdef1 Commit one\n+ abcdef2 Commit two\n- c0ffee1 Replacement commit\n";
+    const prRevList = [
+      "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "cccccccccccccccccccccccccccccccccccccccc",
+    ];
+    const { deps, readStdout } = createMockDeps({
+      prCherryRaw,
+      prRevList,
+      ancestryPairs: [
+        ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", "cccccccccccccccccccccccccccccccccccccccc"],
+        ["bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", "cccccccccccccccccccccccccccccccccccccccc"],
+      ],
+    });
+    const code = runInventoryCli(["--format", "table"], deps);
+    expect(code).toBe(0);
+    expect(readStdout()).toContain("Missing PR commits: 0 across 0 branches");
+  });
+
+  it("filters missing commits with no net file diff against integration", () => {
+    const prCherryRaw = "+ abcdef1 Commit one\n";
+    const prRevList = ["aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"];
+    const { deps, readStdout } = createMockDeps({
+      prCherryRaw,
+      prRevList,
+      commitFilesBySha: {
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa: ["same.ts"],
+      },
+      blobByRefPath: {
+        "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa:same.ts": "blob-same",
+        "origin/integration/ikentic:same.ts": "blob-same",
+      },
+    });
+    const code = runInventoryCli(["--format", "table"], deps);
+    expect(code).toBe(0);
+    expect(readStdout()).toContain("Missing PR commits: 0 across 0 branches");
   });
 });
