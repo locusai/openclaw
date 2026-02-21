@@ -21,16 +21,8 @@ type PackageJson = {
   version?: string;
 };
 
-const firstPartyExtensionScopes = ["@openclaw/"];
-const ENFORCE_PLUGIN_SYNC_ENV = "OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC";
-
-function envEnabled(name: string): boolean {
-  const raw = process.env[name];
-  if (!raw) {
-    return false;
-  }
-  const value = raw.trim().toLowerCase();
-  return value === "1" || value === "true" || value === "yes" || value === "on";
+function normalizePluginSyncVersion(version: string): string {
+  return version.replace(/[-+].*$/, "");
 }
 
 function runPackDry(): PackResult[] {
@@ -43,15 +35,12 @@ function runPackDry(): PackResult[] {
 }
 
 function checkPluginVersions() {
-  if (!envEnabled(ENFORCE_PLUGIN_SYNC_ENV)) {
-    return;
-  }
-
   const rootPackagePath = resolve("package.json");
   const rootPackage = JSON.parse(readFileSync(rootPackagePath, "utf8")) as PackageJson;
   const targetVersion = rootPackage.version;
+  const targetBaseVersion = targetVersion ? normalizePluginSyncVersion(targetVersion) : null;
 
-  if (!targetVersion) {
+  if (!targetVersion || !targetBaseVersion) {
     console.error("release-check: root package.json missing version.");
     process.exit(1);
   }
@@ -76,23 +65,19 @@ function checkPluginVersions() {
       continue;
     }
 
-    const isFirstParty = firstPartyExtensionScopes.some((scope) => pkg.name.startsWith(scope));
-    if (!isFirstParty) {
-      continue;
-    }
-
-    if (pkg.version !== targetVersion) {
+    if (normalizePluginSyncVersion(pkg.version) !== targetBaseVersion) {
       mismatches.push(`${pkg.name} (${pkg.version})`);
     }
   }
 
   if (mismatches.length > 0) {
-    console.error(`release-check: first-party plugin versions must match ${targetVersion}:`);
+    console.error(
+      `release-check: plugin versions must match release base ${targetBaseVersion} (root ${targetVersion}):`,
+    );
     for (const item of mismatches) {
       console.error(`  - ${item}`);
     }
     console.error("release-check: run `pnpm plugins:sync` to align plugin versions.");
-    console.error(`release-check: enforced by ${ENFORCE_PLUGIN_SYNC_ENV}=1.`);
     process.exit(1);
   }
 }
