@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
-FROM node:22-bookworm
+# Generated from stock Dockerfile + Ikentic deltas (do not commit)
+FROM node:22-bookworm as openclaw
 
 # Map container user/group IDs to the host (for bind-mounted volumes).
 # Defaults match the upstream node image user (uid/gid 1000).
@@ -28,7 +29,7 @@ COPY patches ./patches
 COPY scripts ./scripts
 
 RUN --mount=type=secret,id=node_auth_token,required=false \
-    NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token 2>/dev/null || true)" \
+    export NODE_AUTH_TOKEN="$(cat /run/secrets/node_auth_token 2>/dev/null || true)" && \
     pnpm install --frozen-lockfile
 
 # Optionally install Chromium and Xvfb for browser automation.
@@ -45,8 +46,7 @@ RUN if [ -n "$OPENCLAW_INSTALL_BROWSER" ]; then \
     fi
 
 COPY . .
-# The auth-aware .npmrc is only needed for dependency install above.
-# Remove it so later pnpm invocations do not warn about missing NODE_AUTH_TOKEN.
+# .npmrc only needed for dependency install step above
 RUN rm -f /app/.npmrc
 RUN pnpm build
 # Force pnpm for UI build (Bun may fail on ARM/Synology architectures)
@@ -91,3 +91,43 @@ USER node
 #   1. Set OPENCLAW_GATEWAY_TOKEN or OPENCLAW_GATEWAY_PASSWORD env var
 #   2. Override CMD: ["node","openclaw.mjs","gateway","--allow-unconfigured","--bind","lan"]
 CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
+
+# Cloudflare Sandbox target.
+#
+# Build with:
+#   docker buildx build --target cloudflare-sandbox \
+#     --build-arg SANDBOX_BASE_IMAGE=docker.io/cloudflare/sandbox:<version> \
+#     -t ghcr.io/locusai/openclaw:<tag>-cloudflare-sandbox .
+#
+# SANDBOX_BASE_IMAGE must provide:
+#   - `/sandbox` entrypoint binary
+#   - `node` runtime (OpenClaw is executed via `node /app/openclaw.mjs`)
+ARG SANDBOX_BASE_IMAGE
+FROM openclaw AS cloudflare-sandbox
+
+
+COPY --from=${SANDBOX_BASE_IMAGE} /container-server/sandbox /sandbox
+
+# Create OpenClaw directories
+# Legacy .clawdbot paths are kept for R2 backup migration
+RUN mkdir -p /root/.openclaw \
+    && mkdir -p /root/clawd \
+    && mkdir -p /root/clawd/skills
+
+# Copy startup script
+# Build cache bust: 2026-02-11-v30-rclone
+COPY --from=${SANDBOX_BASE_IMAGE} /usr/local/bin/start-openclaw.sh /usr/local/bin/start-openclaw.sh
+RUN chmod +x /usr/local/bin/start-openclaw.sh
+
+# Copy custom skills
+COPY --from=${SANDBOX_BASE_IMAGE} /root/clawd/skills/ /root/clawd/skills/
+
+COPY --from=${SANDBOX_BASE_IMAGE} /usr/local/bin/openclaw /usr/local/bin/openclaw
+COPY scripts/cloudflare-sandbox/ikentic-init.sh /usr/local/lib/openclaw/ikentic-init.sh
+RUN chmod +x /usr/local/bin/openclaw /usr/local/bin/start-openclaw.sh /usr/local/lib/openclaw/ikentic-init.sh
+
+
+# Set working directory
+WORKDIR /root/clawd
+
+ENTRYPOINT ["/sandbox"]

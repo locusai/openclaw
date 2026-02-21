@@ -1,0 +1,21 @@
+services:
+  openclaw-ikentic:
+    image: ${LOCAL_REGISTRY_HOST:-localhost:5000}/locusai/openclaw:cf-sandbox
+    build:
+      context: .
+      dockerfile: Dockerfile # stock; bake script overrides this to a generated Dockerfile
+      target: openclaw-ikentic-cf-sandbox
+      args:
+        SANDBOX_BASE_IMAGE: ghcr.io/locusai/moltworker:stock-${SANDBOX_VERSION}
+        OPENCLAW_UID: ${OPENCLAW_UID:-1000}
+        OPENCLAW_GID: ${OPENCLAW_GID:-1000}
+        OPENCLAW_DOCKER_APT_PACKAGES: ${OPENCLAW_DOCKER_APT_PACKAGES:xz-utils ca-certificates rclone}
+        OPENCLAW_DOCKER_NPM_PACKAGES: ${OPENCLAW_DOCKER_NPM_PACKAGES:-}
+        OPENCLAW_INSTALL_BROWSER: ${OPENCLAW_INSTALL_BROWSER:-}
+      x-bake:
+        platforms:
+          - linux/arm64
+          - linux/amd64
+        output: type=registry
+        secret:
+          - id=node_auth_token,env=NODE_AUTH_TOKEN
