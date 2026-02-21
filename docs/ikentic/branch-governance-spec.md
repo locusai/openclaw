@@ -21,6 +21,10 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
   - Upstream PR branches.
   - Based on `main`.
   - Intended for `openclaw/openclaw` review/merge.
+- `feat/*`
+  - Integration-only feature branches (internal).
+  - Based on `integration/ikentic` (or a short-lived `topic/*` off it).
+  - Not upstream PR routing; if upstreaming later, port patches into a `pr/*` branch based on `main`.
 - `integration/ikentic`
   - Canonical internal integration/deploy branch.
   - Base for internal feature/fix/test work.
@@ -69,10 +73,14 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
 2. Internal feature/fix/test:
    - head: `topic/*` or `carry/*`
    - base: `integration/ikentic`
-3. Release-prep:
+3. Internal feature tracking (optional, integration-only):
+   - head: `feat/<topic>`
+   - base: `integration/ikentic`
+   - do not assume upstream PR semantics for `feat/*`.
+4. Release-prep:
    - head: `topic/release-*`
    - base: `carry/publish`
-4. Release promotion:
+5. Release promotion:
    - head: `carry/publish`
    - base: `integration/ikentic`
 
@@ -298,8 +306,27 @@ Run this sequence at the start of every sync/replay/cutover session:
    - mirror divergence and integration ancestry checks from the Alignment section.
 4. Required lane completeness gate:
    - run `scripts/ikentic-branch-gap-audit.ts` before any replay sign-off or cutover planning.
-5. Open PR head snapshot and workflow/tag truth checks:
+5. Categorized branch inventory:
+   - `node --import tsx scripts/ikentic-branch-inventory.ts`
+6. Open PR head snapshot and workflow/tag truth checks:
    - capture current open PR heads and workflow/tag status into the run report.
+
+## Daily Deterministic Operation
+
+Use the daily runbook command:
+
+- `scripts/ikentic/daily-deterministic-sync.sh`
+
+Optional mechanical bootstrap after gates pass:
+
+- `scripts/ikentic/daily-deterministic-sync.sh --run-sync`
+
+The daily runbook writes machine-readable reports under `.ikentic/reports/` and enforces stop/go
+checks before any mechanical merge bootstrap.
+
+Detailed runbook:
+
+- [`/ikentic/daily-deterministic-sync`](/ikentic/daily-deterministic-sync)
 
 ## Cutover Readiness Package
 
@@ -314,7 +341,6 @@ Every cutover/readiness report must include all sections below:
    - `ADVISORY_MISSING` lanes tracked for follow-up.
 4. Release Safety Gates
    - manifest/lockfile consistency and frozen-lockfile result.
-
 ## Carry/Publish Enforcement Controls
 
 Treat `carry/publish` scope as enforceable policy, not convention.
