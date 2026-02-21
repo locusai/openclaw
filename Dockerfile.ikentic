@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7
 # Generated from stock Dockerfile + Ikentic deltas (do not commit)
+ARG SANDBOX_BASE_IMAGE
 FROM node:22-bookworm as openclaw
 
 # Map container user/group IDs to the host (for bind-mounted volumes).
@@ -102,32 +103,21 @@ CMD ["node", "openclaw.mjs", "gateway", "--allow-unconfigured"]
 # SANDBOX_BASE_IMAGE must provide:
 #   - `/sandbox` entrypoint binary
 #   - `node` runtime (OpenClaw is executed via `node /app/openclaw.mjs`)
-ARG SANDBOX_BASE_IMAGE
+FROM ${SANDBOX_BASE_IMAGE} AS sandbox_base
 FROM openclaw AS cloudflare-sandbox
 
-
-COPY --from=${SANDBOX_BASE_IMAGE} /container-server/sandbox /sandbox
-
-# Create OpenClaw directories
-# Legacy .clawdbot paths are kept for R2 backup migration
-RUN mkdir -p /root/.openclaw \
-    && mkdir -p /root/clawd \
-    && mkdir -p /root/clawd/skills
+COPY --from=sandbox_base /container-server/sandbox /sandbox
 
 # Copy startup script
 # Build cache bust: 2026-02-11-v30-rclone
-COPY --from=${SANDBOX_BASE_IMAGE} /usr/local/bin/start-openclaw.sh /usr/local/bin/start-openclaw.sh
+COPY --from=sandbox_base /usr/local/bin/start-openclaw.sh /usr/local/bin/start-openclaw.sh
 RUN chmod +x /usr/local/bin/start-openclaw.sh
 
 # Copy custom skills
-COPY --from=${SANDBOX_BASE_IMAGE} /root/clawd/skills/ /root/clawd/skills/
+COPY --from=sandbox_base /root/clawd/skills/ /root/clawd/skills/
 
-COPY --from=${SANDBOX_BASE_IMAGE} /usr/local/bin/openclaw /usr/local/bin/openclaw
-COPY scripts/cloudflare-sandbox/ikentic-init.sh /usr/local/lib/openclaw/ikentic-init.sh
-RUN chmod +x /usr/local/bin/openclaw /usr/local/bin/start-openclaw.sh /usr/local/lib/openclaw/ikentic-init.sh
+COPY --from=sandbox_base /usr/local/bin/openclaw /usr/local/bin/openclaw
+RUN chmod +x /usr/local/bin/openclaw /usr/local/bin/start-openclaw.sh
 
-
-# Set working directory
 WORKDIR /root/clawd
-
 ENTRYPOINT ["/sandbox"]

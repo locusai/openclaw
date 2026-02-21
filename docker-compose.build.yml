@@ -4,18 +4,19 @@ services:
     build:
       context: .
       dockerfile: Dockerfile # stock; bake script overrides this to a generated Dockerfile
-      target: openclaw-ikentic-cf-sandbox
+      target: cloudflare-sandbox
       args:
+        SANDBOX_VERSION: ${SANDBOX_VERSION:-0.7.0}
         SANDBOX_BASE_IMAGE: ghcr.io/locusai/moltworker:stock-${SANDBOX_VERSION}
         OPENCLAW_UID: ${OPENCLAW_UID:-1000}
         OPENCLAW_GID: ${OPENCLAW_GID:-1000}
-        OPENCLAW_DOCKER_APT_PACKAGES: ${OPENCLAW_DOCKER_APT_PACKAGES:xz-utils ca-certificates rclone}
+        OPENCLAW_DOCKER_APT_PACKAGES: ${OPENCLAW_DOCKER_APT_PACKAGES:-xz-utils ca-certificates rclone}
         OPENCLAW_DOCKER_NPM_PACKAGES: ${OPENCLAW_DOCKER_NPM_PACKAGES:-}
         OPENCLAW_INSTALL_BROWSER: ${OPENCLAW_INSTALL_BROWSER:-}
       x-bake:
         platforms:
           - linux/arm64
-          - linux/amd64
+          # - linux/amd64
         output: type=registry
         secret:
           - id=node_auth_token,env=NODE_AUTH_TOKEN
