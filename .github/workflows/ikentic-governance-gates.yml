@@ -1,0 +1,109 @@
+name: ikentic-governance-gates
+
+on:
+  pull_request:
+    branches:
+      - integration/ikentic
+      - carry/tests
+      - carry/docs
+      - carry/ops
+      - carry/docker
+      - carry/publish
+  push:
+    branches:
+      - integration/ikentic
+      - carry/tests
+      - carry/docs
+      - carry/ops
+      - carry/docker
+      - carry/publish
+
+jobs:
+  governance-gates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Fetch refs for governance checks
+        run: |
+          set -euo pipefail
+          git fetch origin --prune \
+            +refs/heads/main:refs/remotes/origin/main \
+            +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic \
+            +refs/heads/carry/*:refs/remotes/origin/carry/* \
+            +refs/heads/pr/*:refs/remotes/origin/pr/* \
+            +refs/heads/feat/*:refs/remotes/origin/feat/*
+
+      - name: Run ancestry + branch audits
+        id: audits
+        run: |
+          set -euo pipefail
+          mkdir -p .ikentic/reports
+
+          ancestry_status=0
+          if ! git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/integration/ikentic; then
+            ancestry_status=1
+          fi
+
+          set +e
+          bun scripts/ikentic-branch-gap-audit.ts --format json > .ikentic/reports/gap.json
+          gap_status=$?
+          bun scripts/ikentic-branch-inventory.ts --format json > .ikentic/reports/inventory.json
+          inventory_status=$?
+          set -e
+
+          {
+            echo "ancestry_status=${ancestry_status}"
+            echo "gap_status=${gap_status}"
+            echo "inventory_status=${inventory_status}"
+          } | tee .ikentic/reports/governance-status.txt
+
+          echo "ancestry_status=${ancestry_status}" >> "$GITHUB_OUTPUT"
+          echo "gap_status=${gap_status}" >> "$GITHUB_OUTPUT"
+          echo "inventory_status=${inventory_status}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload governance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ikentic-governance-reports-${{ github.run_id }}
+          path: .ikentic/reports
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Enforce blocking governance gates
+        run: |
+          set -euo pipefail
+
+          ancestry='${{ steps.audits.outputs.ancestry_status }}'
+          gap='${{ steps.audits.outputs.gap_status }}'
+          inventory='${{ steps.audits.outputs.inventory_status }}'
+
+          if [[ "$ancestry" != "0" ]]; then
+            echo "FAIL: origin/main is not ancestor of origin/integration/ikentic"
+            exit 1
+          fi
+          if [[ "$gap" != "0" ]]; then
+            echo "FAIL: required carry-lane completeness gate failed (gap exit: ${gap})"
+            exit 1
+          fi
+          if [[ "$inventory" == "3" ]]; then
+            echo "FAIL: branch inventory returned config/runtime error (exit 3)"
+            exit 1
+          fi
+
+          # inventory exit 2 is advisory for CI because review-lane commits can be expected.
+          if [[ "$inventory" == "2" ]]; then
+            echo "INFO: inventory found review-lane/missing commits (exit 2). See artifacts."
+          fi
+
+          echo "PASS: blocking governance gates satisfied"
+

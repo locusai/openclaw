@@ -2,10 +2,17 @@
 set -euo pipefail
 
 # Resolve deterministic conflict classes for main->integration sync.
-# Class A (package.json): take --theirs (upstream/main)
-# Class C (CHANGELOG.md): take --ours (integration lane)
-# Class B (pnpm-lock.yaml): take --theirs now; always rebuild later
-# Class D: leave unresolved and return non-zero
+#
+# This resolver does not use `--ours/--theirs` shortcuts.
+# It selects explicit index stages:
+# - Stage 2: current branch side (integration-maintained)
+# - Stage 3: merged-in side (upstream-first)
+#
+# Policy:
+# - Class A (package.json): stage 3 (upstream-first baseline)
+# - Class B (pnpm-lock.yaml): stage 3 now; always regenerate later
+# - Class C (CHANGELOG.md): stage 2 (integration-maintained lane)
+# - Class D: leave unresolved and return non-zero
 
 if [[ "${1-}" == "--help" ]]; then
   cat <<'USAGE'
@@ -16,6 +23,16 @@ Class A/B/C conflicts. Leaves Class D unresolved and exits 2 if any remain.
 USAGE
   exit 0
 fi
+
+write_stage_file() {
+  local stage="$1"
+  local file="$2"
+  if ! git cat-file -e ":${stage}:${file}" 2>/dev/null; then
+    echo "missing expected merge stage ${stage} for ${file}" >&2
+    return 1
+  fi
+  git show ":${stage}:${file}" > "${file}"
+}
 
 mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
 if [[ "${#unresolved[@]}" -eq 0 ]]; then
@@ -28,19 +45,19 @@ remaining=()
 for file in "${unresolved[@]}"; do
   case "$file" in
     package.json|*/package.json)
-      git checkout --theirs -- "$file"
+      write_stage_file 3 "$file"
       git add "$file"
-      echo "resolved A (--theirs): $file"
+      echo "resolved A (upstream-first): $file"
       ;;
     pnpm-lock.yaml)
-      git checkout --theirs -- "$file"
+      write_stage_file 3 "$file"
       git add "$file"
-      echo "resolved B (--theirs, rebuild required): $file"
+      echo "resolved B (rebuild required): $file"
       ;;
     CHANGELOG.md|*/CHANGELOG.md)
-      git checkout --ours -- "$file"
+      write_stage_file 2 "$file"
       git add "$file"
-      echo "resolved C (--ours): $file"
+      echo "resolved C (integration-maintained): $file"
       ;;
     *)
       remaining+=("$file")
@@ -55,3 +72,4 @@ if [[ "${#remaining[@]}" -gt 0 ]]; then
 fi
 
 echo "Auto-resolution complete. Rebuild lockfile next: pnpm install --lockfile-only"
+
