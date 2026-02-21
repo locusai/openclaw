@@ -6,6 +6,7 @@ import {
   resolveControlUiDistIndexHealth,
   resolveControlUiDistIndexPathForRoot,
 } from "./control-ui-assets.js";
+import { isCoreOpenClawPackageName } from "./core-package-name.js";
 import { detectPackageManager as detectPackageManagerImpl } from "./detect-package-manager.js";
 import { readPackageName, readPackageVersion } from "./package-json.js";
 import { trimLogTail } from "./restart-sentinel.js";
@@ -17,7 +18,6 @@ import {
   isStableTag,
   type UpdateChannel,
 } from "./update-channels.js";
-import { isCoreOpenClawPackageName } from "./core-package-name.js";
 import { compareSemverStrings } from "./update-check.js";
 import {
   cleanupGlobalRenameDirs,

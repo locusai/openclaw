@@ -106,4 +106,3 @@ jobs:
           fi
 
           echo "PASS: blocking governance gates satisfied"
-

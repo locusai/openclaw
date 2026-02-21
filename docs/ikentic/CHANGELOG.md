@@ -34,6 +34,7 @@ This changelog tracks Ikentic-specific branch work that is not represented in th
   session-start and cutover readiness checks.
 - Added portable IKENTIC test-fixture plugin-root resolution (`OPENCLAW_IKENTIC_PLUGIN_ROOT` first,
   then repo-relative discovery) to remove machine-local path assumptions.
+
 ### Source: `pr/control-ui-plugin-extensions`
 
 - Added gateway and UI support for plugin-provided UI panels (plugin UI loader/runtime, controller

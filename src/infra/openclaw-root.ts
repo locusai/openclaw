@@ -2,7 +2,6 @@ import fsSync from "node:fs";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-
 import { isCoreOpenClawPackageName } from "./core-package-name.js";
 
 async function readPackageName(dir: string): Promise<string | null> {

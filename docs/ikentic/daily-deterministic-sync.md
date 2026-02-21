@@ -61,4 +61,3 @@ Every cycle should produce:
 - `bun` is the preferred TypeScript runner.
 - If `bun` is unavailable, the script falls back to `node --import tsx`.
 - Keep `.ikentic/` untracked; do not commit generated reports.
-

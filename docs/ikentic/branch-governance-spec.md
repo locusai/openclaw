@@ -341,6 +341,7 @@ Every cutover/readiness report must include all sections below:
    - `ADVISORY_MISSING` lanes tracked for follow-up.
 4. Release Safety Gates
    - manifest/lockfile consistency and frozen-lockfile result.
+
 ## Carry/Publish Enforcement Controls
 
 Treat `carry/publish` scope as enforceable policy, not convention.
