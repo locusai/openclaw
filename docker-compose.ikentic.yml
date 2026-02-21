@@ -1,27 +1,49 @@
 # Docker Compose for OpenClaw + IKENTIC plugin
 #
 # NPM mode (production):
-#   1. cp .env.ikentic.example .env.ikentic
-#   2. Set NODE_AUTH_TOKEN in .env.ikentic (GitHub PAT with read:packages)
+#   1. Seed/update .env from .env.ikentic.example
+#   2. Set NODE_AUTH_TOKEN in .env (GitHub PAT with read:packages)
 #   3. docker compose -f docker-compose.ikentic.yml up --build
 #
-# Dev mode (volume mount):
-#   1. cp .env.ikentic.example .env.ikentic
-#   2. Set IKENTIC_PLUGIN_HOST_DIR in .env.ikentic
-#   3. docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic.dev.yml up --build
+# Host state/workspace + installed plugin:
+#   1. Seed/update .env from .env.ikentic.example
+#   2. Set OPENCLAW_CONFIG_DIR, OPENCLAW_WORKSPACE_DIR in .env
+#   3. docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic-mount-state.yml up --build
+#
+# Host plugin source + ephemeral container state/workspace:
+#   1. Seed/update .env from .env.ikentic.example
+#   2. Set IKENTIC_PLUGIN_HOST_DIR in .env
+#   3. docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic-mount-plugin.yml up --build
+#
+# Full dev (host state/workspace + host plugin source):
+#   1. Seed/update .env from .env.ikentic.example
+#   2. Set OPENCLAW_CONFIG_DIR, OPENCLAW_WORKSPACE_DIR, IKENTIC_PLUGIN_HOST_DIR in .env
+#   3. docker compose -f docker-compose.ikentic.yml -f docker-compose.ikentic-mount-all.yml up --build
 #
 # The gateway URL (with auth token) will be printed in the startup logs.
 
 services:
   openclaw:
-    build: .
+    # Optional architecture override for VM/multi-arch setups.
+    # Example: OPENCLAW_DOCKER_PLATFORM=linux/amd64
+    platform: ${OPENCLAW_DOCKER_PLATFORM:-}
+    build:
+      context: .
+      dockerfile: Dockerfile.ikentic
+      args:
+        OPENCLAW_DOCKER_APT_PACKAGES: ${OPENCLAW_DOCKER_APT_PACKAGES:-}
+        OPENCLAW_UID: ${OPENCLAW_UID:-1000}
+        OPENCLAW_GID: ${OPENCLAW_GID:-1000}
+      secrets:
+        - node_auth_token
     env_file:
-      - .env.ikentic
+      - .env
     environment:
       HOME: /home/node
       TERM: xterm-256color
-    volumes:
-      - openclaw-config:/home/node/.openclaw
+      # Runtime auth is read from /run/secrets/node_auth_token.
+      # Keep the container environment token-free even when .env contains NODE_AUTH_TOKEN.
+      NODE_AUTH_TOKEN: ""
     ports:
       - "${OPENCLAW_GATEWAY_PORT:-18789}:18789"
     extra_hosts:
@@ -31,6 +53,9 @@ services:
     init: true
     restart: unless-stopped
     entrypoint: ["bash", "/app/scripts/docker-ikentic-entrypoint.sh"]
+    secrets:
+      - node_auth_token
 
-volumes:
-  openclaw-config:
+secrets:
+  node_auth_token:
+    environment: NODE_AUTH_TOKEN
