@@ -21,6 +21,10 @@ For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Ha
   - Upstream PR branches.
   - Based on `main`.
   - Intended for `openclaw/openclaw` review/merge.
+- `feat/*`
+  - Integration-only feature branches (internal).
+  - Based on `integration/ikentic` (or a short-lived `topic/*` off it).
+  - Not upstream PR routing; if upstreaming later, port patches into a `pr/*` branch based on `main`.
 - `integration/ikentic`
   - Canonical internal integration/deploy branch.
   - Base for internal feature/fix/test work.
@@ -63,10 +67,14 @@ For operator hardening directives, see `AGENTS.md` (section: `Ikentic Overlay Ha
 2. Internal feature/fix/test:
    - head: `topic/*` or `carry/*`
    - base: `integration/ikentic`
-3. Release-prep:
+3. Internal feature tracking (optional, integration-only):
+   - head: `feat/<topic>`
+   - base: `integration/ikentic`
+   - do not assume upstream PR semantics for `feat/*`.
+4. Release-prep:
    - head: `topic/release-*`
    - base: `carry/publish`
-4. Release promotion:
+5. Release promotion:
    - head: `carry/publish`
    - base: `integration/ikentic`
 
@@ -219,6 +227,55 @@ Long-lived `carry/*` branches must be kept current to reduce conflict debt.
    - Non-zero divergence between `carry/publish` and `integration/ikentic` is expected.
    - Do not auto-equalize by merging all integration commits into `carry/publish`.
 
+## Session-Start Truth Protocol
+
+Run this sequence at the start of every sync/replay/cutover session:
+
+1. Environment bootstrap:
+   - `direnv allow .`
+   - `direnv exec . pnpm install`
+2. Ref truth refresh:
+   - `git fetch origin --prune`
+   - `git fetch upstream --prune`
+3. Branch truth checks:
+   - mirror divergence and integration ancestry checks from the Alignment section.
+4. Required lane completeness gate:
+   - run `scripts/ikentic-branch-gap-audit.ts` before any replay sign-off or cutover planning.
+5. Categorized branch inventory:
+   - `node --import tsx scripts/ikentic-branch-inventory.ts`
+6. Open PR head snapshot and workflow/tag truth checks:
+   - capture current open PR heads and workflow/tag status into the run report.
+
+## Daily Deterministic Operation
+
+Use the daily runbook command:
+
+- `scripts/ikentic/daily-deterministic-sync.sh`
+
+Optional mechanical bootstrap after gates pass:
+
+- `scripts/ikentic/daily-deterministic-sync.sh --run-sync`
+
+The daily runbook writes machine-readable reports under `.ikentic/reports/` and enforces stop/go
+checks before any mechanical merge bootstrap.
+
+Detailed runbook:
+
+- [`/ikentic/daily-deterministic-sync`](/ikentic/daily-deterministic-sync)
+
+## Cutover Readiness Package
+
+Every cutover/readiness report must include all sections below:
+
+1. Integration Equivalence
+   - target integration comparison (candidate vs destination integration lane).
+2. Required Lane Completeness (blocking)
+   - branch-gap audit output for lanes in `docs/ikentic/required-lanes.txt`.
+   - any `BLOCKING_MISSING` entry is a no-go.
+3. Advisory Lane Deltas (non-blocking backlog)
+   - `ADVISORY_MISSING` lanes tracked for follow-up.
+4. Release Safety Gates
+   - manifest/lockfile consistency and frozen-lockfile result.
 ## Carry/Publish Enforcement Controls
 
 Treat `carry/publish` scope as enforceable policy, not convention.
