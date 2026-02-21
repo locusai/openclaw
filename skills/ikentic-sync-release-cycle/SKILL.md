@@ -48,7 +48,7 @@ Read these files before branch-management actions:
 - `scripts/ikentic/resolve-sync-conflicts.sh`
   - Auto-resolve Class A and C (and stage lockfile for later rebuild), then report remaining Class D conflicts.
 - `scripts/ikentic/check-lockfile-gates.sh [<base-ref> [<head-ref>]]`
-  - Fail if `package.json` changed without `pnpm-lock.yaml` change.
+  - Fail if dependency-affecting `package.json` keys changed without `pnpm-lock.yaml` change (scripts/version-only changes do not require lockfile churn).
   - Run `pnpm install --frozen-lockfile`.
   - Defaults to `origin/integration/ikentic...HEAD`.
 

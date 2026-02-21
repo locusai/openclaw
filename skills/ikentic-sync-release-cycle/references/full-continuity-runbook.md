@@ -42,10 +42,19 @@ Hard rules:
 
 Deterministic conflict classes:
 
-- Class A: `package.json` files -> upstream-first (`main` / `--theirs`).
+- Class A: `package.json` files -> upstream-first (`main` baseline).
 - Class B: `pnpm-lock.yaml` -> always regenerate from resolved manifest set.
-- Class C: `CHANGELOG.md` files -> integration-maintained lane (`--ours`).
+- Class C: `CHANGELOG.md` files -> integration-maintained lane.
 - Class D: all remaining code/config conflicts -> explicit manual resolution with rationale in sync PR.
+
+Ordering invariant (do not skip):
+
+- Resolve Class A/B/C and regenerate `pnpm-lock.yaml` before any additional porting/promotion work.
+- If the operator expectation is “only our changes are reviewable”, keep upstream-only churn isolated:
+  - PR 1 (mechanical): merge `origin/main` into `integration/ikentic` + deterministic conflict handling + lockfile gates.
+  - PR 2 (carry/review): promote `carry/*` lanes and any manual Class D ports after PR 1 lands.
+- For Ikentic release prep (and any time you intentionally align extension versions), run:
+  - `pnpm plugins:sync:ikentic`
 
 Session-start ground truth protocol (always run fresh; do not trust prior snapshots):
 
