@@ -150,6 +150,14 @@ describe("resolveOpenClawPackageRoot", () => {
     expect(resolveOpenClawPackageRootSync({ cwd: pkgRoot })).toBeNull();
   });
 
+  it("treats scoped OpenClaw packages as core roots", async () => {
+    const pkgRoot = fx("scoped");
+    setFile(path.join(pkgRoot, "package.json"), JSON.stringify({ name: "@acme/openclaw" }));
+
+    expect(resolveOpenClawPackageRootSync({ cwd: pkgRoot })).toBe(pkgRoot);
+    await expect(resolveOpenClawPackageRoot({ cwd: pkgRoot })).resolves.toBe(pkgRoot);
+  });
+
   it("async resolver matches sync behavior", async () => {
     const pkgRoot = fx("async");
     setFile(path.join(pkgRoot, "package.json"), JSON.stringify({ name: "openclaw" }));
