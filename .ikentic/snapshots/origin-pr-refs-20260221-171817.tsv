@@ -1,6 +1,0 @@
-ref	head_oid	subject
-origin/pr/docker-uidgid-persistent-bin	2e796cc509e10714650c580dcb6162cd0b5aa28d	fix(docker): fail on gid collision
-origin/pr/fix-scoped-openclaw-package-root	498fdfe0096bf4cff2b3ea6ea176fc6c9d4c455e	Fix core package root detection for scoped installs
-origin/pr/internal-hooks-clear-before-plugins	3699c9465a3c650065d7289af2bfe0af4f1a7230	style(test): format internal hooks startup regression test
-origin/pr/load-openclaw-plugins-async	79a6c809d5c83ce1d36f66633ac86e27665a6cd6	plugins: preserve explicit memory slot none in loader
-origin/pr/ui-hide-noop-tool-cards	2a42c5ffb2dd2f9bf915ae5527b3f24248cf29b1	style(ui): apply oxfmt import order in tool-cards

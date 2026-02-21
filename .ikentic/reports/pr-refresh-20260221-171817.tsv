@@ -1,6 +1,0 @@
-ref	before_oid	action	after_oid	note
-pr/docker-uidgid-persistent-bin	2e796cc509e10714650c580dcb6162cd0b5aa28d	NEEDS_MANUAL		rebase conflict
-pr/fix-scoped-openclaw-package-root	498fdfe0096bf4cff2b3ea6ea176fc6c9d4c455e	PUSHED	c94a82aa7a1f471ae904f6341c32657bd5d4c68d	rebased onto origin/main
-pr/internal-hooks-clear-before-plugins	3699c9465a3c650065d7289af2bfe0af4f1a7230	PUSHED	ada77ef1f82ddb43135bd94f9792ac060d2563bc	rebased onto origin/main
-pr/load-openclaw-plugins-async	79a6c809d5c83ce1d36f66633ac86e27665a6cd6	NEEDS_MANUAL		rebase conflict
-pr/ui-hide-noop-tool-cards	2a42c5ffb2dd2f9bf915ae5527b3f24248cf29b1	PUSHED	193bf0d8ea353ccac2193bf46eefc30ad3395efb	rebased onto origin/main
