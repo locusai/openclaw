@@ -32,10 +32,12 @@ mapfile -t pkg_files < <(printf '%s\n' "$diff_files" | rg '(^|/)package\.json$' 
 
 if [[ "${#pkg_files[@]}" -gt 0 && "$lock_changed" -eq 0 ]]; then
   # Determine whether any changed package.json modified dependency-affecting keys.
-  if node --input-type=module - "$base_ref" "$head_ref" "${pkg_files[@]}" <<'NODE'
+if node --input-type=module - "$base_ref" "$head_ref" "${pkg_files[@]}" <<'NODE'
 import { execFileSync } from "node:child_process";
 
-const [baseRef, headRef, ...files] = process.argv.slice(1);
+const args = process.argv.slice(2);
+const offset = args[0] === "-" ? 1 : 0;
+const [baseRef, headRef, ...files] = args.slice(offset);
 const depKeys = new Set([
   "dependencies",
   "devDependencies",
@@ -121,4 +123,3 @@ else
 fi
 
 echo "lockfile gates passed"
-
