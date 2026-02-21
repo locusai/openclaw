@@ -79,6 +79,13 @@ Attach at least one:
 - [ ] Screenshot/recording
 - [ ] Perf numbers (if relevant)
 
+## Ikentic Governance (required when base is `integration/ikentic` or `carry/*`)
+
+- [ ] Lane type declared (`mechanical` or `review`)
+- [ ] Async-loader disposition recorded (`21ef80ada...` restored or explicitly waived with rationale)
+- [ ] Lockfile/install gate result included (`check-lockfile-gates`)
+- If not applicable, write `N/A` and explain briefly.
+
 ## Human Verification (required)
 
 What you personally verified (not just CI), and how:
