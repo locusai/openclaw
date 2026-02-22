@@ -9,6 +9,7 @@ import {
   resolveWebFetchDetail,
   resolveWebSearchDetail,
   resolveWriteDetail,
+  type ToolDisplayActionSpec,
   type ToolDisplaySpec as ToolDisplaySpecBase,
 } from "../../../src/agents/tool-display-common.js";
 import type { IconName } from "./icons.ts";
