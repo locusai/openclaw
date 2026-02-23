@@ -79,7 +79,10 @@ git push origin main
 # If a branch has rebase conflicts, it is left unchanged and recorded as NEEDS_MANUAL.
 pr_snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
 pr_snap_path="$(echo "$pr_snap_out" | awk '{print $2}')"
-"${tools_dir}/refresh-pr-refs-with-main.sh" --snapshot "$pr_snap_path" || true
+if ! "${tools_dir}/refresh-pr-refs-with-main.sh" --snapshot "$pr_snap_path"; then
+  echo "PR refresh failed; resolve origin/pr/* rebase conflicts before mechanical sync." >&2
+  exit 2
+fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 branch="codex/sync-main-${stamp}"
