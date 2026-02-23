@@ -10,11 +10,12 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/ikentic/port-pr-refs.sh [--report <tsv>] [--base <ref>]
+Usage: scripts/ikentic/port-pr-refs.sh [--report <tsv>] [--base <ref>] [--snapshot <tsv>]
 
 Defaults:
   --base origin/main
-  --report .ikentic/reports/pr-port-<stamp>.tsv
+  --report ${TMPDIR:-/tmp}/ikentic-reports/pr-port-<stamp>.tsv
+  --snapshot (unset; enumerates refs/remotes/origin/pr directly)
 
 Report columns:
   pr_ref<TAB>commit<TAB>action<TAB>note
@@ -23,6 +24,7 @@ USAGE
 
 report=""
 base_ref="origin/main"
+snapshot=""
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -38,6 +40,10 @@ while [[ "$#" -gt 0 ]]; do
       base_ref="${2:-}"
       shift 2
       ;;
+    --snapshot)
+      snapshot="${2:-}"
+      shift 2
+      ;;
     *)
       echo "unknown arg: $1" >&2
       usage >&2
@@ -50,17 +56,45 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 stamp="$(date +%Y%m%d-%H%M%S)"
-report="${report:-.ikentic/reports/pr-port-${stamp}.tsv}"
+tmp_root="${TMPDIR:-/tmp}"
+report="${report:-${tmp_root%/}/ikentic-reports/pr-port-${stamp}.tsv}"
 mkdir -p "$(dirname "$report")"
 echo -e "pr_ref\tcommit\taction\tnote" > "$report"
 
-refs="$(git for-each-ref --format='%(refname:short)' refs/remotes/origin/pr | sort)"
+refs=()
+if [[ -n "$snapshot" ]]; then
+  if [[ ! -f "$snapshot" ]]; then
+    echo "snapshot not found: $snapshot" >&2
+    exit 1
+  fi
+  while IFS=$'\t' read -r ref expected_oid _subject; do
+    [[ -n "$ref" ]] || continue
+    # Skip header.
+    if [[ "$ref" == "ref" ]]; then
+      continue
+    fi
+    if [[ -n "$expected_oid" ]]; then
+      current_oid="$(git rev-parse "$ref")"
+      if [[ "$current_oid" != "$expected_oid" ]]; then
+        echo -e "${ref}\t\tSTALE_SNAPSHOT\tref moved (${expected_oid} -> ${current_oid})" >> "$report"
+        continue
+      fi
+    fi
+    refs+=("$ref")
+  done < "$snapshot"
+else
+  while IFS= read -r ref; do
+    [[ -n "$ref" ]] || continue
+    refs+=("$ref")
+  done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin/pr | sort)
+fi
+
 if [[ -z "$refs" ]]; then
   echo "no origin/pr/* refs found"
   exit 0
 fi
 
-for ref in $refs; do
+for ref in "${refs[@]}"; do
   # Enumerate PR branch commits relative to main (oldest -> newest).
   commits=()
   while IFS= read -r commit; do

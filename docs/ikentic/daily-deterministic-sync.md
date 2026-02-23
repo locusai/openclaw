@@ -20,7 +20,8 @@ scripts/ikentic/daily-deterministic-sync.sh --run-sync
 
 ## Generated Reports
 
-Reports are written to `.ikentic/reports/`:
+Reports are written to `${TMPDIR:-/tmp}/ikentic-reports/` by default (override with
+`--reports-dir` if you want a repo-local path):
 
 - `gap-<timestamp>.json`
   - Required-lane carry completeness status.
@@ -60,4 +61,6 @@ Every cycle should produce:
 
 - `bun` is the preferred TypeScript runner.
 - If `bun` is unavailable, the script falls back to `node --import tsx`.
-- Keep `.ikentic/` untracked; do not commit generated reports.
+- Reports default to `/tmp` to avoid repo-polluting artifacts. If you override `--reports-dir`
+  to a repo-local path (for example `.ikentic/reports`), keep `.ikentic/` untracked and do not
+  commit generated reports.

@@ -21,6 +21,15 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
   - Upstream PR branches.
   - Based on `main`.
   - Intended for `openclaw/openclaw` review/merge.
+- `carry/stacked`
+  - Generated "stack" lane for internal testing.
+  - Deterministically rebuilt from:
+    - `integration/ikentic` (internal baseline) +
+    - the current snapshot of open `pr/*` patches (ported via clean cherry-picks).
+  - Purpose:
+    - run "integration + pending upstream PRs" together,
+    - without ever pushing integration-only deltas into upstream PR branches.
+  - Not a base for feature work; do not branch from `carry/stacked`.
 - `feat/*`
   - Integration-only feature branches (internal).
   - Based on `integration/ikentic` (or a short-lived `topic/*` off it).
@@ -56,6 +65,8 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
    - `carry/publish` must only contain release-scope commits.
 4. Force-push invariant:
    - no force-push to `integration/ikentic`, `carry/publish`, or persistent `carry/*`.
+   - Exception: `carry/stacked` is a generated lane and may be updated with
+     `--force-with-lease` by governance scripts only.
    - Exception: a name-preserving clean-baseline cutover may use `--force-with-lease`
      exactly once when operator-approved and fully documented (backup refs + exception
      record required). See `CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)` below.
@@ -170,6 +181,20 @@ When restoring Ikentic docs from another branch, use path-scoped apply:
 
 - `git checkout <source-branch> -- docs/ikentic`
 - keep `docs/ci.md` and `docs/reference/RELEASING.md` out of this step.
+
+### Internal stacking without polluting upstream PRs
+
+Some work will need to be tested "together" before upstream PRs merge, or may
+temporarily depend on internal integration-only deltas.
+
+Do **not** solve this by cherry-picking internal commits into `pr/*` branches.
+That makes upstream PRs non-reviewable and creates sync debt.
+
+Instead, use the generated stack lane:
+
+- Rebuild `carry/stacked` from `integration/ikentic` + the current `pr/*` snapshot.
+- Run internal CI/release validation on `carry/stacked`.
+- Keep upstream PR branches (`pr/*`) strictly `main`-based and self-contained.
 
 ### Required flow
 
@@ -321,8 +346,8 @@ Optional mechanical bootstrap after gates pass:
 
 - `scripts/ikentic/daily-deterministic-sync.sh --run-sync`
 
-The daily runbook writes machine-readable reports under `.ikentic/reports/` and enforces stop/go
-checks before any mechanical merge bootstrap.
+The daily runbook writes machine-readable reports under `${TMPDIR:-/tmp}/ikentic-reports/` by
+default and enforces stop/go checks before any mechanical merge bootstrap.
 
 Detailed runbook:
 
