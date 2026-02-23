@@ -89,6 +89,19 @@ run_cmd() {
   fi
 }
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Stage helper scripts to a stable tmp dir so branch switches (integration refs) don't change behavior.
+tools_dir="$(mktemp -d /tmp/ikentic-stacked-tools-XXXXXX)"
+stage_tool() {
+  local f="$1"
+  cp "${script_dir}/${f}" "${tools_dir}/${f}"
+  chmod +x "${tools_dir}/${f}"
+}
+stage_tool "snapshot-pr-refs.sh"
+stage_tool "port-pr-refs.sh"
+stage_tool "check-lockfile-gates.sh"
+
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "working tree has tracked changes; commit/stash before updating stacked carry" >&2
   git status --porcelain >&2 || true
@@ -103,7 +116,7 @@ reports_dir="${reports_dir:-${tmp_root%/}/ikentic-reports}"
 mkdir -p "$reports_dir"
 
 if [[ -z "$snapshot" ]]; then
-  snap_out="$(scripts/ikentic/snapshot-pr-refs.sh)"
+  snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
   snapshot="$(echo "$snap_out" | awk '{print $2}')"
 fi
 if [[ ! -f "$snapshot" ]]; then
@@ -121,18 +134,19 @@ cleanup() {
   if git show-ref --verify --quiet "refs/heads/${tmp_branch}"; then
     git branch -D "${tmp_branch}" >/dev/null 2>&1 || true
   fi
+  rm -rf "$tools_dir" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 git switch -c "$tmp_branch" "$integration_ref" >/dev/null
 
 port_report="${reports_dir%/}/pr-port-${stamp}.tsv"
-scripts/ikentic/port-pr-refs.sh \
+"${tools_dir}/port-pr-refs.sh" \
   --base "$base_ref" \
   --snapshot "$snapshot" \
   --report "$port_report"
 
-scripts/ikentic/check-lockfile-gates.sh "$integration_ref" HEAD
+"${tools_dir}/check-lockfile-gates.sh" "$integration_ref" HEAD
 
 if [[ "$run_check" -eq 1 ]]; then
   run_cmd env CI=true pnpm check
