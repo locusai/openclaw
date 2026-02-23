@@ -2,7 +2,7 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { resolveIkenticPluginRoot } from "./ikentic-e2e-fixtures";
+import { resolveIkenticPluginRoot } from "./ikentic-e2e-fixtures.js";
 
 const originalCwd = process.cwd();
 
