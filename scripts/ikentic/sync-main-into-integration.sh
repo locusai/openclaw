@@ -112,4 +112,8 @@ git commit -m "sync integration with mirror main"
 # Lockfile gates: dependency-aware manifest/lock coupling + frozen install.
 "${tools_dir}/check-lockfile-gates.sh" origin/integration/ikentic HEAD
 
+# Build gates: catch semantic drops from auto-merge (type contracts, lint, format).
+run_cmd pnpm check
+run_cmd pnpm build
+
 echo "created sync branch: ${branch}"
