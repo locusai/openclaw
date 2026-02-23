@@ -58,15 +58,15 @@ done
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-run_check_isolated() {
+run_check_isolated() (
+  set -euo pipefail
+
   # `pnpm check` runs `oxfmt --check`, which scans the repo tree and can fail on
   # local agent scratch artifacts. Temporarily move known scratch dirs out of
   # the repo so the gate is about the rebased branch itself.
-  local tmp_hide
   tmp_hide="$(mktemp -d "${TMPDIR:-/tmp}/ikentic-hide-XXXXXX")"
 
-  local moved=()
-  local d
+  moved=()
   for d in ".ralph" ".ikentic"; do
     if [[ -e "$d" ]]; then
       mv "$d" "${tmp_hide}/"
@@ -75,7 +75,6 @@ run_check_isolated() {
   done
 
   cleanup_hide() {
-    local x
     for x in "${moved[@]}"; do
       if [[ -e "${tmp_hide}/${x}" && ! -e "$x" ]]; then
         mv "${tmp_hide}/${x}" "$x"
@@ -92,7 +91,7 @@ run_check_isolated() {
     env CI=true pnpm install --frozen-lockfile
     env CI=true pnpm check
   fi
-}
+)
 
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "working tree is dirty; commit/stash before refresh" >&2
