@@ -28,7 +28,11 @@ if printf '%s\n' "$diff_files" | rg -q '^pnpm-lock\.yaml$'; then
   lock_changed=1
 fi
 
-mapfile -t pkg_files < <(printf '%s\n' "$diff_files" | rg '(^|/)package\.json$' || true)
+pkg_files=()
+while IFS= read -r file; do
+  [[ -n "$file" ]] || continue
+  pkg_files+=("$file")
+done < <(printf '%s\n' "$diff_files" | rg '(^|/)package\.json$' || true)
 
 if [[ "${#pkg_files[@]}" -gt 0 && "$lock_changed" -eq 0 ]]; then
   # Determine whether any changed package.json modified dependency-affecting keys.

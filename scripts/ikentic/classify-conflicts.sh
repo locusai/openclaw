@@ -19,10 +19,17 @@ USAGE
   exit 0
 fi
 
+files=()
 if [[ "$#" -gt 0 ]]; then
-  mapfile -t files < <(printf '%s\n' "$@")
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    files+=("$file")
+  done < <(printf '%s\n' "$@")
 else
-  mapfile -t files < <(git diff --name-only --diff-filter=U)
+  while IFS= read -r file; do
+    [[ -n "$file" ]] || continue
+    files+=("$file")
+  done < <(git diff --name-only --diff-filter=U)
 fi
 
 if [[ "${#files[@]}" -eq 0 ]]; then
@@ -57,4 +64,3 @@ done | sort | tee /dev/stderr | awk -F '\t' '
     printf "\n"
   }
 '
-

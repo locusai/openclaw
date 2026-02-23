@@ -62,7 +62,11 @@ fi
 
 for ref in $refs; do
   # Enumerate PR branch commits relative to main (oldest -> newest).
-  mapfile -t commits < <(git rev-list --reverse --no-merges "${base_ref}..${ref}")
+  commits=()
+  while IFS= read -r commit; do
+    [[ -n "$commit" ]] || continue
+    commits+=("$commit")
+  done < <(git rev-list --reverse --no-merges "${base_ref}..${ref}")
   if [[ "${#commits[@]}" -eq 0 ]]; then
     echo -e "${ref}\t\tSKIP\tno commits vs ${base_ref}" >> "$report"
     continue
@@ -89,4 +93,3 @@ for ref in $refs; do
 done
 
 echo "pr port report: ${report}"
-

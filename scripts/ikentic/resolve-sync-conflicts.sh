@@ -34,7 +34,11 @@ write_stage_file() {
   git show ":${stage}:${file}" > "${file}"
 }
 
-mapfile -t unresolved < <(git diff --name-only --diff-filter=U)
+unresolved=()
+while IFS= read -r file; do
+  [[ -n "$file" ]] || continue
+  unresolved+=("$file")
+done < <(git diff --name-only --diff-filter=U)
 if [[ "${#unresolved[@]}" -eq 0 ]]; then
   echo "No unresolved conflicts found"
   exit 0
@@ -72,4 +76,3 @@ if [[ "${#remaining[@]}" -gt 0 ]]; then
 fi
 
 echo "Auto-resolution complete. Rebuild lockfile next: pnpm install --lockfile-only"
-
