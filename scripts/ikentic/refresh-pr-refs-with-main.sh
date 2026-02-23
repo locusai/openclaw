@@ -21,11 +21,13 @@ Notes:
   - Requires clean working tree.
   - Pushes updates to origin/pr/* with --force-with-lease when rebase is clean.
   - If rebase conflicts, the branch is left unchanged and recorded as NEEDS_MANUAL.
+  - Runs `pnpm check` on rebased branches by default; failures are recorded as NEEDS_MANUAL.
 USAGE
 }
 
 snapshot=""
 dry_run=0
+run_check=1
 
 while [[ "$#" -gt 0 ]]; do
   case "$1" in
@@ -39,6 +41,10 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --dry-run)
       dry_run=1
+      shift
+      ;;
+    --skip-check)
+      run_check=0
       shift
       ;;
     *)
@@ -59,8 +65,10 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
 fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
-report=".ikentic/reports/pr-refresh-${stamp}.tsv"
-mkdir -p "$(dirname "$report")"
+tmp_root="${TMPDIR:-/tmp}"
+report_dir="${tmp_root%/}/ikentic-reports"
+report="${report_dir}/pr-refresh-${stamp}.tsv"
+mkdir -p "$report_dir"
 
 get_refs() {
   if [[ -n "$snapshot" ]]; then
@@ -93,7 +101,7 @@ while IFS= read -r ref; do
   git switch -c "$tmp" "$ref" >/dev/null
 
   set +e
-  git rebase origin/main >/dev/null 2>&1
+  git -c rerere.enabled=false rebase origin/main >/dev/null 2>&1
   st=$?
   set -e
 
@@ -113,6 +121,26 @@ while IFS= read -r ref; do
     git switch - >/dev/null
     git branch -D "$tmp" >/dev/null 2>&1 || true
     continue
+  fi
+
+  if [[ "$run_check" -eq 1 ]]; then
+    set +e
+    if command -v direnv >/dev/null 2>&1; then
+      direnv exec . env CI=true pnpm install --frozen-lockfile
+      direnv exec . env CI=true pnpm check
+    else
+      env CI=true pnpm install --frozen-lockfile
+      env CI=true pnpm check
+    fi
+    cst=$?
+    set -e
+
+    if [[ "$cst" -ne 0 ]]; then
+      echo -e "${branch}\t${before_oid}\tNEEDS_MANUAL\t${after_oid}\tcheck failed (local branch ${tmp})" >> "$report"
+      failed=1
+      git switch - >/dev/null
+      continue
+    fi
   fi
 
   # Protect against remote drift: only update if origin still points at snapshot before_oid.
