@@ -116,8 +116,9 @@ jobs:
 
       - name: Release check
         run: pnpm release:check
-        env:
-          OPENCLAW_RELEASE_ENFORCE_PLUGIN_SYNC: ${{ steps.resolve-release-channel.outputs.enforce_plugin_sync }}
+
+      - name: Ikentic first-party plugin version gate
+        run: npx tsx scripts/ikentic-release-check.ts
 
       - name: Verify IKENTIC files are included in npm pack
         shell: bash
