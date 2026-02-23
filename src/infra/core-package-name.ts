@@ -11,4 +11,3 @@ export function isCoreOpenClawPackageName(name: string | null | undefined): bool
   // (e.g. "@locusai/openclaw"). Treat any "@<scope>/openclaw" as a core package.
   return /^@[^/]+\/openclaw$/.test(name);
 }
-
