@@ -9,6 +9,8 @@
   "tabWidth": 2,
   "useTabs": false,
   "ignorePatterns": [
+    ".ikentic/",
+    ".ralph/",
     "apps/",
     "assets/",
     "docker-compose.yml",

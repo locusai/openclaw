@@ -14,6 +14,8 @@ __pycache__/
 .worktrees/
 .DS_Store
 **/.DS_Store
+.ikentic/
+.ralph/
 ui/src/ui/__screenshots__/
 ui/playwright-report/
 ui/test-results/
