@@ -4,7 +4,7 @@ import os from "node:os";
 import path from "node:path";
 import { afterAll, afterEach, describe, expect, it } from "vitest";
 import { withEnv } from "../test-utils/env.js";
-import { loadOpenClawPlugins } from "./loader.js";
+import { loadOpenClawPlugins, loadOpenClawPluginsAsync } from "./loader.js";
 
 type TempPlugin = { dir: string; file: string; id: string };
 
@@ -596,5 +596,131 @@ describe("loadOpenClawPlugins", () => {
     const record = registry.plugins.find((entry) => entry.id === "symlinked");
     expect(record?.status).not.toBe("loaded");
     expect(registry.diagnostics.some((entry) => entry.message.includes("escapes"))).toBe(true);
+  });
+});
+
+describe("loadOpenClawPluginsAsync", () => {
+  it("loads a JS plugin from a config load path", async () => {
+    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    const plugin = writePlugin({
+      id: "async-config",
+      body: 'export default { id: "async-config", register() {} };',
+    });
+
+    const registry = await loadOpenClawPluginsAsync({
+      cache: false,
+      config: {
+        plugins: {
+          enabled: true,
+          load: { paths: [plugin.dir] },
+          allow: [plugin.id],
+          entries: {
+            [plugin.id]: { enabled: true },
+          },
+        },
+      },
+    });
+
+    const record = registry.plugins.find((entry) => entry.id === plugin.id);
+    expect(record?.status).toBe("loaded");
+  });
+
+  it("rejects TypeScript entrypoints", async () => {
+    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    const plugin = writePlugin({
+      id: "async-ts",
+      filename: "async-ts.ts",
+      body: 'export default { id: "async-ts", register() {} };',
+    });
+
+    const registry = await loadOpenClawPluginsAsync({
+      cache: false,
+      config: {
+        plugins: {
+          enabled: true,
+          load: { paths: [plugin.dir] },
+          allow: [plugin.id],
+          entries: {
+            [plugin.id]: { enabled: true },
+          },
+        },
+      },
+    });
+
+    const record = registry.plugins.find((entry) => entry.id === plugin.id);
+    expect(record?.status).toBe("error");
+    expect(record?.error).toContain("ESM loader does not support TypeScript entrypoints (.ts)");
+    expect(
+      registry.diagnostics.some((diag) =>
+        diag.message.includes("failed to load plugin: ESM loader does not support TypeScript"),
+      ),
+    ).toBe(true);
+  });
+
+  it("records register() errors using formatError output", async () => {
+    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    const plugin = writePlugin({
+      id: "async-throws",
+      body: 'export default { id: "async-throws", register() { throw new Error("boom"); } };',
+    });
+
+    const registry = await loadOpenClawPluginsAsync({
+      cache: false,
+      config: {
+        plugins: {
+          enabled: true,
+          load: { paths: [plugin.dir] },
+          allow: [plugin.id],
+          entries: {
+            [plugin.id]: { enabled: true },
+          },
+        },
+      },
+    });
+
+    const record = registry.plugins.find((entry) => entry.id === plugin.id);
+    expect(record?.status).toBe("error");
+    expect(record?.error).toBe("boom");
+    expect(
+      registry.diagnostics.some((diag) => diag.message === "plugin failed during register: boom"),
+    ).toBe(true);
+  });
+
+  it("warns when register() returns a promise (async registration is ignored)", async () => {
+    process.env.OPENCLAW_BUNDLED_PLUGINS_DIR = "/nonexistent/bundled/plugins";
+    const plugin = writePlugin({
+      id: "async-promise",
+      body: `export default {
+  id: "async-promise",
+  register() {
+    return new Promise(() => {});
+  }
+};`,
+    });
+
+    const registry = await loadOpenClawPluginsAsync({
+      cache: false,
+      config: {
+        plugins: {
+          enabled: true,
+          load: { paths: [plugin.dir] },
+          allow: [plugin.id],
+          entries: {
+            [plugin.id]: { enabled: true },
+          },
+        },
+      },
+    });
+
+    const record = registry.plugins.find((entry) => entry.id === plugin.id);
+    expect(record?.status).toBe("loaded");
+    expect(
+      registry.diagnostics.some(
+        (diag) =>
+          diag.level === "warn" &&
+          diag.pluginId === plugin.id &&
+          diag.message === "plugin register returned a promise; async registration is ignored",
+      ),
+    ).toBe(true);
   });
 });
