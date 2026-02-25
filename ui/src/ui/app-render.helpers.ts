@@ -6,6 +6,7 @@ import { syncUrlWithSessionKey } from "./app-settings.ts";
 import type { AppViewState } from "./app-view-state.ts";
 import { OpenClawApp } from "./app.ts";
 import { ChatState, loadChatHistory } from "./controllers/chat.ts";
+import type { IconName } from "./icons.ts";
 import { icons } from "./icons.ts";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
@@ -47,7 +48,16 @@ function resetChatStateForSessionSwitch(state: AppViewState, sessionKey: string)
   });
 }
 
-export function renderTab(state: AppViewState, tab: Tab) {
+type RenderTabMeta = {
+  icon?: IconName;
+  label?: string;
+  title?: string;
+};
+
+export function renderTab(state: AppViewState, tab: Tab, meta?: RenderTabMeta) {
+  const label = meta?.label ?? titleForTab(tab);
+  const iconName = meta?.icon ?? iconForTab(tab);
+  const title = meta?.title ?? label;
   const href = pathForTab(tab, state.basePath);
   return html`
     <a
@@ -74,10 +84,10 @@ export function renderTab(state: AppViewState, tab: Tab) {
         }
         state.setTab(tab);
       }}
-      title=${titleForTab(tab)}
+      title=${title}
     >
-      <span class="nav-item__icon" aria-hidden="true">${icons[iconForTab(tab)]}</span>
-      <span class="nav-item__text">${titleForTab(tab)}</span>
+      <span class="nav-item__icon" aria-hidden="true">${icons[iconName]}</span>
+      <span class="nav-item__text">${label}</span>
     </a>
   `;
 }

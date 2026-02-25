@@ -4,10 +4,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { createJiti } from "jiti";
 import type { OpenClawConfig } from "../config/config.js";
 import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
-import { openBoundaryFileSync } from "../infra/boundary-file-read.js";
 import { formatError } from "../gateway/server-utils.js";
+import { openBoundaryFileSync } from "../infra/boundary-file-read.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveUserPath } from "../utils.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import { clearPluginCommands } from "./commands.js";
 import {
   applyTestPluginDefaults,
@@ -177,6 +178,7 @@ function createPluginRecord(params: {
     cliCommands: [],
     services: [],
     commands: [],
+    commandOptions: [],
     httpHandlers: 0,
     hookCount: 0,
     configSchema: params.configSchema,
@@ -410,6 +412,7 @@ function createPluginLoaderContext(options: PluginLoadOptions = {}): PluginLoade
   }
 
   clearPluginCommands();
+  clearPluginCommandOptions();
 
   const runtime = createPluginRuntime();
   const { registry, createApi } = createPluginRegistry({
