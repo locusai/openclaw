@@ -116,12 +116,6 @@ for ref in "${refs[@]}"; do
   fi
 
   for sha in "${commits[@]}"; do
-    # Skip if patch-id already present in current branch.
-    if git cherry -v HEAD "$sha" 2>/dev/null | rg -q '^-'; then
-      echo -e "${ref}\t${sha}\tALREADY_PRESENT\tpatch-id contained" >> "$report"
-      continue
-    fi
-
     tmp="$(mktemp)"
     set +e
     if [[ "$deterministic_dates" -eq 1 ]]; then
