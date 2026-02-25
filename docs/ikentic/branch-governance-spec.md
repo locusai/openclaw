@@ -147,7 +147,7 @@ scripts/ikentic/update-stacked-carry.sh
 
 Outputs:
 
-- PR snapshot TSV path
+- PR snapshot TSV path (reuse for integration)
 - PR port report TSV path
 
 Stop conditions:
@@ -165,7 +165,7 @@ Goal:
 Command:
 
 ```bash
-scripts/ikentic/sync-main-into-integration.sh
+scripts/ikentic/sync-main-into-integration.sh --snapshot <path-to-pr-snapshot.tsv>
 ```
 
 This creates a new sync branch from `origin/integration/ikentic` and runs:

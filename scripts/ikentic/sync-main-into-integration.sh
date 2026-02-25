@@ -8,7 +8,11 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/ikentic/sync-main-into-integration.sh
+Usage: scripts/ikentic/sync-main-into-integration.sh [options]
+
+Options:
+  --snapshot <tsv>   Use an explicit PR snapshot TSV for porting (recommended).
+                    When set, this script will NOT refresh/re-snapshot PR refs.
 
 Creates a new sync branch from origin/integration/ikentic, merges origin/main into it,
 applies deterministic conflict resolution for classes A/B/C, and runs lockfile gates.
@@ -19,10 +23,25 @@ Exit codes:
 USAGE
 }
 
-if [[ "${1-}" == "--help" ]]; then
-  usage
-  exit 0
-fi
+snapshot=""
+
+while [[ "$#" -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --snapshot)
+      snapshot="${2:-}"
+      shift 2
+      ;;
+    *)
+      echo "unknown arg: $1" >&2
+      usage >&2
+      exit 1
+      ;;
+  esac
+done
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repo_root="$(git rev-parse --show-toplevel)"
@@ -56,6 +75,29 @@ stage_tool "snapshot-pr-refs.sh"
 stage_tool "refresh-pr-refs-with-main.sh"
 stage_tool "port-pr-refs.sh"
 
+verify_snapshot_not_stale() {
+  local snap="$1"
+  local stale=0
+  while IFS=$'\t' read -r ref expected_oid _subject; do
+    [[ -n "$ref" ]] || continue
+    if [[ "$ref" == "ref" ]]; then
+      continue
+    fi
+    if [[ -z "$expected_oid" ]]; then
+      continue
+    fi
+    current_oid="$(git rev-parse "$ref")"
+    if [[ "$current_oid" != "$expected_oid" ]]; then
+      echo "STALE_SNAPSHOT: ${ref} moved (${expected_oid} -> ${current_oid})" >&2
+      stale=1
+    fi
+  done < "$snap"
+  if [[ "$stale" -ne 0 ]]; then
+    echo "blocking: snapshot drift detected; regenerate snapshot and retry" >&2
+    exit 2
+  fi
+}
+
 if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
   echo "working tree is dirty; commit/stash before sync" >&2
   git status --porcelain >&2 || true
@@ -72,18 +114,30 @@ else
   git switch -c main origin/main
 fi
 
-git merge --ff-only upstream/main
+git -c rerere.enabled=false -c rerere.autoupdate=false merge --ff-only upstream/main
 git push origin main
 
-# Snapshot + refresh origin/pr/* branches against updated main so they stay current.
-# If a branch has rebase conflicts, it is left unchanged and recorded as NEEDS_MANUAL.
-pre_refresh_snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
-pre_refresh_snap_path="$(echo "$pre_refresh_snap_out" | awk '{print $2}')"
-"${tools_dir}/refresh-pr-refs-with-main.sh" --snapshot "$pre_refresh_snap_path" || true
+post_refresh_snap_path=""
+if [[ -n "$snapshot" ]]; then
+  if [[ ! -f "$snapshot" ]]; then
+    echo "snapshot not found: $snapshot" >&2
+    exit 1
+  fi
+  verify_snapshot_not_stale "$snapshot"
+  post_refresh_snap_path="$snapshot"
+else
+  # Snapshot + refresh origin/pr/* branches against updated main so they stay current.
+  # If a branch has rebase conflicts, it is left unchanged and recorded as NEEDS_MANUAL.
+  pre_refresh_snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
+  echo "$pre_refresh_snap_out"
+  pre_refresh_snap_path="$(echo "$pre_refresh_snap_out" | awk '{print $2}')"
+  "${tools_dir}/refresh-pr-refs-with-main.sh" --snapshot "$pre_refresh_snap_path"
 
-# Re-snapshot after refresh for deterministic porting (STALE_SNAPSHOT blocks stack updates).
-post_refresh_snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
-post_refresh_snap_path="$(echo "$post_refresh_snap_out" | awk '{print $2}')"
+  # Re-snapshot after refresh for deterministic porting (STALE_SNAPSHOT blocks stack updates).
+  post_refresh_snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
+  echo "$post_refresh_snap_out"
+  post_refresh_snap_path="$(echo "$post_refresh_snap_out" | awk '{print $2}')"
+fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
 branch="codex/sync-main-${stamp}"

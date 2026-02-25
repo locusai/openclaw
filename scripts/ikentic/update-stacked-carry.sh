@@ -123,6 +123,7 @@ mkdir -p "$reports_dir"
 
 if [[ -z "$snapshot" ]]; then
   snap_out="$("${tools_dir}/snapshot-pr-refs.sh")"
+  echo "$snap_out"
   snapshot="$(echo "$snap_out" | awk '{print $2}')"
 fi
 if [[ ! -f "$snapshot" ]]; then
@@ -204,6 +205,13 @@ if [[ "$stale_snapshot" -eq 1 ]]; then
   exit 2
 fi
 
+# Non-clean PR ports break determinism. Do not update the stack branch.
+if [[ "$needs_review" -eq 1 ]]; then
+  echo "needs review: some PR commits did not apply cleanly; fix the PR refs and retry (see report)" >&2
+  echo "port report: ${port_report}" >&2
+  exit 2
+fi
+
 # Force-with-lease because this is a generated lane. Protect against remote drift.
 if [[ -n "$before_oid" ]]; then
   git push --force-with-lease="${stack_branch}:${before_oid}" origin HEAD:"${stack_branch}"
@@ -213,7 +221,3 @@ fi
 
 echo "updated origin/${stack_branch}: ${before_oid:-<new>} -> ${after_oid}"
 echo "port report: ${port_report}"
-if [[ "$needs_review" -eq 1 ]]; then
-  echo "needs review: some PR commits did not apply cleanly (see report)" >&2
-  exit 2
-fi

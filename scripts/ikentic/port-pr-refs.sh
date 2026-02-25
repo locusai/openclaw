@@ -99,6 +99,11 @@ if [[ -z "$refs" ]]; then
 fi
 
 for ref in "${refs[@]}"; do
+  if ! git merge-base --is-ancestor "${base_ref}" "${ref}" 2>/dev/null; then
+    echo -e "${ref}\t\tNEEDS_REVIEW\tref is not descendant of ${base_ref}" >> "$report"
+    continue
+  fi
+
   # Enumerate PR branch commits relative to main (oldest -> newest).
   commits=()
   while IFS= read -r commit; do
