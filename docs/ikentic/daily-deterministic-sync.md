@@ -62,5 +62,4 @@ Every cycle should produce:
 - `bun` is the preferred TypeScript runner.
 - If `bun` is unavailable, the script falls back to `node --import tsx`.
 - Reports default to `/tmp` to avoid repo-polluting artifacts. If you override `--reports-dir`
-  to a repo-local path (for example `.ikentic/reports`), keep `.ikentic/` untracked and do not
-  commit generated reports.
+  to a repo-local path, keep the directory untracked and do not commit generated reports.

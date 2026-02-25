@@ -27,11 +27,11 @@ Commands:
 
   snapshot-open-prs [<output-json>]
     Snapshot open PR heads for main-based pr/* branches.
-    Default output: .ikentic/ledger/open-main-prs.json
+    Default output: ${TMPDIR:-/tmp}/ikentic-ledger/open-main-prs.json
 
   snapshot-pr-refs [<output-tsv>]
     Snapshot origin/pr/* refs (git source of truth).
-    Default output: .ikentic/snapshots/origin-pr-refs-<stamp>.tsv
+    Default output: ${TMPDIR:-/tmp}/ikentic-snapshots/origin-pr-refs-<stamp>.tsv
 
   refresh-pr-refs [--snapshot <tsv>] [--dry-run]
     Rebase origin/pr/* branches onto origin/main (conflict-free only) and push back to origin.
@@ -49,7 +49,7 @@ Commands:
       - effective ledger to <output-tsv>
       - raw ledger to <output-tsv>.raw.tsv
       - dropped entries to <output-tsv>.dropped.tsv
-    Default: origin/main..origin/integration/ikentic -> .ikentic/ledger/first-parent.tsv
+    Default: origin/main..origin/integration/ikentic -> ${TMPDIR:-/tmp}/ikentic-ledger/first-parent.tsv
 
   ledger-validate [<ledger-tsv> [<allow-unknown-file>]]
     Validate ordering + coverage:
@@ -97,7 +97,8 @@ classify_lane() {
 }
 
 cmd_snapshot_open_prs() {
-  local out="${1:-.ikentic/ledger/open-main-prs.json}"
+  local tmp_root="${TMPDIR:-/tmp}"
+  local out="${1:-${tmp_root%/}/ikentic-ledger/open-main-prs.json}"
   mkdir -p "$(dirname "$out")"
   run_cmd gh pr list \
     --repo openclaw/openclaw \
@@ -149,7 +150,8 @@ cmd_stage_tools() {
 cmd_ledger_refresh() {
   local base_ref="${1:-origin/main}"
   local head_ref="${2:-origin/integration/ikentic}"
-  local out="${3:-.ikentic/ledger/first-parent.tsv}"
+  local tmp_root="${TMPDIR:-/tmp}"
+  local out="${3:-${tmp_root%/}/ikentic-ledger/first-parent.tsv}"
   mkdir -p "$(dirname "$out")"
 
   local raw_out dropped_out
@@ -257,7 +259,8 @@ cmd_ledger_refresh() {
 }
 
 cmd_ledger_validate() {
-  local ledger="${1:-.ikentic/ledger/first-parent.tsv}"
+  local tmp_root="${TMPDIR:-/tmp}"
+  local ledger="${1:-${tmp_root%/}/ikentic-ledger/first-parent.tsv}"
   local allow_file="${2:-}"
 
   if [[ ! -f "$ledger" ]]; then

@@ -11,7 +11,7 @@ usage() {
 Usage: scripts/ikentic/daily-deterministic-sync.sh [options]
 
 Options:
-  --reports-dir <dir>          Output report directory (default: .ikentic/reports)
+  --reports-dir <dir>          Output report directory (default: ${TMPDIR:-/tmp}/ikentic-reports)
   --integration-ref <ref>      Integration ref for audits (default: origin/integration/ikentic)
   --required-lanes-file <path> Required lane policy file (default: docs/ikentic/required-lanes.txt)
   --run-sync                   Run scripts/ikentic/sync-main-into-integration.sh after gates pass
@@ -24,7 +24,8 @@ Exit codes:
 USAGE
 }
 
-reports_dir=".ikentic/reports"
+tmp_root="${TMPDIR:-/tmp}"
+reports_dir="${tmp_root%/}/ikentic-reports"
 integration_ref="origin/integration/ikentic"
 required_lanes_file="docs/ikentic/required-lanes.txt"
 run_sync=0
@@ -152,4 +153,3 @@ if [[ "$run_sync" -eq 1 ]]; then
 fi
 
 echo "daily deterministic gates passed"
-

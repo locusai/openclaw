@@ -19,6 +19,7 @@ Usage: scripts/ikentic/refresh-pr-refs-with-main.sh [--snapshot <tsv>] [--dry-ru
 
 Notes:
   - Requires clean working tree.
+  - Writes report to ${TMPDIR:-/tmp}/ikentic-reports/pr-refresh-<stamp>.tsv
   - Pushes updates to origin/pr/* with --force-with-lease when rebase is clean.
   - If rebase conflicts, the branch is left unchanged and recorded as NEEDS_MANUAL.
 USAGE
@@ -59,7 +60,8 @@ if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
 fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
-report=".ikentic/reports/pr-refresh-${stamp}.tsv"
+tmp_root="${TMPDIR:-/tmp}"
+report="${tmp_root%/}/ikentic-reports/pr-refresh-${stamp}.tsv"
 mkdir -p "$(dirname "$report")"
 
 get_refs() {

@@ -1,408 +1,243 @@
 # Ikentic Branch Governance Spec
 
-This document is the single-source governance spec for Ikentic branch strategy in `locusai/openclaw`.
+This document defines the canonical git model and start to finish operator flow for Ikentic work in `locusai/openclaw`.
 
-For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hardening`).
+Goal:
 
-## Scope
+- Keep upstream PR branches clean and reviewable (`main` lineage only).
+- Keep internal integration deterministic and repeatable (merge based, no replay magic).
+- Stop re solving the same conflicts by recording real merge and resolution commits in integration history.
 
-- Defines branch purpose, routing rules, and merge policy.
-- Covers both:
-  - upstream-bound work (`main`/`pr/*` lineage),
-  - internal integration/release work (`integration/ikentic`, `carry/*`, `carry/publish`).
+## Annotated branch DAG
 
-## Branch Roles
+The model is intentionally split into three truths:
+
+1. Upstream truth: `origin/main`, `origin/pr/*`
+2. Upstream candidate truth (generated): `origin/carry/stacked`
+3. Internal truth (merge based): `origin/integration/ikentic`, `origin/carry/*`, `origin/topic/*`, `origin/feat/*`
+
+Legend:
+
+- `+-->` normal ancestry (based on)
+- `+--M-->` merge commit into the collector branch
+- `+..CP..>` patch port (cherry pick), no ancestry edge
+- `Gx` gate (blocking unless noted)
+
+```text
+upstream/main
+   |
+   |  G1 Mirror gate
+   |  - origin/main is a ff only mirror of upstream/main
+   |  - after mirror: origin/main...upstream/main must be 0 0
+   v
+origin/main
+   |\
+   | +--> origin/pr/*                                  (upstream PR branches, main lineage only)
+   |       G2 PR refresh gate (per PR ref)
+   |       - rebase onto origin/main with rerere off
+   |       - conflict free only, else NEEDS_MANUAL
+   |
+   +--> origin/carry/stacked                           (generated, main lineage only)
+   |     G3 Stack inputs
+   |     - snapshot origin/pr/* refs to a TSV (frozen for the cycle)
+   |     - stable PR ordering = sort by refname, then oldest to newest commits
+   |     G4 Stack completeness gate
+   |     - rebuild from origin/main + snapshot via clean cherry picks only
+   |     - fail if port report contains STALE_SNAPSHOT or NEEDS_REVIEW
+   |
+   +--M--> origin/integration/ikentic                  (internal collector, no force push)
+         G5 Integration ancestry gate
+         - origin/main must be an ancestor of origin/integration/ikentic
+         G6 Mechanical integration sync gate
+         - merge origin/main with rerere off (A B C auto resolution only)
+         - port the same PR snapshot with rerere off (no NEEDS_REVIEW, no STALE_SNAPSHOT)
+         - lockfile gates + pnpm check + pnpm build
+         |
+         +--M--> origin/carry/ops-v2                   (ops scripts and governance docs)
+         +--M--> origin/carry/docker-v2                (docker runtime docs and files)
+         +--M--> origin/carry/docs                     (ikentic docs lane)
+         +--M--> origin/carry/tests                    (tests lane)
+         +--M--> origin/carry/publish                  (release lane, release cycles only)
+         +--M--> origin/topic/* / origin/feat/*         (internal only work)
+         |
+         G7 Required carry lanes gate
+         - lanes listed in docs/ikentic/required-lanes.txt must be contained by integration (right=0)
+```
+
+Why `carry/stacked` is not merged into integration:
+
+- `carry/stacked` is generated and may be rebuilt with `--force-with-lease`.
+- PR branches can rebase and rewrite SHAs.
+- Merging regenerated stacks into a long lived integration branch is not idempotent and creates duplicate patch and conflict churn.
+
+How integration starts from the stacked patchset without merging the stack branch:
+
+- `carry/stacked` and the mechanical integration sync use the same frozen PR snapshot TSV and the same deterministic port logic.
+- The PR port report TSV is the canonical artifact for what was applied, in what order, and what requires review.
+
+## Canonical operator flow
+
+This is the canonical daily cycle. Do not reorder steps.
+
+### 0. Daily gates (recommended)
+
+Command:
+
+```bash
+scripts/ikentic/daily-deterministic-sync.sh
+```
+
+Optional mechanical bootstrap after all gates pass:
+
+```bash
+scripts/ikentic/daily-deterministic-sync.sh --run-sync
+```
+
+Outputs:
+
+- gap report JSON
+- inventory report JSON
+- daily summary TXT
+
+### 1. Mirror main (G1)
+
+Requirement:
+
+- `origin/main` mirrors `upstream/main` via fast forward only.
+
+Verification:
+
+```bash
+git rev-list --left-right --count origin/main...upstream/main
+```
+
+### 2. Refresh open PR branches (G2)
+
+Goal:
+
+- keep `origin/pr/*` strictly main lineage and current
+- avoid polluting PRs with internal integration deltas
+
+Command:
+
+```bash
+scripts/ikentic/refresh-pr-refs-with-main.sh
+```
+
+Output:
+
+- PR refresh report TSV under `${TMPDIR:-/tmp}/ikentic-reports/`
+
+Policy:
+
+- conflict free rebases only
+- conflicts are recorded as `NEEDS_MANUAL` and handled in a PR review lane
+
+### 3. Build upstream candidate stack (G3, G4)
+
+Goal:
+
+- deterministic view of `origin/main + open PR patches` for composition testing and ordering evidence
+
+Command:
+
+```bash
+scripts/ikentic/update-stacked-carry.sh
+```
+
+Outputs:
+
+- PR snapshot TSV path
+- PR port report TSV path
+
+Stop conditions:
+
+- `STALE_SNAPSHOT` in port report means a PR ref moved after snapshot, stop and rerun
+- `NEEDS_REVIEW` means inter PR conflict or non clean pick, fix the relevant `pr/*` branch and rerun
+
+### 4. Create mechanical integration sync branch (G6)
+
+Goal:
+
+- integration starts from the same PR snapshot ordering as `carry/stacked`
+- integration records real merges and conflict resolutions as commits
+
+Command:
+
+```bash
+scripts/ikentic/sync-main-into-integration.sh
+```
+
+This creates a new sync branch from `origin/integration/ikentic` and runs:
+
+1. merge `origin/main` (rerere off)
+2. port the same PR snapshot (rerere off, clean only)
+3. lockfile gates + pnpm check + pnpm build
+
+Stop conditions:
+
+- unresolved D class conflicts remain after deterministic resolution
+- PR port report contains `STALE_SNAPSHOT` or `NEEDS_REVIEW`
+
+### 5. Merge internal carry lanes (G7)
+
+Merge carry lanes into integration as needed, using merge commits:
+
+- `carry/ops-v2`
+- `carry/docker-v2`
+- `carry/docs`
+- `carry/tests`
+
+Required lane completeness is enforced by:
+
+- `scripts/ikentic-branch-gap-audit.ts` using `docs/ikentic/required-lanes.txt`
+
+### 6. Release cycle only
+
+Release flow is constrained to:
+
+- work lands on `carry/publish`
+- promotion is `carry/publish -> integration/ikentic`
+- tags for Ikentic releases match `v*-ike*`
+
+## Determinism rules
+
+All ops scripts must preserve determinism:
+
+- rerere disabled for rebase, merge, and cherry pick operations
+- do not rely on stash or autostash
+- do not use worktrees for these flows
+- require a clean working tree before running governance scripts
+
+Generated artifacts:
+
+- default output directories live under `${TMPDIR:-/tmp}` to avoid repo pollution
+- if you override outputs to a repo local path, keep them untracked and do not commit them
+
+## Branch meanings
 
 - `main`
-  - Mirror of `upstream/main` only.
-  - No internal-only commits.
-  - Sync mode: fast-forward only.
+  - mirror of `upstream/main` only
 - `pr/*`
-  - Upstream PR branches.
-  - Based on `main`.
-  - Intended for `openclaw/openclaw` review/merge.
+  - upstream PR branches, main lineage only
 - `carry/stacked`
-  - Generated upstream-candidate stack lane.
-  - Deterministically rebuilt from:
-    - `main` (upstream mirror baseline) +
-    - the current snapshot of open `pr/*` patches (ported via clean cherry-picks only).
-  - Must not contain integration-only deltas and must never be based on `integration/ikentic`.
-  - Purpose:
-    - run "main + pending upstream PRs" together,
-    - as a stable view of what upstream would look like if these PRs merged.
-  - Not a base for feature work; do not branch from `carry/stacked`.
-- `feat/*`
-  - Integration-only feature branches (internal).
-  - Based on `integration/ikentic` (or a short-lived `topic/*` off it).
-  - Not upstream PR routing; if upstreaming later, port patches into a `pr/*` branch based on `main`.
+  - generated upstream candidate stack (main + PR patchset)
+  - force updates allowed via governance scripts only
 - `integration/ikentic`
-  - Canonical internal integration/deploy branch.
-  - Base for internal feature/fix/test work.
-  - Merge-based; no force-push except explicit one-time governance exceptions.
+  - internal collector branch, merge based, no force push
 - `carry/*`
-  - Long-lived internal patch lanes.
-  - Merge into `integration/ikentic`.
-  - Keep long-lived by default; retire only explicitly.
+  - long lived internal lanes merged into integration with merge commits
 - `carry/publish`
-  - Long-lived release-only lane.
-  - Contains only release-scope changes:
-    - version bumps,
-    - changelog/release-note updates,
-    - plugin packaging/release guard updates.
-  - Never delete.
-  - Not a catchall internal branch.
-- `topic/*`
-  - Short-lived implementation branches.
-- `topic/release-*`
-  - Short-lived release-prep branches targeting `carry/publish`.
+  - release only lane
+- `topic/*`, `feat/*`
+  - internal only work lanes
 
-## Hard Invariants
-
-1. Mirror invariant:
-   - `origin/main...upstream/main` must be `0 0` after mirror sync.
-2. Integration ancestry invariant:
-   - `origin/main` must be an ancestor of `origin/integration/ikentic`.
-3. Stacked carry lineage invariant:
-   - `origin/main` must be an ancestor of `origin/carry/stacked`.
-4. Release lane scope invariant:
-   - `carry/publish` must only contain release-scope commits.
-5. Force-push invariant:
-   - no force-push to `integration/ikentic`, `carry/publish`, or persistent `carry/*`.
-   - Exception: `carry/stacked` is a generated lane and may be updated with
-     `--force-with-lease` by governance scripts only.
-   - Exception: a name-preserving clean-baseline cutover may use `--force-with-lease`
-     exactly once when operator-approved and fully documented (backup refs + exception
-     record required). See `CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)` below.
-6. PR safety invariant:
-   - active-review PR branches are additive-update by default (no history rewrite unless explicit maintainer override).
-7. Required lane completeness invariant:
-   - all lanes listed in `docs/ikentic/required-lanes.txt` must have `right=0` versus
-     `origin/integration/ikentic` before cutover or replay sign-off.
-
-## PR Routing Rules
-
-1. Upstream work:
-   - head: `pr/<topic>`
-   - base: upstream `main`
-2. Internal feature/fix/test:
-   - head: `topic/*` or `carry/*`
-   - base: `integration/ikentic`
-3. Internal feature tracking (optional, integration-only):
-   - head: `feat/<topic>`
-   - base: `integration/ikentic`
-   - do not assume upstream PR semantics for `feat/*`.
-4. Release-prep:
-   - head: `topic/release-*`
-   - base: `carry/publish`
-5. Release promotion:
-   - head: `carry/publish`
-   - base: `integration/ikentic`
-
-Do not target `carry/publish` for normal internal feature/fix/test PRs.
-
-## Merge Strategy by Lane
-
-Use merge strategy intentionally by branch type:
-
-1. `topic/* -> integration/ikentic` (short-lived internal work):
-   - prefer squash merge to keep integration history readable.
-2. `carry/* -> integration/ikentic` (long-lived internal patch lanes):
-   - require merge commit (`--no-ff`) so previously integrated carry commits are tracked cleanly.
-3. `main -> integration/ikentic` (upstream mirror sync):
-   - require merge commit (`--no-ff`).
-4. `topic/release-* -> carry/publish` and `carry/publish -> integration/ikentic`:
-   - use merge commit (`--no-ff`) for release traceability.
-
-If a lane uses a different strategy for a specific change, document why in the PR.
-
-## Main-Based PR Porting Model
-
-`pr/*` branches are `main`-lineage and should not be merged directly into `integration/ikentic`.
-Port patches, not branch lineage.
-
-### Mechanical sync requirement
-
-Every sync cycle must split into:
-
-1. Mechanical sync update (merge-first):
-   - `main` mirror merge,
-   - deterministic conflict-class handling only,
-   - conflict-free patch ports from open main-based PR snapshot.
-2. Final review update:
-   - only unresolved/manual/conflict-bearing ports and intentional integration deltas.
-
-Do not create the final review branch before the mechanical sync branch is merged into
-`integration/ikentic`.
-
-### Open PR snapshot requirement
-
-Before mechanical porting, capture a snapshot of open upstream PR heads:
-
-- include `number`, `headRefName`, `baseRefName`, and `headRefOid`,
-- include only `baseRefName == main` and `headRefName` in `pr/*`,
-- freeze this snapshot for the cycle.
-
-Before porting each snapshot branch, verify `origin/<headRefName>` still matches `headRefOid`.
-If any branch head moved, stop the cycle and regenerate a fresh snapshot before continuing.
-
-### Mechanical determinism requirement
-
-Mechanical sync branches must not include manual conflict edits.
-
-- allowed: deterministic class resolution rules from this spec,
-- allowed: clean `cherry-pick -x` ports that apply without manual edits,
-- not allowed: hand-edited conflict resolutions for code/config paths.
-
-Branches requiring manual resolution move to the final review branch by design.
-
-### Mechanical promotion policy
-
-Mechanical sync is merged first and promoted directly to `integration/ikentic` without PR when
-the change set is deterministic-only.
-
-Required gates before direct promotion:
-
-1. conflict state is clean (no unresolved files),
-2. only deterministic conflict classes were applied (`A`, `B`, `C`),
-3. lockfile/manifest gates pass (`check-lockfile-gates` / frozen lockfile install).
-
-If any manual `D`-class edits are required, stop mechanical promotion and move that work to the
-review branch.
-
-### Post-mechanical review separation
-
-After mechanical promotion lands on `integration/ikentic`:
-
-1. create a review branch from the new integration head,
-2. apply only manual/conflict-bearing intentional deltas,
-3. apply docs/ops updates in a separate review lane,
-4. open PRs only for these review-lane changes.
-
-Do not include mechanical merge payload files in review PRs.
-
-When restoring Ikentic docs from another branch, use path-scoped apply:
-
-- `git checkout <source-branch> -- docs/ikentic`
-- keep `docs/ci.md` and `docs/reference/RELEASING.md` out of this step.
-
-### Internal stacking without polluting upstream PRs
-
-Some work will need to be tested "together" before upstream PRs merge, or may
-temporarily depend on other upstream PRs.
-
-Do **not** solve this by cherry-picking internal commits into `pr/*` branches.
-That makes upstream PRs non-reviewable and creates sync debt.
-
-Use the generated stack lane only for upstream-candidate testing:
-
-- Rebuild `carry/stacked` from `origin/main` + the current `pr/*` snapshot.
-- Run internal CI/release validation on `carry/stacked`.
-- Keep upstream PR branches (`pr/*`) strictly `main`-based and self-contained.
-
-If you need to test integration-only deltas together with upstream PRs, do that on an
-`integration/ikentic` sync or review branch (not on `carry/stacked`).
-
-### Required flow
-
-1. Create sync branch from integration:
-   - `git switch integration/ikentic`
-   - `git switch -c topic/sync-<pr-topic>`
-2. Port upstream PR commits:
-   - `git cherry-pick -x <sha1> <sha2> ...`
-3. Resolve conflicts and validate targeted tests.
-4. If deterministic-only, promote directly to `integration/ikentic` (no PR).
-5. If review-lane deltas remain, open internal PR from review branch:
-   - `topic/sync-<pr-topic>-review -> integration/ikentic`
-6. When upstream PR updates:
-   - cherry-pick only new upstream commits onto the same sync branch.
-7. If the sync PR is already merged:
-   - create `topic/sync-<pr-topic>-2` from current `integration/ikentic`,
-   - cherry-pick only new upstream commits,
-   - open a follow-up internal PR.
-
-### CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)
-
-> Not part of normal sync/release flow.
-> Use only when rebuilding the integration baseline and preserving the
-> `integration/ikentic` branch name is required.
+## Cutover exception
 
 If integration baseline reconstruction requires keeping branch name `integration/ikentic`:
 
-1. resolve and verify the replacement baseline branch head,
-2. create remote backup branch + annotated tag at current `origin/integration/ikentic`,
-3. push replacement branch to origin,
-4. move `integration/ikentic` with
-   `git push --force-with-lease=integration/ikentic:<old-sha> origin <new-branch>:integration/ikentic`,
-5. verify remote head SHA and record the exception in `docs/ikentic/CHANGELOG.md`,
-6. re-enable/confirm branch protections immediately after the cutover window.
-
-### Equivalence checks
-
-- `git cherry -v origin/integration/ikentic origin/pr/<topic>`
-- `git range-diff origin/main...origin/pr/<topic> origin/main...topic/sync-<pr-topic>`
-
-If all relevant patches are already present, close duplicate integration sync PRs.
-
-### Commit trailers (recommended)
-
-When porting from upstream into integration, add trailers for auditability:
-
-- `Upstream-Status: Pending|Merged|Rejected|Internal`
-- `Upstream-PR: <url>`
-
-### Commit hygiene (recommended)
-
-When creating commits in operational lanes (especially `integration/ikentic` and `carry/*`), use
-`scripts/committer "<message>" <file...>` so staging stays path-scoped and you do not accidentally
-bundle unrelated changes. `scripts/committer` is a local helper; governance scripts do not depend
-on it at runtime.
-
-## Release Flow
-
-1. Start release branch from `carry/publish`:
-   - `topic/release-<version>`
-2. Apply release-scope changes only.
-3. Merge `topic/release-* -> carry/publish`.
-4. Promote `carry/publish -> integration/ikentic`.
-5. Tag from promoted `integration/ikentic` commit with exact version match:
-   - `package.json` version == tag version.
-6. If tag push fails to trigger:
-   - keep old tag as history,
-   - cut next tag from next promoted release commit.
-
-## Carry Branch Maintenance
-
-Long-lived `carry/*` branches must be kept current to reduce conflict debt.
-
-1. Measure lag:
-   - `git rev-list --left-right --count refs/remotes/origin/carry/<topic>...refs/remotes/origin/main`
-2. Refresh cadence:
-   - refresh each active `carry/*` at least once per upstream sync cycle, or when lag exceeds 50 commits.
-3. Refresh method (no force-push policy):
-   - `git switch carry/<topic>`
-   - `git merge --no-ff main -m "sync carry/<topic> with main"`
-   - `git push origin carry/<topic>`
-4. If branch history becomes too noisy:
-   - create `carry/<topic>-v2` from current `integration/ikentic` or `main`,
-   - cherry-pick active commits,
-   - retire the old carry branch explicitly after containment checks.
-5. Governance hygiene:
-   - each carry branch must have an owner and reason (why it cannot move upstream),
-   - review active carry branches at least quarterly; retire obsolete branches.
-
-## PR Update Stability Policy
-
-1. Draft phase:
-   - rebase allowed on base branch,
-   - push with `--force-with-lease`.
-2. Active review phase:
-   - no history rewrite by default,
-   - update with additive commits.
-   - for internal PRs only, merging the current base branch into the PR branch is allowed.
-3. Maintainer override:
-   - if rewrite is required, announce and use `--force-with-lease` only.
-4. Upstream expectation override:
-   - upstream PRs may be rebased before merge if upstream requires clean history.
-   - avoid merge-commits into upstream PR branches unless upstream maintainers explicitly allow it.
-
-## Alignment Checks (Operational)
-
-1. Mirror:
-   - `git rev-list --left-right --count refs/remotes/origin/main...refs/remotes/upstream/main`
-2. Integration ancestry:
-   - `git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/integration/ikentic`
-3. Integration equivalence:
-   - Compare integration targets directly when validating a rebuild/cutover candidate.
-   - This check is necessary but not sufficient.
-4. Required carry lane completeness (blocking):
-   - `node --import tsx scripts/ikentic-branch-gap-audit.ts`
-   - default policy file: `docs/ikentic/required-lanes.txt`
-   - Exit codes:
-     - `0` no blocking gaps
-     - `2` blocking gaps found in required lanes
-     - `3` config/execution error (for example malformed lane names or missing required lane ref)
-5. Advisory carry lane deltas (non-blocking):
-   - reported by the same audit command as `ADVISORY_MISSING`.
-6. Carry publish scope:
-   - `git log --oneline refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
-   - `git diff --name-only refs/remotes/origin/integration/ikentic..refs/remotes/origin/carry/publish`
-7. Note:
-   - Non-zero divergence between `carry/publish` and `integration/ikentic` is expected.
-   - Do not auto-equalize by merging all integration commits into `carry/publish`.
-
-## Session-Start Truth Protocol
-
-Run this sequence at the start of every sync/replay/cutover session:
-
-1. Environment bootstrap:
-   - `direnv allow .`
-   - `direnv exec . pnpm install`
-2. Ref truth refresh:
-   - `git fetch origin --prune`
-   - `git fetch upstream --prune`
-3. Branch truth checks:
-   - mirror divergence and integration ancestry checks from the Alignment section.
-4. Required lane completeness gate:
-   - run `scripts/ikentic-branch-gap-audit.ts` before any replay sign-off or cutover planning.
-5. Categorized branch inventory:
-   - `node --import tsx scripts/ikentic-branch-inventory.ts`
-6. Open PR head snapshot and workflow/tag truth checks:
-   - capture current open PR heads and workflow/tag status into the run report.
-
-## Daily Deterministic Operation
-
-Use the daily runbook command:
-
-- `scripts/ikentic/daily-deterministic-sync.sh`
-
-Optional mechanical bootstrap after gates pass:
-
-- `scripts/ikentic/daily-deterministic-sync.sh --run-sync`
-
-The daily runbook writes machine-readable reports under `${TMPDIR:-/tmp}/ikentic-reports/` by
-default and enforces stop/go checks before any mechanical merge bootstrap.
-
-Detailed runbook:
-
-- [`/ikentic/daily-deterministic-sync`](/ikentic/daily-deterministic-sync)
-
-## Cutover Readiness Package
-
-Every cutover/readiness report must include all sections below:
-
-1. Integration Equivalence
-   - target integration comparison (candidate vs destination integration lane).
-2. Required Lane Completeness (blocking)
-   - branch-gap audit output for lanes in `docs/ikentic/required-lanes.txt`.
-   - any `BLOCKING_MISSING` entry is a no-go.
-3. Advisory Lane Deltas (non-blocking backlog)
-   - `ADVISORY_MISSING` lanes tracked for follow-up.
-4. Release Safety Gates
-   - manifest/lockfile consistency and frozen-lockfile result.
-
-## Carry/Publish Enforcement Controls
-
-Treat `carry/publish` scope as enforceable policy, not convention.
-
-1. Branch protection:
-   - require pull request reviews and block direct pushes.
-2. Ownership:
-   - require approval from release owners for PRs targeting `carry/publish`.
-3. Path guard (CI):
-   - fail PRs to `carry/publish` if changed files are outside release-scope allowlist.
-4. Suggested allowlist (adjust to repo reality):
-   - root/package version files,
-   - `CHANGELOG*` and release-note files,
-   - plugin packaging and release scripts/config,
-   - release workflow guards.
-
-## Governance Decisions (Current)
-
-- `carry/publish` is release-only.
-- Internal PRs remain on `integration/ikentic`.
-- Main-based upstream PR branches are ported via `topic/sync-*` + `cherry-pick -x`.
-- Open main-based PR heads are snapshotted and pinned before mechanical ports.
-- Final review branch is created only after mechanical sync merge lands.
-- Mechanical sync branches contain deterministic-only edits; manual conflict resolution is review-lane work.
-- Ikentic-specific documentation content lives under `docs/ikentic/**`.
-- Non-Ikentic docs (for example `docs/reference/*`, `docs/ci.md`) must stay free of Ikentic policy/process content and Ikentic-specific cross-links.
+1. resolve and verify the replacement baseline branch head
+2. create remote backup branch and annotated tag at current `origin/integration/ikentic`
+3. move `integration/ikentic` with `git push --force-with-lease` exactly once
+4. verify head SHA and record the exception in `docs/ikentic/CHANGELOG.md`
+5. re enable and confirm branch protections immediately after cutover

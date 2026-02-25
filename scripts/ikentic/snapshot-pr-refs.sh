@@ -10,7 +10,7 @@ usage() {
 Usage: scripts/ikentic/snapshot-pr-refs.sh [<output-tsv>]
 
 Default output:
-  .ikentic/snapshots/origin-pr-refs-<stamp>.tsv
+  ${TMPDIR:-/tmp}/ikentic-snapshots/origin-pr-refs-<stamp>.tsv
 USAGE
 }
 
@@ -23,7 +23,8 @@ repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
 stamp="$(date +%Y%m%d-%H%M%S)"
-out="${1:-.ikentic/snapshots/origin-pr-refs-${stamp}.tsv}"
+tmp_root="${TMPDIR:-/tmp}"
+out="${1:-${tmp_root%/}/ikentic-snapshots/origin-pr-refs-${stamp}.tsv}"
 mkdir -p "$(dirname "$out")"
 
 {

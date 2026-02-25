@@ -110,8 +110,25 @@ fi
 # Finalize the merge commit (mechanical lane marker subject).
 git commit -m "sync integration with mirror main"
 
-# Attempt clean ports of origin/pr/* commits (no manual conflict edits). Conflicts are reported and skipped.
-"${tools_dir}/port-pr-refs.sh" --base origin/main --snapshot "$post_refresh_snap_path" || true
+# Attempt clean ports of origin/pr/* commits (no manual conflict edits).
+# If any PR commit conflicts, stop and move the remainder to review lane by design.
+tmp_root="${TMPDIR:-/tmp}"
+port_report="${tmp_root%/}/ikentic-reports/pr-port-integration-${stamp}.tsv"
+"${tools_dir}/port-pr-refs.sh" \
+  --base origin/main \
+  --snapshot "$post_refresh_snap_path" \
+  --report "$port_report"
+
+if rg -q $'\tSTALE_SNAPSHOT\t' "$port_report"; then
+  echo "blocking: snapshot drift detected during PR port (see report)" >&2
+  echo "pr port report: ${port_report}" >&2
+  exit 2
+fi
+if rg -q $'\tNEEDS_REVIEW\t' "$port_report"; then
+  echo "review lane required: some PR commits did not apply cleanly (see report)" >&2
+  echo "pr port report: ${port_report}" >&2
+  exit 2
+fi
 
 # Lockfile gates: dependency-aware manifest/lock coupling + frozen install.
 "${tools_dir}/check-lockfile-gates.sh" origin/integration/ikentic HEAD
