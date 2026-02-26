@@ -25,6 +25,8 @@ const log = createSubsystemLogger("llm-slug-generator");
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenClawConfig;
+  provider?: string;
+  model?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -42,13 +44,13 @@ export async function generateSlugViaLLM(params: {
 Conversation summary:
 ${params.sessionContent.slice(0, 2000)}
 
-Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", "bug-fix"`;
+	Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", "bug-fix"`;
 
     // Resolve model from agent config instead of using hardcoded defaults
     const modelRef = resolveAgentEffectiveModelPrimary(params.cfg, agentId);
     const parsed = modelRef ? parseModelRef(modelRef, DEFAULT_PROVIDER) : null;
-    const provider = parsed?.provider ?? DEFAULT_PROVIDER;
-    const model = parsed?.model ?? DEFAULT_MODEL;
+    const provider = params.provider ?? parsed?.provider ?? DEFAULT_PROVIDER;
+    const model = params.model ?? parsed?.model ?? DEFAULT_MODEL;
 
     const result = await runEmbeddedPiAgent({
       sessionId: `slug-generator-${Date.now()}`,
