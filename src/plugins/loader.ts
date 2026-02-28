@@ -50,25 +50,20 @@ const defaultLogger = () => createSubsystemLogger("plugins");
 const resolvePluginSdkAliasFile = (params: {
   srcFile: string;
   distFile: string;
-  modulePath?: string;
 }): string | null => {
   try {
-    const modulePath = params.modulePath ?? fileURLToPath(import.meta.url);
+    const modulePath = fileURLToPath(import.meta.url);
     const isProduction = process.env.NODE_ENV === "production";
     const isTest = process.env.VITEST || process.env.NODE_ENV === "test";
-    const normalizedModulePath = modulePath.replace(/\\/g, "/");
-    const isDistRuntime = normalizedModulePath.includes("/dist/");
     let cursor = path.dirname(modulePath);
     for (let i = 0; i < 6; i += 1) {
       const srcCandidate = path.join(cursor, "src", "plugin-sdk", params.srcFile);
       const distCandidate = path.join(cursor, "dist", "plugin-sdk", params.distFile);
-      const orderedCandidates = isDistRuntime
-        ? [distCandidate, srcCandidate]
-        : isProduction
-          ? isTest
-            ? [distCandidate, srcCandidate]
-            : [distCandidate]
-          : [srcCandidate, distCandidate];
+      const orderedCandidates = isProduction
+        ? isTest
+          ? [distCandidate, srcCandidate]
+          : [distCandidate]
+        : [srcCandidate, distCandidate];
       for (const candidate of orderedCandidates) {
         if (fs.existsSync(candidate)) {
           return candidate;
@@ -91,10 +86,6 @@ const resolvePluginSdkAlias = (): string | null =>
 
 const resolvePluginSdkAccountIdAlias = (): string | null => {
   return resolvePluginSdkAliasFile({ srcFile: "account-id.ts", distFile: "account-id.js" });
-};
-
-export const __testing = {
-  resolvePluginSdkAliasFile,
 };
 
 function buildCacheKey(params: {
@@ -584,7 +575,7 @@ function preparePluginCandidate(
   });
   if (!opened.ok) {
     record.status = "error";
-    record.error = "plugin entry path escapes plugin root";
+    record.error = "plugin entry path escapes plugin root or fails alias checks";
     ctx.registry.plugins.push(record);
     ctx.seenIds.set(pluginId, candidate.origin);
     ctx.registry.diagnostics.push({
@@ -836,7 +827,7 @@ export async function loadOpenClawPluginsAsync(
 
     let mod: OpenClawPluginModule;
     try {
-      const ext = path.extname(candidate.source).toLowerCase();
+      const ext = path.extname(prepared.safeSource).toLowerCase();
       if (ext === ".ts" || ext === ".tsx" || ext === ".mts" || ext === ".cts") {
         throw new Error(
           `ESM loader does not support TypeScript entrypoints (${ext}); use loadOpenClawPlugins instead.`,
