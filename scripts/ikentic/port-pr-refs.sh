@@ -131,20 +131,11 @@ for ref in "${refs[@]}"; do
     continue
   fi
 
-  declare -A commits_not_reachable=()
   if [[ -n "$skip_if_present_in" ]]; then
-    while IFS= read -r commit; do
-      [[ -n "$commit" ]] || continue
-      commits_not_reachable["$commit"]=1
-    done < <(git rev-list --no-merges "${base_ref}..${ref}" --not "${skip_if_present_in}")
-  else
-    for commit in "${commits_all[@]}"; do
-      commits_not_reachable["$commit"]=1
-    done
-  fi
+    not_reachable_file="$(mktemp)"
+    git rev-list --no-merges "${base_ref}..${ref}" --not "${skip_if_present_in}" >"$not_reachable_file"
 
-  declare -A commits_patch_present=()
-  if [[ -n "$skip_if_present_in" ]]; then
+    patch_present_file="$(mktemp)"
     while IFS= read -r line; do
       [[ -n "$line" ]] || continue
       if [[ "${line}" != -* ]]; then
@@ -154,18 +145,20 @@ for ref in "${refs[@]}"; do
       [[ -n "$sha" ]] || continue
       full_sha="$(git rev-parse "${sha}^{commit}" 2>/dev/null || true)"
       [[ -n "$full_sha" ]] || continue
-      commits_patch_present["$full_sha"]=1
+      echo "$full_sha" >>"$patch_present_file"
     done < <(git cherry "$skip_if_present_in" "$ref" 2>/dev/null || true)
   fi
 
   for sha in "${commits_all[@]}"; do
-    if [[ -z "${commits_not_reachable["$sha"]+x}" ]]; then
-      echo -e "${ref}\t${sha}\tSKIP_PRESENT\talready reachable from ${skip_if_present_in}" >> "$report"
-      continue
-    fi
-    if [[ -n "$skip_if_present_in" && -n "${commits_patch_present["$sha"]+x}" ]]; then
-      echo -e "${ref}\t${sha}\tSKIP_PRESENT\tpatch already present in ${skip_if_present_in}" >> "$report"
-      continue
+    if [[ -n "$skip_if_present_in" ]]; then
+      if ! grep -Fqx -- "$sha" "$not_reachable_file"; then
+        echo -e "${ref}\t${sha}\tSKIP_PRESENT\talready reachable from ${skip_if_present_in}" >> "$report"
+        continue
+      fi
+      if grep -Fqx -- "$sha" "$patch_present_file"; then
+        echo -e "${ref}\t${sha}\tSKIP_PRESENT\tpatch already present in ${skip_if_present_in}" >> "$report"
+        continue
+      fi
     fi
 
     tmp="$(mktemp)"
@@ -193,6 +186,10 @@ for ref in "${refs[@]}"; do
     fi
     echo -e "${ref}\t${sha}\tPICKED\tclean" >> "$report"
   done
+
+  if [[ -n "$skip_if_present_in" ]]; then
+    rm -f "${not_reachable_file:-}" "${patch_present_file:-}" >/dev/null 2>&1 || true
+  fi
 done
 
 echo "pr port report: ${report}"
