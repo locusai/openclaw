@@ -29,8 +29,10 @@ describe("diffs plugin registration", () => {
       registerGatewayMethod() {},
       registerCli() {},
       registerService() {},
+      registerPluginUi() {},
       registerProvider() {},
       registerCommand() {},
+      registerCommandOption() {},
       resolvePath(input: string) {
         return input;
       },
@@ -90,8 +92,10 @@ describe("diffs plugin registration", () => {
       registerGatewayMethod() {},
       registerCli() {},
       registerService() {},
+      registerPluginUi() {},
       registerProvider() {},
       registerCommand() {},
+      registerCommandOption() {},
       resolvePath(input: string) {
         return input;
       },

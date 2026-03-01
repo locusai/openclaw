@@ -207,8 +207,10 @@ function createApi(): OpenClawPluginApi {
     registerGatewayMethod() {},
     registerCli() {},
     registerService() {},
+    registerPluginUi() {},
     registerProvider() {},
     registerCommand() {},
+    registerCommandOption() {},
     resolvePath(input: string) {
       return input;
     },
