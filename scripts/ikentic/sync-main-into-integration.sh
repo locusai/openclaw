@@ -187,6 +187,7 @@ port_report="${tmp_root%/}/ikentic-reports/pr-port-integration-${stamp}.tsv"
 "${tools_dir}/port-pr-refs.sh" \
   --base origin/main \
   --snapshot "$post_refresh_snap_path" \
+  --skip-if-present-in origin/integration/ikentic \
   --report "$port_report"
 
 if rg -q $'\tSTALE_SNAPSHOT\t' "$port_report"; then

@@ -10,12 +10,15 @@ set -euo pipefail
 
 usage() {
   cat <<'USAGE'
-Usage: scripts/ikentic/port-pr-refs.sh [--report <tsv>] [--base <ref>] [--snapshot <tsv>] [--deterministic-dates]
+Usage: scripts/ikentic/port-pr-refs.sh [--report <tsv>] [--base <ref>] [--snapshot <tsv>] [--skip-if-present-in <ref>] [--deterministic-dates]
 
 Defaults:
   --base origin/main
   --report ${TMPDIR:-/tmp}/ikentic-reports/pr-port-<stamp>.tsv
   --snapshot (unset; enumerates refs/remotes/origin/pr directly)
+
+Optional:
+  --skip-if-present-in <ref>  Skip commits already present in <ref> by patch-id (or already reachable by commit).
 
 Report columns:
   pr_ref<TAB>commit<TAB>action<TAB>note
@@ -25,6 +28,7 @@ USAGE
 report=""
 base_ref="origin/main"
 snapshot=""
+skip_if_present_in=""
 deterministic_dates=0
 
 while [[ "$#" -gt 0 ]]; do
@@ -43,6 +47,10 @@ while [[ "$#" -gt 0 ]]; do
       ;;
     --snapshot)
       snapshot="${2:-}"
+      shift 2
+      ;;
+    --skip-if-present-in)
+      skip_if_present_in="${2:-}"
       shift 2
       ;;
     --deterministic-dates)
@@ -65,6 +73,13 @@ tmp_root="${TMPDIR:-/tmp}"
 report="${report:-${tmp_root%/}/ikentic-reports/pr-port-${stamp}.tsv}"
 mkdir -p "$(dirname "$report")"
 echo -e "pr_ref\tcommit\taction\tnote" > "$report"
+
+if [[ -n "$skip_if_present_in" ]]; then
+  if ! git rev-parse --verify --quiet "${skip_if_present_in}^{commit}" >/dev/null; then
+    echo "skip ref not found: ${skip_if_present_in}" >&2
+    exit 1
+  fi
+fi
 
 refs=()
 if [[ -n "$snapshot" ]]; then
@@ -105,17 +120,54 @@ for ref in "${refs[@]}"; do
   fi
 
   # Enumerate PR branch commits relative to main (oldest -> newest).
-  commits=()
+  commits_all=()
   while IFS= read -r commit; do
     [[ -n "$commit" ]] || continue
-    commits+=("$commit")
+    commits_all+=("$commit")
   done < <(git rev-list --reverse --no-merges "${base_ref}..${ref}")
-  if [[ "${#commits[@]}" -eq 0 ]]; then
+
+  if [[ "${#commits_all[@]}" -eq 0 ]]; then
     echo -e "${ref}\t\tSKIP\tno commits vs ${base_ref}" >> "$report"
     continue
   fi
 
-  for sha in "${commits[@]}"; do
+  declare -A commits_not_reachable=()
+  if [[ -n "$skip_if_present_in" ]]; then
+    while IFS= read -r commit; do
+      [[ -n "$commit" ]] || continue
+      commits_not_reachable["$commit"]=1
+    done < <(git rev-list --no-merges "${base_ref}..${ref}" --not "${skip_if_present_in}")
+  else
+    for commit in "${commits_all[@]}"; do
+      commits_not_reachable["$commit"]=1
+    done
+  fi
+
+  declare -A commits_patch_present=()
+  if [[ -n "$skip_if_present_in" ]]; then
+    while IFS= read -r line; do
+      [[ -n "$line" ]] || continue
+      if [[ "${line}" != -* ]]; then
+        continue
+      fi
+      sha="$(echo "$line" | awk '{print $2}')"
+      [[ -n "$sha" ]] || continue
+      full_sha="$(git rev-parse "${sha}^{commit}" 2>/dev/null || true)"
+      [[ -n "$full_sha" ]] || continue
+      commits_patch_present["$full_sha"]=1
+    done < <(git cherry "$skip_if_present_in" "$ref" 2>/dev/null || true)
+  fi
+
+  for sha in "${commits_all[@]}"; do
+    if [[ -z "${commits_not_reachable["$sha"]+x}" ]]; then
+      echo -e "${ref}\t${sha}\tSKIP_PRESENT\talready reachable from ${skip_if_present_in}" >> "$report"
+      continue
+    fi
+    if [[ -n "$skip_if_present_in" && -n "${commits_patch_present["$sha"]+x}" ]]; then
+      echo -e "${ref}\t${sha}\tSKIP_PRESENT\tpatch already present in ${skip_if_present_in}" >> "$report"
+      continue
+    fi
+
     tmp="$(mktemp)"
     set +e
     if [[ "$deterministic_dates" -eq 1 ]]; then
