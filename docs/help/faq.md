@@ -1050,13 +1050,13 @@ Basic flow:
 - Spawn with `sessions_spawn` using `thread: true` (and optionally `mode: "session"` for persistent follow-up).
 - Or manually bind with `/focus <target>`.
 - Use `/agents` to inspect binding state.
-- Use `/session ttl <duration|off>` to control auto-unfocus.
+- Use `/session idle <duration|off>` and `/session max-age <duration|off>` to control auto-unfocus.
 - Use `/unfocus` to detach the thread.
 
 Required config:
 
-- Global defaults: `session.threadBindings.enabled`, `session.threadBindings.ttlHours`.
-- Discord overrides: `channels.discord.threadBindings.enabled`, `channels.discord.threadBindings.ttlHours`.
+- Global defaults: `session.threadBindings.enabled`, `session.threadBindings.idleHours`, `session.threadBindings.maxAgeHours`.
+- Discord overrides: `channels.discord.threadBindings.enabled`, `channels.discord.threadBindings.idleHours`, `channels.discord.threadBindings.maxAgeHours`.
 - Auto-bind on spawn: set `channels.discord.threadBindings.spawnSubagentSessions: true`.
 
 Docs: [Sub-agents](/tools/subagents), [Discord](/channels/discord), [Configuration Reference](/gateway/configuration-reference), [Slash commands](/tools/slash-commands).
@@ -1405,7 +1405,8 @@ Non-loopback binds **require auth**. Configure `gateway.auth.mode` + `gateway.au
 
 Notes:
 
-- `gateway.remote.token` is for **remote CLI calls** only; it does not enable local gateway auth.
+- `gateway.remote.token` / `.password` do **not** enable local gateway auth by themselves.
+- Local call paths can use `gateway.remote.*` as fallback when `gateway.auth.*` is unset.
 - The Control UI authenticates via `connect.params.auth.token` (stored in app/UI settings). Avoid putting tokens in URLs.
 
 ### Why do I need a token on localhost now
