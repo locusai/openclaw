@@ -132,7 +132,7 @@ if [[ ! -f "$snapshot" ]]; then
 fi
 
 start_ref="$(git rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-tmp_branch="codex/tmp-stacked-carry-${stamp}"
+tmp_branch="tmp/stacked-carry-${stamp}"
 scratch_dir=""
 
 cleanup() {

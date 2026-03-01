@@ -91,7 +91,7 @@ while IFS= read -r ref; do
     continue
   fi
 
-  tmp="codex/tmp-pr-refresh-${stamp}-$(echo "$branch" | tr '/.' '__' | tr -cd 'A-Za-z0-9_-')"
+  tmp="tmp/pr-refresh-${stamp}-$(echo "$branch" | tr '/.' '__' | tr -cd 'A-Za-z0-9_-')"
   git switch -c "$tmp" "$ref" >/dev/null
 
   set +e

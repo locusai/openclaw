@@ -140,7 +140,7 @@ else
 fi
 
 stamp="$(date +%Y%m%d-%H%M%S)"
-branch="codex/sync-main-${stamp}"
+branch="topic/sync-main-${stamp}"
 
 git switch -c "$branch" origin/integration/ikentic
 
