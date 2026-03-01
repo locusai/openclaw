@@ -107,15 +107,31 @@ fi
 git fetch origin --prune
 git fetch upstream --prune
 
-# Ensure local main exists and mirror upstream/main with ff-only policy.
+# Ensure local main exists.
 if git show-ref --verify --quiet refs/heads/main; then
   git switch main
 else
   git switch -c main origin/main
 fi
 
-git -c rerere.enabled=false -c rerere.autoupdate=false merge --ff-only upstream/main
-git push origin main
+if [[ -n "$snapshot" ]]; then
+  # When an explicit PR snapshot is provided, it is assumed to be pinned against the current
+  # mirrored origin/main baseline. Do not advance origin/main here, or the snapshot becomes stale.
+  main_divergence="$(git rev-list --left-right --count origin/main...upstream/main)"
+  read -r main_left main_right <<<"$main_divergence"
+  if [[ "${main_left:-}" != "0" || "${main_right:-}" != "0" ]]; then
+    echo "blocking: origin/main is not a ff-only mirror of upstream/main (origin/main...upstream/main = ${main_left:-?} ${main_right:-?})" >&2
+    echo "run mirror gate + PR refresh + re-snapshot, then retry sync with --snapshot" >&2
+    exit 2
+  fi
+
+  # Keep local main aligned with origin/main for consistency (no-op if already).
+  git -c rerere.enabled=false -c rerere.autoupdate=false merge --ff-only origin/main
+else
+  # Mirror upstream/main with ff-only policy.
+  git -c rerere.enabled=false -c rerere.autoupdate=false merge --ff-only upstream/main
+  git push origin main
+fi
 
 post_refresh_snap_path=""
 if [[ -n "$snapshot" ]]; then
