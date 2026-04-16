@@ -7,6 +7,7 @@ import type { GatewayRequestHandler } from "../gateway/server-methods/types.js";
 import { openBoundaryFileSync } from "../infra/boundary-file-read.js";
 import { createSubsystemLogger } from "../logging/subsystem.js";
 import { resolveUserPath } from "../utils.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import { clearPluginCommands } from "./commands.js";
 import {
   applyTestPluginDefaults,
@@ -302,6 +303,7 @@ function createPluginRecord(params: {
     cliCommands: [],
     services: [],
     commands: [],
+    commandOptions: [],
     httpRoutes: 0,
     hookCount: 0,
     configSchema: params.configSchema,
@@ -523,6 +525,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
 
   // Clear previously registered plugin commands before reloading
   clearPluginCommands();
+  clearPluginCommandOptions();
 
   // Lazily initialize the runtime so startup paths that discover/skip plugins do
   // not eagerly load every channel runtime dependency.
