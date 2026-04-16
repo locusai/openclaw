@@ -22,6 +22,7 @@ const BASE_METHODS = [
   "config.patch",
   "config.schema",
   "config.schema.lookup",
+  "plugins.ui.list",
   "exec.approvals.get",
   "exec.approvals.set",
   "exec.approvals.node.get",

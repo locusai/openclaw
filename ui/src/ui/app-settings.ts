@@ -27,7 +27,9 @@ import { loadPresence } from "./controllers/presence.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { loadSkills } from "./controllers/skills.ts";
 import {
+  pluginIdFromTab,
   inferBasePathFromPathname,
+  isPluginTab,
   normalizeBasePath,
   normalizePath,
   pathForTab,
@@ -59,6 +61,7 @@ type SettingsHost = {
   themeMedia: MediaQueryList | null;
   themeMediaHandler: ((event: MediaQueryListEvent) => void) | null;
   pendingGatewayUrl?: string | null;
+  ensurePluginUiLoaded?: (extensionId: string) => Promise<void>;
 };
 
 export function applySettings(host: SettingsHost, next: UiSettings) {
@@ -221,6 +224,10 @@ export async function refreshActiveTab(host: SettingsHost) {
       !host.chatHasAutoScrolled,
     );
   }
+  const activeExtensionId = pluginIdFromTab(host.tab);
+  if (activeExtensionId) {
+    await host.ensurePluginUiLoaded?.(activeExtensionId);
+  }
   if (host.tab === "config") {
     await loadConfigSchema(host as unknown as OpenClawApp);
     await loadConfig(host as unknown as OpenClawApp);
@@ -346,6 +353,10 @@ function applyTabSelection(
   if (next === "chat") {
     host.chatHasAutoScrolled = false;
   }
+  const nextExtensionId = pluginIdFromTab(next);
+  if (nextExtensionId) {
+    void host.ensurePluginUiLoaded?.(nextExtensionId);
+  }
   if (next === "logs") {
     startLogsPolling(host as unknown as Parameters<typeof startLogsPolling>[0]);
   } else {
@@ -374,7 +385,7 @@ export function syncUrlWithTab(host: SettingsHost, tab: Tab, replace: boolean) {
   const currentPath = normalizePath(window.location.pathname);
   const url = new URL(window.location.href);
 
-  if (tab === "chat" && host.sessionKey) {
+  if ((tab === "chat" || isPluginTab(tab)) && host.sessionKey) {
     url.searchParams.set("session", host.sessionKey);
   } else {
     url.searchParams.delete("session");
