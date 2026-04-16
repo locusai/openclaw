@@ -1,0 +1,111 @@
+name: NPM Publish
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  IKENTIC_BUNDLE_SPEC: ${{ vars.IKENTIC_BUNDLE_SPEC }}
+
+jobs:
+  publish:
+    name: Publish to GitHub Packages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: false
+
+      - name: Setup Node environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          install-bun: "false"
+
+      - name: Validate tag matches package version
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          PACKAGE_VERSION="$(node -e "console.log(JSON.parse(require('node:fs').readFileSync('package.json', 'utf8')).version)")"
+          if [ "$TAG_VERSION" != "$PACKAGE_VERSION" ]; then
+            echo "Tag version ($TAG_VERSION) does not match package.json version ($PACKAGE_VERSION)."
+            exit 1
+          fi
+
+      - name: Bundle IKENTIC plugin
+        run: pnpm bundle:ikentic
+        env:
+          IKENTIC_BUNDLE_SPEC: ${{ env.IKENTIC_BUNDLE_SPEC }}
+          NPM_CONFIG_USERCONFIG: ${{ github.workspace }}/.npmrc
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+
+      - name: Build
+        run: pnpm build
+
+      - name: Release check
+        run: pnpm release:check
+
+      - name: Verify IKENTIC files are included in npm pack
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module -e '
+            import { execSync } from "node:child_process";
+            const raw = execSync("npm pack --dry-run --json --ignore-scripts", { encoding: "utf8" });
+            const parsed = JSON.parse(raw);
+            const files = parsed.flatMap((entry) => entry.files ?? []);
+            const hasIkentic = files.some((entry) =>
+              typeof entry.path === "string" &&
+              (entry.path === "extensions/openclaw-ikentic-plugin/package.json" ||
+                entry.path.startsWith("extensions/openclaw-ikentic-plugin/")),
+            );
+            if (!hasIkentic) {
+              console.error("IKENTIC plugin files are missing from npm pack output.");
+              process.exit(1);
+            }
+            console.log("IKENTIC plugin files detected in npm pack output.");
+          '
+
+      - name: Runtime smoke (no NODE_AUTH_TOKEN)
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT="$(NODE_AUTH_TOKEN= node openclaw.mjs plugins list)"
+          echo "$OUTPUT"
+          if ! grep -q "openclaw-ikentic-plugin" <<< "$OUTPUT"; then
+            echo "IKENTIC plugin is not discoverable without NODE_AUTH_TOKEN."
+            exit 1
+          fi
+
+      - name: Security check (no token value in npm tarball)
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.IKENTIC_READ_PACKAGES_TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TMP_DIR="$(mktemp -d)"
+          TARBALL="$(npm pack --ignore-scripts --pack-destination "$TMP_DIR" | tail -n 1)"
+          tar -xzf "$TMP_DIR/$TARBALL" -C "$TMP_DIR"
+          if [ -n "${NODE_AUTH_TOKEN:-}" ] && rg --fixed-strings --quiet "$NODE_AUTH_TOKEN" "$TMP_DIR/package"; then
+            echo "IKENTIC read token value found in npm tarball contents."
+            exit 1
+          fi
+          echo "No IKENTIC read token value found in npm tarball contents."
+
+      - name: Setup Node.js for GitHub Packages
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          registry-url: "https://npm.pkg.github.com"
+          scope: "@locusai"
+
+      - name: Publish package
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

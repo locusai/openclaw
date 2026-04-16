@@ -21,6 +21,8 @@ type PackageJson = {
   version?: string;
 };
 
+const firstPartyExtensionScopes = ["@openclaw/"];
+
 function runPackDry(): PackResult[] {
   const raw = execSync("npm pack --dry-run --json --ignore-scripts", {
     encoding: "utf8",
@@ -60,13 +62,18 @@ function checkPluginVersions() {
       continue;
     }
 
+    const isFirstParty = firstPartyExtensionScopes.some((scope) => pkg.name.startsWith(scope));
+    if (!isFirstParty) {
+      continue;
+    }
+
     if (pkg.version !== targetVersion) {
       mismatches.push(`${pkg.name} (${pkg.version})`);
     }
   }
 
   if (mismatches.length > 0) {
-    console.error(`release-check: plugin versions must match ${targetVersion}:`);
+    console.error(`release-check: first-party plugin versions must match ${targetVersion}:`);
     for (const item of mismatches) {
       console.error(`  - ${item}`);
     }
