@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import type { PluginUiDescriptor } from "./types.ts";
 import {
   getPluginUiRuntimeApi,
   installPluginUiRuntimeApi,
   registerPluginUiAdapter,
   resolvePluginUiAdapter,
 } from "./runtime.ts";
+import type { PluginUiDescriptor } from "./types.ts";
 
 const EXTENSION: PluginUiDescriptor = {
   id: "plugin:demo",

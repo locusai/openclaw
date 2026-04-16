@@ -1,6 +1,6 @@
+import { getActivePluginRegistry } from "../../plugins/runtime.js";
 import type { OpenClawPluginUiEntry } from "../../plugins/types.js";
 import type { GatewayRequestHandlers } from "./types.js";
-import { getActivePluginRegistry } from "../../plugins/runtime.js";
 
 export type PluginUiDescriptor = {
   id: string;
