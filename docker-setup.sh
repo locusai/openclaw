@@ -1,6 +1,38 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+usage() {
+  cat <<'EOF'
+Usage: docker-setup.sh [--build-only]
+
+Options:
+  --build-only   Build the Docker image and exit (skip onboarding + starting gateway).
+EOF
+}
+
+build_only=false
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --help|-h)
+      usage
+      exit 0
+      ;;
+    --build-only)
+      build_only=true
+      shift
+      ;;
+    --)
+      shift
+      break
+      ;;
+    *)
+      echo "Unknown argument: $1" >&2
+      usage >&2
+      exit 2
+      ;;
+  esac
+done
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 COMPOSE_FILE="$ROOT_DIR/docker-compose.yml"
 EXTRA_COMPOSE_FILE="$ROOT_DIR/docker-compose.extra.yml"
@@ -30,6 +62,39 @@ is_truthy_value() {
     1 | true | yes | on) return 0 ;;
     *) return 1 ;;
   esac
+}
+
+is_uint() {
+  [[ "${1:-}" =~ ^[0-9]+$ ]]
+}
+
+resolve_numeric_id() {
+  local name="$1"
+  local default="$2"
+  local flag="$3"
+  local value="${!name-}"
+
+  if [[ -n "$value" ]]; then
+    if ! is_uint "$value"; then
+      echo "${name} must be a numeric id (got: ${value})" >&2
+      exit 2
+    fi
+    printf '%s' "$value"
+    return
+  fi
+
+  value="$(id "$flag" 2>/dev/null || true)"
+  if is_uint "$value"; then
+    printf '%s' "$value"
+    return
+  fi
+
+  if [[ -n "$value" ]]; then
+    echo "Warning: id ${flag} returned a non-numeric value (${value}); defaulting ${name}=${default}" >&2
+  else
+    echo "Warning: id ${flag} failed; defaulting ${name}=${default}" >&2
+  fi
+  printf '%s' "$default"
 }
 
 read_config_gateway_token() {
@@ -232,6 +297,10 @@ if [[ -n "$SANDBOX_ENABLED" && -S "$DOCKER_SOCKET_PATH" ]]; then
 fi
 export DOCKER_GID
 
+OPENCLAW_UID="$(resolve_numeric_id OPENCLAW_UID 1000 -u)"
+OPENCLAW_GID="$(resolve_numeric_id OPENCLAW_GID 1000 -g)"
+export OPENCLAW_UID OPENCLAW_GID
+
 if [[ -z "${OPENCLAW_GATEWAY_TOKEN:-}" ]]; then
   EXISTING_CONFIG_TOKEN="$(read_config_gateway_token || true)"
   if [[ -n "$EXISTING_CONFIG_TOKEN" ]]; then
@@ -402,6 +471,8 @@ upsert_env "$ENV_FILE" \
   OPENCLAW_IMAGE \
   OPENCLAW_EXTRA_MOUNTS \
   OPENCLAW_HOME_VOLUME \
+  OPENCLAW_UID \
+  OPENCLAW_GID \
   OPENCLAW_DOCKER_APT_PACKAGES \
   OPENCLAW_EXTENSIONS \
   OPENCLAW_SANDBOX \
@@ -416,6 +487,8 @@ if [[ "$IMAGE_NAME" == "openclaw:local" ]]; then
     --build-arg "OPENCLAW_DOCKER_APT_PACKAGES=${OPENCLAW_DOCKER_APT_PACKAGES}" \
     --build-arg "OPENCLAW_EXTENSIONS=${OPENCLAW_EXTENSIONS}" \
     --build-arg "OPENCLAW_INSTALL_DOCKER_CLI=${OPENCLAW_INSTALL_DOCKER_CLI:-}" \
+    --build-arg "OPENCLAW_UID=${OPENCLAW_UID}" \
+    --build-arg "OPENCLAW_GID=${OPENCLAW_GID}" \
     -t "$IMAGE_NAME" \
     -f "$ROOT_DIR/Dockerfile" \
     "$ROOT_DIR"
@@ -442,6 +515,12 @@ echo "==> Fixing data-directory permissions"
 docker compose "${COMPOSE_ARGS[@]}" run --rm --user root --entrypoint sh openclaw-cli -c \
   'find /home/node/.openclaw -xdev -exec chown node:node {} +; \
    [ -d /home/node/.openclaw/workspace/.openclaw ] && chown -R node:node /home/node/.openclaw/workspace/.openclaw || true'
+
+if [[ "$build_only" == true ]]; then
+  echo ""
+  echo "==> Build-only mode: skipping onboarding and gateway start."
+  exit 0
+fi
 
 echo ""
 echo "==> Onboarding (interactive)"
