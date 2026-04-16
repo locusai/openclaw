@@ -1,10 +1,12 @@
+import { CURRENT_SESSION_VERSION, SessionManager } from "@mariozechner/pi-coding-agent";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { CURRENT_SESSION_VERSION, SessionManager } from "@mariozechner/pi-coding-agent";
+import type { OpenClawConfig } from "../../config/config.js";
+import type { TtsAutoMode } from "../../config/types.tts.js";
+import type { MsgContext, TemplateContext } from "../templating.js";
 import { resolveSessionAgentId } from "../../agents/agent-scope.js";
 import { normalizeChatType } from "../../channels/chat-type.js";
-import type { OpenClawConfig } from "../../config/config.js";
 import {
   DEFAULT_RESET_TRIGGERS,
   deriveSessionMetaPatch,
@@ -24,14 +26,13 @@ import {
   type SessionScope,
   updateSessionStore,
 } from "../../config/sessions.js";
-import type { TtsAutoMode } from "../../config/types.tts.js";
 import { archiveSessionTranscripts } from "../../gateway/session-utils.fs.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
+import { stripPluginCommandOptionsFromBody } from "../../plugins/command-options.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
 import { normalizeSessionDeliveryFields } from "../../utils/delivery-context.js";
 import { resolveCommandAuthorization } from "../command-auth.js";
-import type { MsgContext, TemplateContext } from "../templating.js";
 import { normalizeInboundTextNewlines } from "./inbound-text.js";
 import { stripMentions, stripStructuralPrefixes } from "./mentions.js";
 
@@ -53,6 +54,70 @@ export type SessionInitResult = {
   bodyStripped?: string;
   triggerBodyNormalized: string;
 };
+
+function stripResetMetadataArgs(body: string, trigger: string): string {
+  if (!body) {
+    return "";
+  }
+  const tokens = body.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "";
+  }
+  const dropLooseResetOptions = (argsTokens: string[]): string => {
+    const kept: string[] = [];
+    for (let i = 0; i < argsTokens.length; i += 1) {
+      const token = argsTokens[i];
+      if (!token) {
+        continue;
+      }
+      if (token.startsWith("--")) {
+        if (!token.includes("=")) {
+          const next = argsTokens[i + 1];
+          if (next && !next.startsWith("-")) {
+            i += 1;
+          }
+        }
+        continue;
+      }
+      if (token.startsWith("-") && token.length > 1) {
+        const next = argsTokens[i + 1];
+        if (next && !next.startsWith("-")) {
+          i += 1;
+        }
+        continue;
+      }
+      kept.push(token);
+    }
+    return kept.join(" ").trim();
+  };
+  const filtered = tokens.filter((token) => {
+    const lower = token.toLowerCase();
+    // Legacy persona: args live here; structured /new options are now handled via plugin command options.
+    // These should not be forwarded to the agent as user prompt text.
+    if (lower.startsWith("persona:")) {
+      return false;
+    }
+    return true;
+  });
+  const cleaned = filtered.join(" ").trim();
+  if (!cleaned) {
+    return "";
+  }
+  const triggerToken = trigger?.trim() || "/new";
+  const rebuilt = stripPluginCommandOptionsFromBody({
+    commandBody: `${triggerToken} ${cleaned}`.trim(),
+  }).commandBody;
+  const rebuiltTokens = rebuilt.split(/\s+/).filter(Boolean);
+  if (rebuiltTokens.length === 0) {
+    return "";
+  }
+  const triggerLower = triggerToken.toLowerCase();
+  let argsTokens = rebuiltTokens;
+  if (rebuiltTokens[0]?.toLowerCase() === triggerLower || rebuiltTokens[0]?.startsWith("/")) {
+    argsTokens = rebuiltTokens.slice(1);
+  }
+  return dropLooseResetOptions(argsTokens);
+}
 
 function forkSessionFromParent(params: {
   parentEntry: SessionEntry;
@@ -198,7 +263,10 @@ export async function initSessionState(params: {
       strippedForResetLower.startsWith(triggerPrefixLower)
     ) {
       isNewSession = true;
-      bodyStripped = strippedForReset.slice(trigger.length).trimStart();
+      bodyStripped = stripResetMetadataArgs(
+        strippedForReset.slice(trigger.length).trimStart(),
+        trigger,
+      );
       resetTriggered = true;
       break;
     }
