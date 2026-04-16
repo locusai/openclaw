@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026.2.18-ike.dev.1
+
+### Changes
+
+- Version alignment with core OpenClaw release numbers.
+
 ## 2026.2.18-ike.dev.0
 
 ### Changes
