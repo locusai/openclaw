@@ -10,10 +10,12 @@ import type { IconName } from "./icons.ts";
 
 type ToolDisplaySpec = ToolDisplaySpecBase & {
   icon?: string;
+  suppressWhenNoOutput?: boolean;
 };
 
 type SharedToolDisplaySpec = ToolDisplaySpecBase & {
   emoji?: string;
+  suppressWhenNoOutput?: boolean;
 };
 
 type SharedToolDisplayConfig = {
@@ -46,6 +48,7 @@ const EMOJI_ICON_MAP: Record<string, IconName> = {
   "💻": "monitor",
   "🔌": "plug",
   "💬": "messageSquare",
+  "✅": "check",
 };
 
 const SLACK_SPEC: ToolDisplaySpec = {
@@ -80,6 +83,7 @@ function convertSpec(spec?: SharedToolDisplaySpec): ToolDisplaySpec {
     label: spec?.label,
     detailKeys: spec?.detailKeys,
     actions: spec?.actions,
+    suppressWhenNoOutput: spec?.suppressWhenNoOutput,
   };
 }
 
@@ -147,6 +151,11 @@ export function resolveToolDisplay(params: {
     verb,
     detail,
   };
+}
+
+export function shouldSuppressToolCardWhenNoOutput(name?: string): boolean {
+  const key = normalizeToolName(name).toLowerCase();
+  return TOOL_MAP[key]?.suppressWhenNoOutput === true;
 }
 
 export function formatToolDetail(display: ToolDisplay): string | undefined {
