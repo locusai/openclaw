@@ -266,6 +266,7 @@ export type OpenClawPluginApi = {
   registerGatewayMethod: (method: string, handler: GatewayRequestHandler) => void;
   registerCli: (registrar: OpenClawPluginCliRegistrar, opts?: { commands?: string[] }) => void;
   registerService: (service: OpenClawPluginService) => void;
+  registerPluginUi: (extension: OpenClawPluginUiEntry) => void;
   registerProvider: (provider: ProviderPlugin) => void;
   /**
    * Register a custom command that bypasses the LLM agent.
@@ -280,6 +281,25 @@ export type OpenClawPluginApi = {
     handler: PluginHookHandlerMap[K],
     opts?: { priority?: number },
   ) => void;
+};
+
+export type OpenClawPluginUiMount = {
+  kind: "web_component";
+  modulePath: string;
+  tagName: string;
+  exportName?: string;
+  adapterId?: string;
+  sessionAttribute?: string;
+};
+
+export type OpenClawPluginUiEntry = {
+  id: string;
+  label: string;
+  description?: string;
+  icon?: string;
+  group?: string;
+  order?: number;
+  mount: OpenClawPluginUiMount;
 };
 
 export type PluginOrigin = "bundled" | "global" | "workspace" | "config";
