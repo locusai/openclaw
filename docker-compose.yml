@@ -16,6 +16,18 @@ services:
       - "${OPENCLAW_BRIDGE_PORT:-18790}:18790"
     init: true
     restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "const http=require('http');const token=process.env.OPENCLAW_GATEWAY_TOKEN||'';const path=token?'/health?token='+encodeURIComponent(token):'/health';const req=http.get({host:'127.0.0.1',port:18789,path},res=>{process.exit(res.statusCode===200?0:1)});req.on('error',()=>process.exit(1));",
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     command:
       [
         "node",
