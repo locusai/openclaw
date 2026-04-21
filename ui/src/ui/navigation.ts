@@ -11,7 +11,7 @@ export const TAB_GROUPS = [
   { label: "settings", tabs: ["config", "debug", "logs"] },
 ] as const;
 
-export type Tab =
+export type CoreTab =
   | "agents"
   | "overview"
   | "channels"
@@ -26,7 +26,29 @@ export type Tab =
   | "debug"
   | "logs";
 
-const TAB_PATHS: Record<Tab, string> = {
+const PLUGIN_TAB_PREFIX = "plugin:" as const;
+const PLUGIN_ROUTE_PREFIX = "/plugin/" as const;
+
+export type PluginTab = `${typeof PLUGIN_TAB_PREFIX}${string}`;
+export type Tab = CoreTab | PluginTab;
+
+export function pluginTabFromId(id: string): PluginTab {
+  return `${PLUGIN_TAB_PREFIX}${id}`;
+}
+
+export function pluginIdFromTab(tab: Tab): string | null {
+  if (typeof tab !== "string" || !tab.startsWith(PLUGIN_TAB_PREFIX)) {
+    return null;
+  }
+  const id = tab.slice(PLUGIN_TAB_PREFIX.length).trim();
+  return id || null;
+}
+
+export function isPluginTab(tab: Tab): tab is PluginTab {
+  return pluginIdFromTab(tab) !== null;
+}
+
+const TAB_PATHS: Record<CoreTab, string> = {
   agents: "/agents",
   overview: "/overview",
   channels: "/channels",
@@ -42,7 +64,7 @@ const TAB_PATHS: Record<Tab, string> = {
   logs: "/logs",
 };
 
-const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as Tab]));
+const PATH_TO_TAB = new Map(Object.entries(TAB_PATHS).map(([tab, path]) => [path, tab as CoreTab]));
 
 export function normalizeBasePath(basePath: string): string {
   if (!basePath) {
@@ -76,8 +98,15 @@ export function normalizePath(path: string): string {
 }
 
 export function pathForTab(tab: Tab, basePath = ""): string {
+  const extensionId = pluginIdFromTab(tab);
+  if (extensionId) {
+    const encoded = encodeURIComponent(extensionId);
+    const extensionPath = `${PLUGIN_ROUTE_PREFIX}${encoded}`;
+    const base = normalizeBasePath(basePath);
+    return base ? `${base}${extensionPath}` : extensionPath;
+  }
   const base = normalizeBasePath(basePath);
-  const path = TAB_PATHS[tab];
+  const path = TAB_PATHS[tab as CoreTab];
   return base ? `${base}${path}` : path;
 }
 
@@ -91,14 +120,31 @@ export function tabFromPath(pathname: string, basePath = ""): Tab | null {
       path = path.slice(base.length);
     }
   }
-  let normalized = normalizePath(path).toLowerCase();
-  if (normalized.endsWith("/index.html")) {
-    normalized = "/";
-  }
-  if (normalized === "/") {
+  const normalizedPath = normalizePath(path);
+  const normalizedNoIndex = normalizedPath.toLowerCase().endsWith("/index.html")
+    ? "/"
+    : normalizedPath;
+  const normalizedLower = normalizedNoIndex.toLowerCase();
+  if (normalizedLower === "/") {
     return "chat";
   }
-  return PATH_TO_TAB.get(normalized) ?? null;
+  if (normalizedLower.startsWith(PLUGIN_ROUTE_PREFIX)) {
+    const raw = normalizedPath.slice(PLUGIN_ROUTE_PREFIX.length);
+    const firstSegment = raw.split("/")[0] ?? "";
+    if (!firstSegment) {
+      return null;
+    }
+    try {
+      const decoded = decodeURIComponent(firstSegment).trim();
+      if (!decoded) {
+        return null;
+      }
+      return pluginTabFromId(decoded);
+    } catch {
+      return null;
+    }
+  }
+  return PATH_TO_TAB.get(normalizedLower) ?? null;
 }
 
 export function inferBasePathFromPathname(pathname: string): string {
@@ -119,11 +165,21 @@ export function inferBasePathFromPathname(pathname: string): string {
       const prefix = segments.slice(0, i);
       return prefix.length ? `/${prefix.join("/")}` : "";
     }
+    if (candidate.startsWith(PLUGIN_ROUTE_PREFIX)) {
+      const suffix = candidate.slice(PLUGIN_ROUTE_PREFIX.length);
+      if (suffix) {
+        const prefix = segments.slice(0, i);
+        return prefix.length ? `/${prefix.join("/")}` : "";
+      }
+    }
   }
   return `/${segments.join("/")}`;
 }
 
 export function iconForTab(tab: Tab): IconName {
+  if (isPluginTab(tab)) {
+    return "puzzle";
+  }
   switch (tab) {
     case "agents":
       return "folder";

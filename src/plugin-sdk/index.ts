@@ -97,6 +97,8 @@ export type {
   AnyAgentTool,
   OpenClawPluginConfigSchema,
   OpenClawPluginApi,
+  OpenClawPluginUiEntry,
+  OpenClawPluginUiMount,
   OpenClawPluginService,
   OpenClawPluginServiceContext,
   PluginLogger,
