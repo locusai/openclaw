@@ -62,6 +62,8 @@ source branch.
 - Functionality: Adds `.env.ikentic.example` to document Ikentic overlay environment variables.
 - Functionality: Overlay compose files now load environment variables via `env_file: .env`.
 - Functionality: `.env.ikentic.example` clarifies public issuer usage and host state examples.
+- Functionality: `.env.ikentic.example` now documents `IKE_AUTH_BASE_URL` and optional
+  `IKE_ADMIN_API_ALLOWED_ORIGINS` so non-loopback sandbox image boots seed Control UI origins.
 - Functionality: Adjusts plugin registry handling used by the overlay.
 - Bead: `ikeagent-9884` (PR pending: ike-overlay/docker-compose).
 - Upstream PR: Not submitted (pending).
