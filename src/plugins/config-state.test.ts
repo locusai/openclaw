@@ -47,6 +47,22 @@ describe("normalizePluginsConfig", () => {
     });
     expect(result.slots.memory).toBe("memory-core");
   });
+
+  it("enables bundled channel plugins when the matching channel config is enabled", () => {
+    const result = resolveEffectiveEnableState({
+      id: "telegram",
+      origin: "bundled",
+      config: normalizePluginsConfig({}),
+      rootConfig: {
+        channels: {
+          telegram: {
+            enabled: true,
+          },
+        },
+      },
+    });
+    expect(result).toEqual({ enabled: true });
+  });
 });
 
 describe("resolveEffectiveEnableState", () => {
