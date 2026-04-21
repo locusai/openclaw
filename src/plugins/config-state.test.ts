@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizePluginsConfig } from "./config-state.js";
+import { normalizePluginsConfig, resolveEffectiveEnableState } from "./config-state.js";
 
 describe("normalizePluginsConfig", () => {
   it("uses default memory slot when not specified", () => {
@@ -46,5 +46,21 @@ describe("normalizePluginsConfig", () => {
       slots: { memory: "   " },
     });
     expect(result.slots.memory).toBe("memory-core");
+  });
+
+  it("enables bundled channel plugins when the matching channel config is enabled", () => {
+    const result = resolveEffectiveEnableState({
+      id: "telegram",
+      origin: "bundled",
+      config: normalizePluginsConfig({}),
+      rootConfig: {
+        channels: {
+          telegram: {
+            enabled: true,
+          },
+        },
+      },
+    });
+    expect(result).toEqual({ enabled: true });
   });
 });
