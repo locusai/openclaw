@@ -67,5 +67,5 @@ Use process-only mode for recurring cycles where the operator wants the reusable
 3. Build and merge the mechanical sync branch (mirror merge + deterministic conflict handling + conflict-free snapshot PR ports).
 4. Build final review branch from post-mechanical `integration/ikentic` head for unresolved/manual/conflict-bearing ports only.
 5. Run release path `topic/release-* -> carry/publish -> integration/ikentic -> tag`.
-6. Verify npm publish evidence lines for bundle spec, dist-tag, and published version.
+6. Verify npm publish evidence lines for dist-tag and published version.
 7. Delete temporary `topic/sync-*` and `topic/release-*` branches after merge; keep long-lived lanes.

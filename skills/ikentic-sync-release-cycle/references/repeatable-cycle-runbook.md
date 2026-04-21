@@ -42,10 +42,7 @@ Ordering invariant (do not skip):
 - If the operator expectation is “only our changes are reviewable”, keep upstream-only churn isolated:
   - PR 1 (mechanical): merge `origin/main` into `integration/ikentic` + deterministic conflict handling + lockfile gates.
   - PR 2 (carry/review): promote `carry/*` lanes and any manual Class D ports after PR 1 lands.
-- For Ikentic release prep (and any time you intentionally align extension versions), run:
-  - `pnpm plugins:sync:ikentic`
-
-Repeatable execution checklist:
+    Repeatable execution checklist:
 
 Phase A: Session truth load
 
@@ -103,7 +100,7 @@ Phase E: Dev release publish
 
 - Determine next dev version/tag from remote tags.
 - Create release branch from `carry/publish`.
-- Apply release version/bundle updates for latest dev plugin line.
+- Apply release version updates required for the carry package artifact.
 - Merge release branch into `carry/publish`.
 - Promote `carry/publish` into `integration/ikentic`.
 - Before tagging, enforce lockfile gates on integration head:
@@ -114,7 +111,6 @@ Phase F: Publish verification
 
 - Confirm npm workflow is active and run completed for the tag.
 - Verify logs include:
-  - `Resolved IKENTIC bundle spec ... @locusai/openclaw-ikentic-plugin@dev`
   - `Using npm dist-tag: dev`
   - `+ @locusai/openclaw@<target-dev-version>`
 - Confirm docker workflow state only; do not change unless explicitly requested.

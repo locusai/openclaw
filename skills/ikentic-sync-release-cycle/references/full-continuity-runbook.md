@@ -53,10 +53,7 @@ Ordering invariant (do not skip):
 - If the operator expectation is “only our changes are reviewable”, keep upstream-only churn isolated:
   - PR 1 (mechanical): merge `origin/main` into `integration/ikentic` + deterministic conflict handling + lockfile gates.
   - PR 2 (carry/review): promote `carry/*` lanes and any manual Class D ports after PR 1 lands.
-- For Ikentic release prep (and any time you intentionally align extension versions), run:
-  - `pnpm plugins:sync:ikentic`
-
-Session-start ground truth protocol (always run fresh; do not trust prior snapshots):
+    Session-start ground truth protocol (always run fresh; do not trust prior snapshots):
 
 1. Bootstrap env in worktree:
 
@@ -96,7 +93,7 @@ Session-start ground truth protocol (always run fresh; do not trust prior snapsh
 - `direnv exec . gh api repos/locusai/openclaw/actions/workflows/docker-release.yml`
 - `direnv exec . gh run list --workflow npm-publish.yml --repo locusai/openclaw --limit 30`
 - `direnv exec . gh run list --workflow docker-release.yml --repo locusai/openclaw --limit 30`
-- `direnv exec . gh run view <latest-successful-npm-run-id> --repo locusai/openclaw --log | rg -n "Resolved IKENTIC bundle spec|Using npm dist-tag|\\+ @locusai/openclaw@"`
+- `direnv exec . gh run view <latest-successful-npm-run-id> --repo locusai/openclaw --log | rg -n "Using npm dist-tag|\\+ @locusai/openclaw@"`
 
 6. Tag truth:
 
@@ -164,7 +161,7 @@ Execution objectives:
 1. Bring mirror `main` up to spec (ff-only from upstream) when behind.
 2. Bring `integration/ikentic` up to spec by merging mechanical sync first, then review-only deltas.
 3. Build/publish newest dev release on correct branch route: `topic/release -> carry/publish -> integration/ikentic -> tag`.
-4. Validate npm publish evidence lines for plugin spec, dist-tag, and published package version.
+4. Validate npm publish evidence lines for dist-tag and published package version.
 5. Keep temporary sync/release branches cleaned up after merge; keep long-lived governance lanes intact.
 
 Use this runbook as source of truth for planning and execution continuity.

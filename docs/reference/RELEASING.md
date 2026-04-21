@@ -19,21 +19,14 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - Load env from `~/.profile` and confirm `SPARKLE_PRIVATE_KEY_FILE` + App Store Connect vars are set (SPARKLE_PRIVATE_KEY_FILE should live in `~/.profile`).
 - Use Sparkle keys from `~/Library/CloudStorage/Dropbox/Backup/Sparkle` if needed.
 - Confirm release CI has:
-  - `IKENTIC_READ_PACKAGES_TOKEN` (repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps)
-  - `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages
-  - IKENTIC npm publish workflow tags:
-    - runs only on `v*-ike*`
-    - plugin spec is derived from release tag:
-      - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
-      - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
-      - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
-      - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
-    - npm dist-tag is derived from release tag:
-      - `-ike.N` -> `ike`
-      - `-ike.beta.N` -> `beta`
-      - `-ike.rc.N` -> `rc`
-      - `-ike.dev.N` -> `dev`
-    - lineage gate enforces tagged commit reachability from both `origin/carry/publish` and `origin/integration/ikentic`
+  - carry npm publish workflow runs only on `v*-ike*`
+  - publish dist-tag is derived from the release tag:
+    - `-ike.N` -> `ike`
+    - `-ike.beta.N` -> `beta`
+    - `-ike.rc.N` -> `rc`
+    - `-ike.dev.N` -> `dev`
+  - lineage gate enforces tagged commit reachability from both `origin/carry/publish` and `origin/integration/ikentic`
+  - this repo publishes only the plain `@locusai/openclaw` package artifact; downstream Ikentic image/plugin composition lives outside this repo
 
 1. **Version & metadata**
 
@@ -58,22 +51,11 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 4. **Validation**
 
-- [ ] `pnpm bundle:ikentic` with:
-  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@<channel-or-version>` (set explicitly for local verification)
-  - `NODE_AUTH_TOKEN=<read-packages-token>`
-  - `NPM_CONFIG_USERCONFIG=$PWD/.npmrc`
-  - if `IKENTIC_BUNDLE_SPEC` is unset locally, fallback defaults to stable:
-    - `@locusai/openclaw-ikentic-plugin@latest`
 - [ ] `pnpm build`
 - [ ] `pnpm check`
 - [ ] `pnpm test` (or `pnpm test:coverage` if you need coverage output)
 - [ ] `pnpm release:check` (verifies npm pack contents)
-- [ ] `npm pack --dry-run --json --ignore-scripts` and confirm files include `extensions/openclaw-ikentic-plugin/**`
-- [ ] Runtime smoke without token:
-  - `NODE_AUTH_TOKEN= node openclaw.mjs plugins list` and confirm `openclaw-ikentic-plugin` is discoverable
-- [ ] Security checks:
-  - Verify no read token value appears in packed npm tarball contents
-  - Verify no read token value appears in Docker image filesystem/history
+- [ ] `npm pack --dry-run --json --ignore-scripts`
 - [ ] `OPENCLAW_INSTALL_SMOKE_SKIP_NONROOT=1 pnpm test:install:smoke` (Docker install smoke test, fast path; required before release)
   - If the immediate previous npm release is known broken, set `OPENCLAW_INSTALL_SMOKE_PREVIOUS=<last-good-version>` or `OPENCLAW_INSTALL_SMOKE_SKIP_PREVIOUS=1` for the preinstall step.
 - [ ] (Optional) Full installer smoke (adds non-root + CLI coverage): `pnpm test:install:smoke`
@@ -96,7 +78,7 @@ When the operator says “release”, immediately do this preflight (no extra qu
 
 - [ ] Confirm git status is clean; commit and push as needed.
 - [ ] `npm login` (verify 2FA) if needed.
-- [ ] `npm publish --access public` (workflow equivalent: publish to GitHub Packages; prerelease versions auto-publish to dist-tag derived from release tag, e.g. `-ike.0` -> `ike`, `-ike.dev.0` -> `dev`).
+- [ ] `npm publish --access public` for upstream public npm releases. Workflow equivalent for this carry publishes `@locusai/openclaw` to GitHub Packages, with prerelease versions auto-published to the dist-tag derived from the release tag (for example `-ike.0` -> `ike`, `-ike.dev.0` -> `dev`).
 - [ ] Verify the registry: `npm view openclaw version`, `npm view openclaw dist-tags`, and `npx -y openclaw@X.Y.Z --version` (or `--help`).
 
 ### Troubleshooting (notes from 2.0.0-beta2 release)
@@ -120,12 +102,11 @@ When the operator says “release”, immediately do this preflight (no extra qu
 - [ ] From a clean temp directory (no `package.json`), run `npx -y openclaw@X.Y.Z send --help` to confirm install/CLI entrypoints work.
 - [ ] Announce/share release notes.
 
-## IKENTIC build-time bundling policy
+## Carry artifact scope
 
-- IKENTIC is bundled at build time in release workflows (npm package + Docker image).
-- End users do not need runtime registry access or `NODE_AUTH_TOKEN` to load the bundled IKENTIC plugin.
-- Do not pass registry tokens into Docker build args or image layers; bundle in the workspace before `docker build`.
-- Never commit secrets or token values to the repo, docs, or artifacts.
+- This repo publishes the plain `@locusai/openclaw` package artifact only.
+- Ikentic plugin composition, Ikentic Docker images, and sandbox overlays are downstream-owned surfaces.
+- Do not reintroduce downstream runtime composition into this repo's npm or Docker release flow.
 
 ## Plugin publish scope (npm)
 

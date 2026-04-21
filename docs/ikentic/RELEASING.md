@@ -26,45 +26,26 @@ Branch governance is defined in
 - Use Ikentic version/tag suffixes for prereleases (for example `2026.2.16-ike.dev.0`).
 - Tag version and `package.json` version must match exactly.
 - If a pushed tag does not trigger publish workflows, keep it as history and cut the next version tag.
-- For Ikentic release prep, use:
-  - `pnpm plugins:sync:ikentic`
-  - This syncs extension versions while preserving extension `CHANGELOG.md` content.
 
 ## CI prerequisites
 
-- `IKENTIC_READ_PACKAGES_TOKEN` repo secret with read access to `npm.pkg.github.com` for IKENTIC and transitive `@locusai/*` runtime deps.
-- `NPM_CONFIG_USERCONFIG=${{ github.workspace }}/.npmrc` in IKENTIC bundle steps so installs under `extensions/...` resolve `@locusai` via GitHub Packages.
-- `npm-publish.yml` Ikentic behavior:
+- `npm-publish.yml` carry behavior:
   - Runs only on `v*-ike*` tags.
-  - Plugin spec from tag:
-    - `-ike.N` -> `@locusai/openclaw-ikentic-plugin@latest`
-    - `-ike.beta.N` -> `@locusai/openclaw-ikentic-plugin@beta`
-    - `-ike.rc.N` -> `@locusai/openclaw-ikentic-plugin@rc`
-    - `-ike.dev.N` -> `@locusai/openclaw-ikentic-plugin@dev`
   - npm dist-tag from tag:
     - `-ike.N` -> `ike`
     - `-ike.beta.N` -> `beta`
     - `-ike.rc.N` -> `rc`
     - `-ike.dev.N` -> `dev`
+  - Publishes the plain `@locusai/openclaw` package artifact to GitHub Packages.
 - Release lineage gate must confirm tagged commit reachability from both:
   - `origin/carry/publish`
   - `origin/integration/ikentic`
 
 ## Extra validation gates
 
-- `pnpm bundle:ikentic` with:
-  - `IKENTIC_BUNDLE_SPEC=@locusai/openclaw-ikentic-plugin@<channel-or-version>`
-  - `NODE_AUTH_TOKEN=<read-packages-token>`
-  - `NPM_CONFIG_USERCONFIG=$PWD/.npmrc`
-  - If `IKENTIC_BUNDLE_SPEC` is unset locally, fallback defaults to
-    `@locusai/openclaw-ikentic-plugin@latest`.
-- `npm pack --dry-run --json --ignore-scripts` includes `extensions/openclaw-ikentic-plugin/**`.
-- Runtime smoke without token:
-  - `NODE_AUTH_TOKEN= node openclaw.mjs plugins list`
-  - Confirm `openclaw-ikentic-plugin` is discoverable.
-- Security checks:
-  - No read token value appears in packed npm tarball contents.
-  - No read token value appears in Docker image filesystem/history.
+- `pnpm build`
+- `pnpm release:check`
+- `npm pack --dry-run --json --ignore-scripts`
 - If manifests changed, `pnpm install` must update `pnpm-lock.yaml`, and
   `pnpm install --frozen-lockfile` must pass before tagging.
 
@@ -78,13 +59,11 @@ Branch governance is defined in
 
 ## Required publish evidence
 
-- `Resolved IKENTIC bundle spec ... @locusai/openclaw-ikentic-plugin@dev`
 - `Using npm dist-tag: dev`
 - `+ @locusai/openclaw@<version>`
+- lineage gate logs showing reachability from both promotion refs
 
-## Build-time bundling policy
+## Scope boundary
 
-- IKENTIC is bundled at build time in release workflows (npm package + Docker image).
-- End users do not need runtime registry access or `NODE_AUTH_TOKEN` to load the bundled plugin.
-- Do not pass registry tokens into Docker build args or image layers.
-- Never commit secrets or token values to repo files, docs, or artifacts.
+- This repo no longer owns Ikentic runtime composition, compose files, or Docker images.
+- Downstream Ikentic runtime and sandbox overlays are owned outside this repo.

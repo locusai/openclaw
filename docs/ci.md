@@ -49,7 +49,7 @@ pnpm check:docs     # docs format + lint + broken links
 pnpm release:check  # validate npm pack
 ```
 
-## Ikentic Fork Release Workflow Notes
+## Carry Release Workflow Notes
 
 Ikentic branch governance is defined in
 [`/ikentic/branch-governance-spec`](/ikentic/branch-governance-spec).
@@ -57,9 +57,11 @@ Canonical upstream-port tracking is in
 [`/ikentic/upstream-port-ledger`](/ikentic/upstream-port-ledger).
 This CI page only covers workflow execution behavior.
 
-If Docker release is not used:
-
-- Disable `docker-release.yml` in GitHub Actions settings/API.
-- Do not modify workflow YAML only to disable it operationally.
-- Keep npm publish flow (`npm-publish.yml`) as the required release gate.
-- Plugin version lockstep enforcement in `npm-publish.yml` is stable-channel only (`-ike.N`); prerelease tags (`dev|beta|rc`) do not enforce lockstep.
+- Downstream Ikentic Docker images are not built from this repo's CI surface.
+- Keep npm publish flow (`npm-publish.yml`) as the required carry artifact release gate.
+- `npm-publish.yml` runs only on `v*-ike*` tags and enforces tagged commit reachability from both `origin/carry/publish` and `origin/integration/ikentic`.
+- Publish dist-tag comes from the prerelease suffix:
+  - `-ike.N` -> `ike`
+  - `-ike.beta.N` -> `beta`
+  - `-ike.rc.N` -> `rc`
+  - `-ike.dev.N` -> `dev`
