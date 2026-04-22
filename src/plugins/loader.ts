@@ -15,6 +15,7 @@ import {
 } from "../memory/prompt-section.js";
 import { resolveUserPath } from "../utils.js";
 import { inspectBundleMcpRuntimeSupport } from "./bundle-mcp.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import { clearPluginCommands } from "./command-registry-state.js";
 import {
   applyTestPluginDefaults,
@@ -356,6 +357,7 @@ function createPluginRecord(params: {
     cliCommands: [],
     services: [],
     commands: [],
+    commandOptions: [],
     httpRoutes: 0,
     hookCount: 0,
     configSchema: params.configSchema,
@@ -717,6 +719,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   // Skip for non-activating (snapshot) loads to avoid wiping commands from other plugins.
   if (shouldActivate) {
     clearPluginCommands();
+    clearPluginCommandOptions();
     clearPluginInteractiveHandlers();
     clearMemoryPromptSection();
   }
