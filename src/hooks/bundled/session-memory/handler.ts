@@ -13,6 +13,7 @@ import {
   resolveAgentWorkspaceDir,
 } from "../../../agents/agent-scope.js";
 import type { OpenClawConfig } from "../../../config/config.js";
+import type { HookHandler } from "../../hooks.js";
 import { resolveStateDir } from "../../../config/paths.js";
 import { writeFileWithinRoot } from "../../../infra/fs-safe.js";
 import { createSubsystemLogger } from "../../../logging/subsystem.js";
@@ -22,7 +23,6 @@ import {
   toAgentStoreSessionKey,
 } from "../../../routing/session-key.js";
 import { resolveHookConfig } from "../../config.js";
-import type { HookHandler } from "../../hooks.js";
 import { generateSlugViaLLM } from "../../llm-slug-generator.js";
 import { findPreviousSessionFile, getRecentSessionContentWithResetFallback } from "./transcript.js";
 
@@ -151,9 +151,34 @@ const saveSessionToMemory: HookHandler = async (event) => {
       const allowLlmSlug = !isTestEnv && hookConfig?.llmSlug !== false;
 
       if (sessionContent && cfg && allowLlmSlug) {
+        const modelProvider =
+          typeof sessionEntry.modelProvider === "string" && sessionEntry.modelProvider.trim()
+            ? sessionEntry.modelProvider.trim()
+            : undefined;
+        const modelId =
+          typeof sessionEntry.model === "string" && sessionEntry.model.trim()
+            ? sessionEntry.model.trim()
+            : undefined;
+        const overrideProvider =
+          typeof sessionEntry.providerOverride === "string" && sessionEntry.providerOverride.trim()
+            ? sessionEntry.providerOverride.trim()
+            : undefined;
+        const overrideModel =
+          typeof sessionEntry.modelOverride === "string" && sessionEntry.modelOverride.trim()
+            ? sessionEntry.modelOverride.trim()
+            : undefined;
+        const slugProvider = modelProvider ?? overrideProvider;
+        const slugModel = modelId ?? overrideModel;
+        log.debug("Slug model resolved", {
+          model: slugProvider && slugModel ? `${slugProvider}/${slugModel}` : "default",
+        });
         log.debug("Calling generateSlugViaLLM...");
         // Use LLM to generate a descriptive slug
-        slug = await generateSlugViaLLM({ sessionContent, cfg });
+        slug = await generateSlugViaLLM({
+          sessionContent,
+          cfg,
+          ...(slugProvider && slugModel ? { provider: slugProvider, model: slugModel } : {}),
+        });
         log.debug("Generated slug", { slug });
       }
     }
