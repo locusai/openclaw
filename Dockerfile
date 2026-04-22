@@ -78,15 +78,6 @@ RUN set -eu; \
 # This reduces the attack surface by preventing container escape via root privileges
 USER node
 
-FROM openclaw-base AS openclaw-pack
-
-USER root
-RUN mkdir -p /opt/openclaw-artifacts \
- && chown node:node /opt/openclaw-artifacts
-USER node
-RUN pnpm pack --pack-destination /opt/openclaw-artifacts \
- && test -n "$(find /opt/openclaw-artifacts -maxdepth 1 -name '*.tgz' -print -quit)"
-
 FROM openclaw-base AS openclaw-runtime
 
 # Start gateway server with default config.
