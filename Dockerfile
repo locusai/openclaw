@@ -1,4 +1,4 @@
-FROM node:22-bookworm@sha256:cd7bcd2e7a1e6f72052feb023c7f6b722205d3fcab7bbcbd2d1bfdab10b1e935
+FROM node:22-bookworm@sha256:cd7bcd2e7a1e6f72052feb023c7f6b722205d3fcab7bbcbd2d1bfdab10b1e935 AS openclaw-base
 
 # OCI base-image metadata for downstream image consumers.
 # If you change these annotations, also update:
@@ -115,6 +115,14 @@ ENV NODE_ENV=production
 # The node:22-bookworm image includes a 'node' user (uid 1000)
 # This reduces the attack surface by preventing container escape via root privileges
 USER node
+
+FROM openclaw-base AS openclaw-pack
+
+RUN mkdir -p /opt/openclaw-artifacts \
+ && pnpm pack --pack-destination /opt/openclaw-artifacts \
+ && test -n "$(find /opt/openclaw-artifacts -maxdepth 1 -name '*.tgz' -print -quit)"
+
+FROM openclaw-base AS openclaw-runtime
 
 # Start gateway server with default config.
 # Binds to loopback (127.0.0.1) by default for security.
