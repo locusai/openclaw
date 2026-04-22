@@ -10,6 +10,7 @@ import type {
 import { registerInternalHook } from "../hooks/internal-hooks.js";
 import type { HookEntry } from "../hooks/types.js";
 import { resolveUserPath } from "../utils.js";
+import { registerPluginCommandOption } from "./command-options.js";
 import { registerPluginCommand } from "./commands.js";
 import { normalizePluginHttpPath } from "./http-path.js";
 import { findOverlappingPluginHttpRoute } from "./http-route-overlap.js";
@@ -24,6 +25,7 @@ import type {
   OpenClawPluginChannelRegistration,
   OpenClawPluginCliRegistrar,
   OpenClawPluginCommandDefinition,
+  OpenClawPluginCommandOptionDefinition,
   OpenClawPluginHttpRouteAuth,
   OpenClawPluginHttpRouteMatch,
   OpenClawPluginUiEntry,
@@ -101,6 +103,12 @@ export type PluginCommandRegistration = {
   source: string;
 };
 
+export type PluginCommandOptionRegistration = {
+  pluginId: string;
+  definition: OpenClawPluginCommandOptionDefinition;
+  source: string;
+};
+
 export type PluginUiEntryRegistration = {
   pluginId: string;
   extension: OpenClawPluginUiEntry;
@@ -127,6 +135,7 @@ export type PluginRecord = {
   cliCommands: string[];
   services: string[];
   commands: string[];
+  commandOptions: string[];
   httpRoutes: number;
   hookCount: number;
   configSchema: boolean;
@@ -147,6 +156,7 @@ export type PluginRegistry = {
   services: PluginServiceRegistration[];
   commands: PluginCommandRegistration[];
   pluginUiEntries?: PluginUiEntryRegistration[];
+  commandOptions: PluginCommandOptionRegistration[];
   diagnostics: PluginDiagnostic[];
 };
 
@@ -188,6 +198,7 @@ export function createEmptyPluginRegistry(): PluginRegistry {
     services: [],
     commands: [],
     pluginUiEntries: [],
+    commandOptions: [],
     diagnostics: [],
   };
 }
@@ -595,6 +606,29 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
+  const registerCommandOption = (
+    record: PluginRecord,
+    definition: OpenClawPluginCommandOptionDefinition,
+  ) => {
+    const result = registerPluginCommandOption(record.id, definition);
+    if (!result.ok) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `command option registration failed: ${result.error}`,
+      });
+      return;
+    }
+
+    record.commandOptions.push(`${definition.command}:${definition.option}`);
+    registry.commandOptions.push({
+      pluginId: record.id,
+      definition,
+      source: record.source,
+    });
+  };
+
   const registerTypedHook = <K extends PluginHookName>(
     record: PluginRecord,
     hookName: K,
@@ -680,6 +714,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       registerService: (service) => registerService(record, service),
       registerPluginUi: (extension) => registerPluginUi(record, extension),
       registerCommand: (command) => registerCommand(record, command),
+      registerCommandOption: (definition) => registerCommandOption(record, definition),
       registerContextEngine: (id, factory) => registerContextEngine(id, factory),
       resolvePath: (input: string) => resolveUserPath(input),
       on: (hookName, handler, opts) =>
@@ -699,6 +734,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerService,
     registerPluginUi,
     registerCommand,
+    registerCommandOption,
     registerHook,
     registerTypedHook,
   };
