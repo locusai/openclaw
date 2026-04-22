@@ -11,7 +11,6 @@ import type { ExecApprovalsFile, ExecApprovalsSnapshot } from "./controllers/exe
 import type { SkillMessage } from "./controllers/skills.ts";
 import type { GatewayBrowserClient, GatewayHelloOk } from "./gateway.ts";
 import type { Tab } from "./navigation.ts";
-import type { PluginUiDescriptor } from "./plugin-ui/types.ts";
 import type { UiSettings } from "./storage.ts";
 import type { ThemeTransitionContext } from "./theme-transition.ts";
 import type { ThemeMode } from "./theme.ts";
@@ -81,11 +80,6 @@ export type AppViewState = {
   chatThinkingLevel: string | null;
   chatQueue: ChatQueueItem[];
   chatManualRefreshInFlight: boolean;
-  pluginUiLoading: boolean;
-  pluginUiError: string | null;
-  pluginUiEntries: PluginUiDescriptor[];
-  pluginUiReadyById: Record<string, boolean>;
-  pluginUiLoadErrorById: Record<string, string | null>;
   nodesLoading: boolean;
   nodes: Array<Record<string, unknown>>;
   chatNewMessagesBelow: boolean;
@@ -281,8 +275,6 @@ export type AppViewState = {
   loadOverview: () => Promise<void>;
   loadAssistantIdentity: () => Promise<void>;
   loadCron: () => Promise<void>;
-  ensurePluginUiLoaded: (extensionId: string) => Promise<void>;
-  resolvePluginUiAdapterForEntry: (extension: PluginUiDescriptor) => unknown;
   handleWhatsAppStart: (force: boolean) => Promise<void>;
   handleWhatsAppWait: () => Promise<void>;
   handleWhatsAppLogout: () => Promise<void>;
