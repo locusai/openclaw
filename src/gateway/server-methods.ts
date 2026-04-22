@@ -20,7 +20,6 @@ import { logsHandlers } from "./server-methods/logs.js";
 import { modelsHandlers } from "./server-methods/models.js";
 import { nodeHandlers } from "./server-methods/nodes.js";
 import { pushHandlers } from "./server-methods/push.js";
-import { pluginUiHandlers } from "./server-methods/plugin-ui.js";
 import { sendHandlers } from "./server-methods/send.js";
 import { sessionsHandlers } from "./server-methods/sessions.js";
 import { skillsHandlers } from "./server-methods/skills.js";
@@ -82,7 +81,6 @@ const READ_METHODS = new Set([
   "node.list",
   "node.describe",
   "chat.history",
-  "plugins.ui.list",
 ]);
 const WRITE_METHODS = new Set([
   "send",
@@ -136,7 +134,6 @@ export const coreGatewayHandlers: GatewayRequestHandlers = {
   ...healthHandlers,
   ...channelsHandlers,
   ...chatHandlers,
-  ...pluginUiHandlers,
   ...cronHandlers,
   ...deviceHandlers,
   ...doctorHandlers,
