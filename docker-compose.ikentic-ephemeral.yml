@@ -4,14 +4,25 @@ services:
     env_file:
       - .env
     environment:
-      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      HOME: /home/openclaw
+      OPENCLAW_STATE_DIR: /home/openclaw/.openclaw
     volumes:
-      - ${IKENTIC_PLUGIN_DIR}:/home/node/.openclaw-plugins/ikentic
+      - ${IKENTIC_PLUGIN_DIR}:/home/openclaw/.openclaw-plugins/ikentic
+    entrypoint:
+      - /bin/sh
+      - -lc
+    command: /usr/local/bin/start-openclaw.sh
 
   openclaw-cli:
     env_file:
       - .env
     environment:
-      OPENCLAW_STATE_DIR: /home/node/.openclaw
+      HOME: /home/openclaw
+      OPENCLAW_STATE_DIR: /home/openclaw/.openclaw
     volumes:
-      - ${IKENTIC_PLUGIN_DIR}:/home/node/.openclaw-plugins/ikentic
+      - ${IKENTIC_PLUGIN_DIR}:/home/openclaw/.openclaw-plugins/ikentic
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - exec runuser -u openclaw -- env HOME='/home/openclaw' OPENCLAW_STATE_DIR='/home/openclaw/.openclaw' PATH='/home/openclaw/.openclaw/bin:/opt/openclaw-runtime/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin' sh -lc 'exec openclaw "$@"' -- "$@"
+      - --
