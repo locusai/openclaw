@@ -16,6 +16,10 @@ import {
   registerSessionBindingAdapter,
 } from "../../infra/outbound/session-binding-service.js";
 import { enqueueSystemEvent, resetSystemEventsForTest } from "../../infra/system-events.js";
+import {
+  clearPluginCommandOptions,
+  registerPluginCommandOption,
+} from "../../plugins/command-options.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";
 import {
   createChannelTestPluginBase,
@@ -1168,6 +1172,66 @@ describe("initSessionState RawBody", () => {
     });
 
     expect(result.sessionKey).toBe(boundSessionKey);
+  });
+});
+
+describe("initSessionState reset trigger metadata stripping", () => {
+  it("strips registered plugin command options from /new body", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona marketing-assistant hello there",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello there");
+    clearPluginCommandOptions();
+  });
+
+  it("strips registered plugin command options with equals syntax", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-eq-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona=marketing-assistant hello",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello");
+    clearPluginCommandOptions();
   });
 });
 

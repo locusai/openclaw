@@ -1,4 +1,5 @@
 import { logVerbose } from "../../globals.js";
+import { executePluginCommandOptions } from "../../plugins/command-options.js";
 import { resolveSendPolicy } from "../../sessions/send-policy.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
 import { emitResetCommandHooks } from "./commands-reset-hooks.js";
@@ -23,16 +24,43 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
   if (HANDLERS === null) {
     HANDLERS = (await loadCommandHandlersRuntime()).loadCommandHandlers();
   }
-  const resetResult = await maybeHandleResetCommand(params);
-  if (resetResult) {
-    return resetResult;
-  }
-
   const allowTextCommands = shouldHandleTextCommands({
     cfg: params.cfg,
     surface: params.command.surface,
     commandSource: params.ctx.CommandSource,
   });
+
+  if (allowTextCommands) {
+    const optionResult = await executePluginCommandOptions({
+      commandBody: params.command.commandBodyNormalized,
+      sessionKey: params.sessionKey,
+      sessionId: params.sessionEntry?.sessionId,
+      senderId: params.command.senderId,
+      channel: params.command.channel,
+      channelId: params.command.channelId,
+      isAuthorizedSender: params.command.isAuthorizedSender,
+      config: params.cfg,
+      from: params.command.from,
+      to: params.command.to,
+      accountId: params.ctx.AccountId ?? undefined,
+      messageThreadId:
+        typeof params.ctx.MessageThreadId === "number" ? params.ctx.MessageThreadId : undefined,
+    });
+    if (optionResult.commandBody !== params.command.commandBodyNormalized) {
+      params.command.commandBodyNormalized = optionResult.commandBody;
+    }
+    if (optionResult.shouldStop) {
+      return {
+        shouldContinue: false,
+        ...(optionResult.reply ? { reply: optionResult.reply } : {}),
+      };
+    }
+  }
+
+  const resetResult = await maybeHandleResetCommand(params);
+  if (resetResult) {
+    return resetResult;
+  }
 
   for (const handler of HANDLERS) {
     const result = await handler(params, allowTextCommands);

@@ -94,6 +94,7 @@ const createRegistry = (diagnostics: PluginDiagnostic[]): PluginRegistry => ({
   httpRoutes: [],
   cliRegistrars: [],
   services: [],
+  commandOptions: [],
   conversationBindingResolvedHandlers: [],
   diagnostics,
 });
