@@ -4,7 +4,11 @@ import { resolveCanvasIframeUrl } from "../canvas-url.ts";
 import { resolveEmbedSandbox, type EmbedSandboxMode } from "../embed-sandbox.ts";
 import { icons } from "../icons.ts";
 import type { SidebarContent } from "../sidebar-content.ts";
-import { formatToolDetail, resolveToolDisplay } from "../tool-display.ts";
+import {
+  formatToolDetail,
+  resolveToolDisplay,
+  shouldSuppressToolCardWhenNoOutput,
+} from "../tool-display.ts";
 import type { ToolCard } from "../types/chat-types.ts";
 import { extractTextCached } from "./message-extract.ts";
 import { isToolResultMessage } from "./message-normalizer.ts";
@@ -200,6 +204,16 @@ export function extractToolCards(message: unknown, prefix = "tool"): ToolCard[] 
       outputText: text,
       preview: extractToolPreview(text, name),
     });
+  }
+
+  const hasOutputText = cards.some((card) => Boolean(card.outputText?.trim()));
+  if (!hasOutputText) {
+    return cards.filter(
+      (card) =>
+        card.outputText !== undefined ||
+        card.inputText === undefined ||
+        !shouldSuppressToolCardWhenNoOutput(card.name),
+    );
   }
 
   return cards;
