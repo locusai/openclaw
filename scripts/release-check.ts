@@ -30,6 +30,7 @@ const requiredPathGroups = [
   "dist/control-ui/index.html",
 ];
 const forbiddenPrefixes = ["dist-runtime/", "dist/OpenClaw.app/"];
+const controlUiAssetPrefix = "dist/control-ui/assets/";
 // 2026.3.12 ballooned to ~213.6 MiB unpacked and correlated with low-memory
 // startup/doctor OOM reports. Keep enough headroom for the current pack with
 // restored bundled upgrade surfaces and Control UI assets while still catching
@@ -381,6 +382,12 @@ async function checkPluginSdkExports() {
   }
 }
 
+export function collectControlUiAssetPayloadErrors(paths: Iterable<string>): string[] {
+  return [...paths].some((path) => path.startsWith(controlUiAssetPrefix))
+    ? []
+    : [`missing Control UI asset payload under ${controlUiAssetPrefix}`];
+}
+
 async function main() {
   checkAppcastSparkleVersions();
   await checkPluginSdkExports();
@@ -400,8 +407,14 @@ async function main() {
     .toSorted((left, right) => left.localeCompare(right));
   const forbidden = collectForbiddenPackPaths(paths);
   const sizeErrors = collectPackUnpackedSizeErrors(results);
+  const controlUiAssetErrors = collectControlUiAssetPayloadErrors(paths);
 
-  if (missing.length > 0 || forbidden.length > 0 || sizeErrors.length > 0) {
+  if (
+    missing.length > 0 ||
+    forbidden.length > 0 ||
+    sizeErrors.length > 0 ||
+    controlUiAssetErrors.length > 0
+  ) {
     if (missing.length > 0) {
       console.error("release-check: missing files in npm pack:");
       for (const path of missing) {
@@ -419,6 +432,15 @@ async function main() {
           "release-check: build artifacts are missing. Run `pnpm build` before `pnpm release:check`.",
         );
       }
+    }
+    if (controlUiAssetErrors.length > 0) {
+      console.error("release-check: missing Control UI asset payload in npm pack:");
+      for (const error of controlUiAssetErrors) {
+        console.error(`  - ${error}`);
+      }
+      console.error(
+        "release-check: Control UI release artifacts are incomplete. Run `pnpm build && pnpm ui:build` before `pnpm release:check`.",
+      );
     }
     if (forbidden.length > 0) {
       console.error("release-check: forbidden files in npm pack:");
