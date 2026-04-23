@@ -17,11 +17,7 @@ import type { loadConfig } from "../config/config.js";
 import { resolveAgentModelPrimaryValue } from "../config/model-input.js";
 import { resolveStateDir } from "../config/paths.js";
 import { startGmailWatcherWithLogs } from "../hooks/gmail-watcher-lifecycle.js";
-import {
-  clearInternalHooks,
-  createInternalHookEvent,
-  triggerInternalHook,
-} from "../hooks/internal-hooks.js";
+import { createInternalHookEvent, triggerInternalHook } from "../hooks/internal-hooks.js";
 import { loadInternalHooks } from "../hooks/loader.js";
 import { isTruthyEnvValue } from "../infra/env.js";
 import type { loadOpenClawPlugins } from "../plugins/loader.js";
@@ -131,8 +127,8 @@ export async function startGatewaySidecars(params: {
 
   // Load internal hook handlers from configuration and directory discovery.
   try {
-    // Clear any previously registered hooks to ensure fresh loading
-    clearInternalHooks();
+    // Internal hooks are cleared once at gateway startup before plugins load.
+    // Do not clear here: plugins may register internal hooks during plugin registration.
     const loadedCount = await loadInternalHooks(params.cfg, params.defaultWorkspaceDir);
     if (loadedCount > 0) {
       params.logHooks.info(
