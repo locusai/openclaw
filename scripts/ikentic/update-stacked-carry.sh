@@ -14,7 +14,7 @@ Usage: scripts/ikentic/update-stacked-carry.sh [options]
 Options:
   --integration-ref <ref>   Integration baseline (default: origin/integration/ikentic)
   --base-ref <ref>          Main mirror base for PR commit ranges (default: origin/main)
-  --stack-branch <name>     Branch to update on origin (default: carry/stacked)
+  --stack-branch <name>     Branch to update on origin (default: integration/ikentic)
   --snapshot <tsv>          Snapshot TSV from snapshot-pr-refs.sh (optional)
   --reports-dir <dir>       Output reports directory (default: ${TMPDIR:-/tmp}/ikentic-reports)
   --skip-check              Skip pnpm check/build gates
@@ -30,7 +30,7 @@ USAGE
 
 integration_ref="origin/integration/ikentic"
 base_ref="origin/main"
-stack_branch="carry/stacked"
+stack_branch="integration/ikentic"
 snapshot=""
 reports_dir=""
 run_check=1

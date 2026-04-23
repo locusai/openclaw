@@ -9,7 +9,7 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
 - Defines branch purpose, routing rules, and merge policy.
 - Covers both:
   - upstream-bound work (`main`/`pr/*` lineage),
-  - internal integration/release work (`integration/ikentic`, `carry/*`, `carry/publish`).
+  - Ikentic carry/release work (`integration/ikentic`, `carry/*`, `carry/publish`).
 
 ## Branch Roles
 
@@ -21,23 +21,18 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
   - Upstream PR branches.
   - Based on `main`.
   - Intended for `openclaw/openclaw` review/merge.
-- `carry/stacked`
-  - Generated "stack" lane for internal testing.
-  - Deterministically rebuilt from:
-    - `integration/ikentic` (internal baseline) +
-    - the current snapshot of open `pr/*` patches (ported via clean cherry-picks).
+- `integration/ikentic`
+  - Canonical live Ikentic carry branch.
+  - Built from the accepted `oc-release` packet stack and the selected upstream stable base.
   - Purpose:
-    - run "integration + pending upstream PRs" together,
-    - without ever pushing integration-only deltas into upstream PR branches.
-  - Not a base for feature work; do not branch from `carry/stacked`.
+    - preserve one remote branch for the current OpenClaw carry truth,
+    - feed downstream release replay and stage-one source-image work,
+    - avoid pushing integration-only deltas into upstream PR branches.
+  - Not a scratch base for feature work; make carry changes as packet refs first, then promote the rebuilt head here.
 - `feat/*`
   - Integration-only feature branches (internal).
   - Based on `integration/ikentic` (or a short-lived `topic/*` off it).
   - Not upstream PR routing; if upstreaming later, port patches into a `pr/*` branch based on `main`.
-- `integration/ikentic`
-  - Canonical internal integration/deploy branch.
-  - Base for internal feature/fix/test work.
-  - Merge-based; no force-push except explicit one-time governance exceptions.
 - `carry/*`
   - Long-lived internal patch lanes.
   - Merge into `integration/ikentic`.
@@ -65,8 +60,6 @@ For operator runbook directives, see `AGENTS.md` (section: `Ikentic Overlay Hard
    - `carry/publish` must only contain release-scope commits.
 4. Force-push invariant:
    - no force-push to `integration/ikentic`, `carry/publish`, or persistent `carry/*`.
-   - Exception: `carry/stacked` is a generated lane and may be updated with
-     `--force-with-lease` by governance scripts only.
    - Exception: a name-preserving clean-baseline cutover may use `--force-with-lease`
      exactly once when operator-approved and fully documented (backup refs + exception
      record required). See `CUTOVER EXCEPTION (ONE-TIME, EMERGENCY-ONLY)` below.
@@ -190,10 +183,8 @@ temporarily depend on internal integration-only deltas.
 Do **not** solve this by cherry-picking internal commits into `pr/*` branches.
 That makes upstream PRs non-reviewable and creates sync debt.
 
-Instead, use the generated stack lane:
-
-- Rebuild `carry/stacked` from `integration/ikentic` + the current `pr/*` snapshot.
-- Run internal CI/release validation on `carry/stacked`.
+- Rebuild the accepted packet stack into `integration/ikentic`.
+- Run internal CI/release validation on `integration/ikentic`.
 - Keep upstream PR branches (`pr/*`) strictly `main`-based and self-contained.
 
 ### Required flow
