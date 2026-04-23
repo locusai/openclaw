@@ -500,6 +500,12 @@ export async function executePluginCommandOptions(params: {
         to: params.to,
         accountId: params.accountId,
         messageThreadId: params.messageThreadId,
+        requestConversationBinding: async () => ({
+          status: "error",
+          message: "This command option cannot bind the current conversation.",
+        }),
+        detachConversationBinding: async () => ({ removed: false }),
+        getCurrentConversationBinding: async () => null,
         invocation,
         option: {
           name: optionToken.name,
