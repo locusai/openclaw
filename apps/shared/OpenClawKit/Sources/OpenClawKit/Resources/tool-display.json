@@ -126,6 +126,12 @@
         }
       }
     },
+    "ikentic_locus_check_task": {
+      "emoji": "✅",
+      "title": "Ike Locus Check Task",
+      "detailKeys": ["taskId"],
+      "suppressWhenNoOutput": true
+    },
     "cron": {
       "emoji": "⏰",
       "title": "Cron",
