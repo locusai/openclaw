@@ -31,6 +31,7 @@ export function createEmptyPluginRegistry(): PluginRegistry {
     securityAuditCollectors: [],
     services: [],
     commands: [],
+    commandOptions: [],
     conversationBindingResolvedHandlers: [],
     diagnostics: [],
   };

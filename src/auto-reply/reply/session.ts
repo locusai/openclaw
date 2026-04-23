@@ -33,6 +33,7 @@ import type { TtsAutoMode } from "../../config/types.tts.js";
 import { getSessionBindingService } from "../../infra/outbound/session-binding-service.js";
 import { deliverSessionMaintenanceWarning } from "../../infra/session-maintenance-warning.js";
 import { createSubsystemLogger } from "../../logging/subsystem.js";
+import { stripPluginCommandOptionsFromBody } from "../../plugins/command-options.js";
 import { getGlobalHookRunner } from "../../plugins/hook-runner-global.js";
 import type { PluginHookSessionEndReason } from "../../plugins/hook-types.js";
 import { normalizeMainKey } from "../../routing/session-key.js";
@@ -157,6 +158,68 @@ function isResetAuthorizedForContext(params: {
     return true;
   }
   return scopes.includes("operator.admin");
+}
+
+function stripResetMetadataArgs(body: string, trigger: string): string {
+  if (!body) {
+    return "";
+  }
+  const tokens = body.split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) {
+    return "";
+  }
+  const dropLooseResetOptions = (argsTokens: string[]): string => {
+    const kept: string[] = [];
+    for (let i = 0; i < argsTokens.length; i += 1) {
+      const token = argsTokens[i];
+      if (!token) {
+        continue;
+      }
+      if (token.startsWith("--")) {
+        if (!token.includes("=")) {
+          const next = argsTokens[i + 1];
+          if (next && !next.startsWith("-")) {
+            i += 1;
+          }
+        }
+        continue;
+      }
+      if (token.startsWith("-") && token.length > 1) {
+        const next = argsTokens[i + 1];
+        if (next && !next.startsWith("-")) {
+          i += 1;
+        }
+        continue;
+      }
+      kept.push(token);
+    }
+    return kept.join(" ").trim();
+  };
+  const filtered = tokens.filter((token) => {
+    const lower = token.toLowerCase();
+    if (lower.startsWith("persona:")) {
+      return false;
+    }
+    return true;
+  });
+  const cleaned = filtered.join(" ").trim();
+  if (!cleaned) {
+    return "";
+  }
+  const triggerToken = trigger?.trim() || "/new";
+  const rebuilt = stripPluginCommandOptionsFromBody({
+    commandBody: `${triggerToken} ${cleaned}`.trim(),
+  }).commandBody;
+  const rebuiltTokens = rebuilt.split(/\s+/).filter(Boolean);
+  if (rebuiltTokens.length === 0) {
+    return "";
+  }
+  const triggerLower = triggerToken.toLowerCase();
+  let argsTokens = rebuiltTokens;
+  if (rebuiltTokens[0]?.toLowerCase() === triggerLower || rebuiltTokens[0]?.startsWith("/")) {
+    argsTokens = rebuiltTokens.slice(1);
+  }
+  return dropLooseResetOptions(argsTokens);
 }
 
 function resolveSessionConversationBindingContext(
@@ -353,7 +416,10 @@ export async function initSessionState(params: {
       strippedForResetLower.startsWith(triggerPrefixLower)
     ) {
       isNewSession = true;
-      bodyStripped = strippedForReset.slice(trigger.length).trimStart();
+      bodyStripped = stripResetMetadataArgs(
+        strippedForReset.slice(trigger.length).trimStart(),
+        trigger,
+      );
       resetTriggered = true;
       matchedResetTriggerLower = triggerLower;
       break;
