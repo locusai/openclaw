@@ -189,6 +189,39 @@ describe("stageBundledPluginRuntimeDeps", () => {
     ).toBe("module.exports = 'transitive';\n");
   });
 
+  it("prunes staged runtime dependency bin shims before packaging", () => {
+    const { pluginDir, repoRoot } = createBundledPluginFixture({
+      packageJson: {
+        name: "@openclaw/fixture-plugin",
+        version: "1.0.0",
+        dependencies: { direct: "1.0.0" },
+        openclaw: { bundle: { stageRuntimeDependencies: true } },
+      },
+    });
+    const directDir = path.join(repoRoot, "node_modules", "direct");
+    fs.mkdirSync(path.join(directDir, "node_modules", ".bin"), { recursive: true });
+    fs.writeFileSync(
+      path.join(directDir, "package.json"),
+      '{ "name": "direct", "version": "1.0.0" }\n',
+      "utf8",
+    );
+    fs.writeFileSync(path.join(directDir, "index.js"), "module.exports = 'direct';\n", "utf8");
+    fs.writeFileSync(
+      path.join(directDir, "node_modules", ".bin", "direct-cli"),
+      "#!/usr/bin/env node\n",
+      "utf8",
+    );
+
+    stageBundledPluginRuntimeDeps({ cwd: repoRoot });
+
+    expect(
+      fs.existsSync(path.join(pluginDir, "node_modules", "direct", "node_modules", ".bin")),
+    ).toBe(false);
+    expect(
+      fs.readFileSync(path.join(pluginDir, "node_modules", "direct", "index.js"), "utf8"),
+    ).toBe("module.exports = 'direct';\n");
+  });
+
   it("falls back to staging installs when the root dependency version is incompatible", () => {
     const { pluginDir, repoRoot } = createBundledPluginFixture({
       packageJson: {
