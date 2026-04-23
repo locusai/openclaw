@@ -236,6 +236,8 @@ vi.resetModules();
 const { addSubagentRunForTests, listSubagentRunsForRequester, resetSubagentRegistryForTests } =
   await import("../../agents/subagent-registry.js");
 const internalHooks = await import("../../hooks/internal-hooks.js");
+const { clearPluginCommandOptions, registerPluginCommandOption } =
+  await import("../../plugins/command-options.js");
 const { clearPluginCommands, registerPluginCommand } = await import("../../plugins/commands.js");
 const { abortEmbeddedPiRun, compactEmbeddedPiSession } =
   await import("../../agents/pi-embedded.js");
@@ -2255,6 +2257,87 @@ describe("handleCommands plugin commands", () => {
     expect(commandResult.shouldContinue).toBe(false);
     expect(commandResult.reply?.text).toBe("from plugin");
     clearPluginCommands();
+  });
+});
+
+describe("handleCommands plugin command options", () => {
+  it("stops with plugin reply when a command option handler returns reply", async () => {
+    clearPluginCommandOptions();
+    expect(
+      registerPluginCommandOption("test-plugin", {
+        command: "new",
+        option: "print",
+        takesValue: true,
+        handler: async (ctx) => ({
+          action: "reply",
+          reply: { text: `plugin:${ctx.option.value}` },
+        }),
+      }).ok,
+    ).toBe(true);
+
+    const cfg = {
+      commands: { text: true },
+      channels: { whatsapp: { allowFrom: ["*"] } },
+    } as OpenClawConfig;
+    const params = buildParams("/new --print hello", cfg);
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(false);
+    expect(result.reply?.text).toBe("plugin:hello");
+    clearPluginCommandOptions();
+  });
+
+  it("continues to core behavior when handler returns continue", async () => {
+    clearPluginCommandOptions();
+    expect(
+      registerPluginCommandOption("test-plugin", {
+        command: "new",
+        option: "flag",
+        handler: async () => ({ action: "continue" }),
+      }).ok,
+    ).toBe(true);
+
+    const cfg = {
+      commands: { text: true },
+      channels: { whatsapp: { allowFrom: ["*"] } },
+    } as OpenClawConfig;
+    const params = buildParams("/new --flag", cfg);
+    const hookSpy = vi.spyOn(internalHooks, "triggerInternalHook").mockResolvedValue();
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(true);
+    expect(result.reply).toBeUndefined();
+    expect(hookSpy).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "command", action: "new" }),
+    );
+    hookSpy.mockRestore();
+    clearPluginCommandOptions();
+  });
+
+  it("supports namespace selectors for command options", async () => {
+    clearPluginCommandOptions();
+    expect(
+      registerPluginCommandOption("test-plugin", {
+        command: "new",
+        option: "mode",
+        namespace: "demo",
+        handler: async () => ({
+          action: "reply",
+          reply: { text: "namespaced" },
+        }),
+      }).ok,
+    ).toBe(true);
+
+    const cfg = {
+      commands: { text: true },
+      channels: { whatsapp: { allowFrom: ["*"] } },
+    } as OpenClawConfig;
+    const params = buildParams("/new demo --mode test", cfg);
+    const result = await handleCommands(params);
+
+    expect(result.shouldContinue).toBe(false);
+    expect(result.reply?.text).toBe("namespaced");
+    clearPluginCommandOptions();
   });
 });
 
