@@ -66,7 +66,7 @@ const stagedRuntimeDepPruneRules = new Map([
   // Type declarations only; runtime resolves through lib/es entrypoints.
   ["@larksuiteoapi/node-sdk", ["types"]],
 ]);
-const runtimeDepsStagingVersion = 2;
+const runtimeDepsStagingVersion = 3;
 
 function collectInstalledRuntimeClosure(rootNodeModulesDir, dependencySpecs) {
   const packageCache = new Map();
@@ -116,6 +116,24 @@ function pruneStagedInstalledDependencyCargo(nodeModulesDir, depName) {
 function pruneStagedRuntimeDependencyCargo(nodeModulesDir) {
   for (const depName of stagedRuntimeDepPruneRules.keys()) {
     pruneStagedInstalledDependencyCargo(nodeModulesDir, depName);
+  }
+  pruneStagedRuntimeDependencyBinDirs(nodeModulesDir);
+}
+
+function pruneStagedRuntimeDependencyBinDirs(nodeModulesDir) {
+  if (!fs.existsSync(nodeModulesDir)) {
+    return;
+  }
+
+  for (const dirent of fs.readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    const candidate = path.join(nodeModulesDir, dirent.name);
+    if (dirent.name === ".bin") {
+      removePathIfExists(candidate);
+      continue;
+    }
+    if (dirent.isDirectory()) {
+      pruneStagedRuntimeDependencyBinDirs(candidate);
+    }
   }
 }
 
