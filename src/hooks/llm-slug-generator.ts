@@ -36,6 +36,8 @@ function resolveSlugGeneratorTimeoutMs(cfg: OpenClawConfig): number {
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenClawConfig;
+  provider?: string;
+  model?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -58,8 +60,8 @@ Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", 
     // Resolve model from agent config instead of using hardcoded defaults
     const modelRef = resolveAgentEffectiveModelPrimary(params.cfg, agentId);
     const parsed = modelRef ? parseModelRef(modelRef, DEFAULT_PROVIDER) : null;
-    const provider = parsed?.provider ?? DEFAULT_PROVIDER;
-    const model = parsed?.model ?? DEFAULT_MODEL;
+    const provider = params.provider ?? parsed?.provider ?? DEFAULT_PROVIDER;
+    const model = params.model ?? parsed?.model ?? DEFAULT_MODEL;
     const timeoutMs = resolveSlugGeneratorTimeoutMs(params.cfg);
 
     const result = await runEmbeddedPiAgent({
