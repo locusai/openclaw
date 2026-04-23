@@ -19,29 +19,29 @@ jobs:
         with:
           submodules: false
 
-      - name: Enforce carry/integration release lineage
+      - name: Enforce version branch release lineage
         shell: bash
         run: |
           set -euo pipefail
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
           TAG_SHA="${GITHUB_SHA}"
+          VERSION_REF="version/openclaw-${TAG_VERSION}"
           git fetch --no-tags origin \
-            +refs/heads/carry/publish:refs/remotes/origin/carry/publish \
+            "+refs/heads/${VERSION_REF}:refs/remotes/origin/${VERSION_REF}" \
             +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic
-          CARRY_SHA="$(git rev-parse origin/carry/publish)"
+          VERSION_SHA="$(git rev-parse "origin/${VERSION_REF}")"
           INTEGRATION_SHA="$(git rev-parse origin/integration/ikentic)"
           echo "Lineage check context: tag=${GITHUB_REF_NAME} tag_sha=${TAG_SHA}"
-          echo "Lineage check refs: origin/carry/publish=${CARRY_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/carry/publish"; then
-            echo "Lineage check passed: tag commit is reachable from origin/carry/publish."
-          else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/carry/publish (${CARRY_SHA})."
+          echo "Lineage check refs: origin/${VERSION_REF}=${VERSION_SHA} origin/integration/ikentic=${INTEGRATION_SHA}"
+          if [ "$TAG_SHA" != "$VERSION_SHA" ]; then
+            echo "Lineage check failed: tag commit ${TAG_SHA} does not equal origin/${VERSION_REF} (${VERSION_SHA})."
             exit 1
           fi
-          if git merge-base --is-ancestor "$TAG_SHA" "origin/integration/ikentic"; then
-            echo "Lineage check passed: tag commit is reachable from origin/integration/ikentic."
+          echo "Lineage check passed: tag commit equals origin/${VERSION_REF}."
+          if [ "$TAG_SHA" = "$INTEGRATION_SHA" ]; then
+            echo "Lineage check passed: version branch is the current integration head."
           else
-            echo "Lineage check failed: tag commit ${TAG_SHA} is not reachable from origin/integration/ikentic (${INTEGRATION_SHA})."
-            exit 1
+            echo "Lineage check note: version branch is a historical release head, not the current integration head."
           fi
 
       - name: Setup Node environment
@@ -84,9 +84,12 @@ jobs:
         run: |
           set -euo pipefail
           TAG_VERSION="${GITHUB_REF_NAME#v}"
+          BASE_VERSION="${TAG_VERSION%%-*}"
+          BASE_DIST_TAG="ike-${BASE_VERSION//./-}"
           PRERELEASE="$(printf '%s' "$TAG_VERSION" | sed -nE 's/^[0-9]+\.[0-9]+\.[0-9]+-([^+]+)(\+.*)?$/\1/p')"
           if [ -z "$PRERELEASE" ]; then
             echo "dist_tag=" >> "$GITHUB_OUTPUT"
+            echo "base_dist_tag=" >> "$GITHUB_OUTPUT"
             echo "No prerelease suffix detected; publishing with npm default tag."
             exit 0
           fi
@@ -100,14 +103,17 @@ jobs:
             DIST_TAG="${PRERELEASE%%.*}"
           fi
           echo "dist_tag=$DIST_TAG" >> "$GITHUB_OUTPUT"
+          echo "base_dist_tag=$BASE_DIST_TAG" >> "$GITHUB_OUTPUT"
           echo "Using npm dist-tag: $DIST_TAG"
+          echo "Using npm stable-base dist-tag: $BASE_DIST_TAG"
 
       - name: Publish package
         shell: bash
         run: |
           set -euo pipefail
           OWNER_SCOPE="$(printf '%s' "${GITHUB_REPOSITORY_OWNER}" | tr '[:upper:]' '[:lower:]')"
-          TARGET_NAME="@${OWNER_SCOPE}/openclaw"
+          TAG_VERSION="${GITHUB_REF_NAME#v}"
+          export TARGET_NAME="@${OWNER_SCOPE}/openclaw"
           node --input-type=module -e '
             import fs from "node:fs";
             const target = process.env.TARGET_NAME;
@@ -126,7 +132,11 @@ jobs:
           else
             npm publish --registry "https://npm.pkg.github.com"
           fi
+          if [ -n "${NPM_BASE_DIST_TAG:-}" ]; then
+            npm dist-tag add "${TARGET_NAME}@${TAG_VERSION}" "$NPM_BASE_DIST_TAG" --registry "https://npm.pkg.github.com"
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NPM_PUBLISH_DIST_TAG: ${{ steps.resolve-publish-tag.outputs.dist_tag }}
+          NPM_BASE_DIST_TAG: ${{ steps.resolve-publish-tag.outputs.base_dist_tag }}
           TARGET_NAME: "@${{ github.repository_owner }}/openclaw"
