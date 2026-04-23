@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   collectAppcastSparkleVersionErrors,
   collectBundledExtensionManifestErrors,
+  collectControlUiAssetPayloadErrors,
   collectForbiddenPackPaths,
   collectPackUnpackedSizeErrors,
 } from "../scripts/release-check.ts";
@@ -139,5 +140,22 @@ describe("collectPackUnpackedSizeErrors", () => {
     ).toEqual([
       "npm pack --dry-run produced no unpackedSize data; pack size budget was not verified.",
     ]);
+  });
+});
+
+describe("collectControlUiAssetPayloadErrors", () => {
+  it("rejects packs that ship the dashboard HTML without the asset payload", () => {
+    expect(collectControlUiAssetPayloadErrors(["dist/control-ui/index.html"])).toEqual([
+      "missing Control UI asset payload under dist/control-ui/assets/",
+    ]);
+  });
+
+  it("accepts packs that ship dashboard assets", () => {
+    expect(
+      collectControlUiAssetPayloadErrors([
+        "dist/control-ui/index.html",
+        "dist/control-ui/assets/index-Bu8rSoJV.js",
+      ]),
+    ).toEqual([]);
   });
 });

@@ -68,6 +68,9 @@ jobs:
       - name: Build
         run: pnpm build
 
+      - name: Build Control UI
+        run: pnpm ui:build
+
       - name: Release check
         run: pnpm release:check
 

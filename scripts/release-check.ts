@@ -24,8 +24,10 @@ const requiredPathGroups = [
   "dist/plugin-sdk/compat.js",
   "dist/plugin-sdk/root-alias.cjs",
   "dist/build-info.json",
+  "dist/control-ui/index.html",
 ];
 const forbiddenPrefixes = ["dist-runtime/", "dist/OpenClaw.app/"];
+const controlUiAssetPrefix = "dist/control-ui/assets/";
 // 2026.3.12 ballooned to ~213.6 MiB unpacked and correlated with low-memory
 // startup/doctor OOM reports. Keep enough headroom for the current pack while
 // failing fast if duplicate/shim content sneaks back into the release artifact.
@@ -287,6 +289,12 @@ async function checkPluginSdkExports() {
   }
 }
 
+export function collectControlUiAssetPayloadErrors(paths: Iterable<string>): string[] {
+  return [...paths].some((path) => path.startsWith(controlUiAssetPrefix))
+    ? []
+    : [`missing Control UI asset payload under ${controlUiAssetPrefix}`];
+}
+
 async function main() {
   checkAppcastSparkleVersions();
   await checkPluginSdkExports();
@@ -306,13 +314,28 @@ async function main() {
     .toSorted();
   const forbidden = collectForbiddenPackPaths(paths);
   const sizeErrors = collectPackUnpackedSizeErrors(results);
+  const controlUiAssetErrors = collectControlUiAssetPayloadErrors(paths);
 
-  if (missing.length > 0 || forbidden.length > 0 || sizeErrors.length > 0) {
+  if (
+    missing.length > 0 ||
+    forbidden.length > 0 ||
+    sizeErrors.length > 0 ||
+    controlUiAssetErrors.length > 0
+  ) {
     if (missing.length > 0) {
       console.error("release-check: missing files in npm pack:");
       for (const path of missing) {
         console.error(`  - ${path}`);
       }
+    }
+    if (controlUiAssetErrors.length > 0) {
+      console.error("release-check: missing Control UI asset payload in npm pack:");
+      for (const error of controlUiAssetErrors) {
+        console.error(`  - ${error}`);
+      }
+      console.error(
+        "release-check: Control UI release artifacts are incomplete. Run `pnpm build && pnpm ui:build` before `pnpm release:check`.",
+      );
     }
     if (forbidden.length > 0) {
       console.error("release-check: forbidden files in npm pack:");
