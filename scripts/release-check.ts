@@ -3,6 +3,7 @@
 import { execSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { pathToFileURL } from "node:url";
 
 type PackFile = { path: string };
 type PackResult = { files?: PackFile[] };
@@ -13,8 +14,10 @@ const requiredPathGroups = [
   "dist/plugin-sdk/index.js",
   "dist/plugin-sdk/index.d.ts",
   "dist/build-info.json",
+  "dist/control-ui/index.html",
 ];
 const forbiddenPrefixes = ["dist/OpenClaw.app/"];
+const controlUiAssetPrefix = "dist/control-ui/assets/";
 
 type PackageJson = {
   name?: string;
@@ -82,6 +85,12 @@ function checkPluginVersions() {
   }
 }
 
+export function collectControlUiAssetPayloadErrors(paths: Iterable<string>): string[] {
+  return [...paths].some((path) => path.startsWith(controlUiAssetPrefix))
+    ? []
+    : [`missing Control UI asset payload under ${controlUiAssetPrefix}`];
+}
+
 function main() {
   checkPluginVersions();
 
@@ -100,13 +109,23 @@ function main() {
   const forbidden = [...paths].filter((path) =>
     forbiddenPrefixes.some((prefix) => path.startsWith(prefix)),
   );
+  const controlUiAssetErrors = collectControlUiAssetPayloadErrors(paths);
 
-  if (missing.length > 0 || forbidden.length > 0) {
+  if (missing.length > 0 || forbidden.length > 0 || controlUiAssetErrors.length > 0) {
     if (missing.length > 0) {
       console.error("release-check: missing files in npm pack:");
       for (const path of missing) {
         console.error(`  - ${path}`);
       }
+    }
+    if (controlUiAssetErrors.length > 0) {
+      console.error("release-check: missing Control UI asset payload in npm pack:");
+      for (const error of controlUiAssetErrors) {
+        console.error(`  - ${error}`);
+      }
+      console.error(
+        "release-check: Control UI release artifacts are incomplete. Run `pnpm build && pnpm ui:build` before `pnpm release:check`.",
+      );
     }
     if (forbidden.length > 0) {
       console.error("release-check: forbidden files in npm pack:");
@@ -120,4 +139,6 @@ function main() {
   console.log("release-check: npm pack contents look OK.");
 }
 
-main();
+if (import.meta.url === pathToFileURL(process.argv[1] ?? "").href) {
+  main();
+}
