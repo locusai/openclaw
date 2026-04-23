@@ -103,7 +103,7 @@ const defaultStagedRuntimeDepPruneRules = new Map([
   ["@jimp/plugin-quantize", { paths: ["src/__image_snapshots__"] }],
   ["@jimp/plugin-threshold", { paths: ["src/__image_snapshots__"] }],
 ]);
-const runtimeDepsStagingVersion = 2;
+const runtimeDepsStagingVersion = 3;
 
 function resolveRuntimeDepPruneConfig(params = {}) {
   return {
@@ -214,6 +214,24 @@ function listInstalledDependencyNames(nodeModulesDir) {
 function pruneStagedRuntimeDependencyCargo(nodeModulesDir, pruneConfig) {
   for (const depName of listInstalledDependencyNames(nodeModulesDir)) {
     pruneStagedInstalledDependencyCargo(nodeModulesDir, depName, pruneConfig);
+  }
+  pruneStagedRuntimeDependencyBinDirs(nodeModulesDir);
+}
+
+function pruneStagedRuntimeDependencyBinDirs(nodeModulesDir) {
+  if (!fs.existsSync(nodeModulesDir)) {
+    return;
+  }
+
+  for (const dirent of fs.readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    const candidate = path.join(nodeModulesDir, dirent.name);
+    if (dirent.name === ".bin") {
+      removePathIfExists(candidate);
+      continue;
+    }
+    if (dirent.isDirectory()) {
+      pruneStagedRuntimeDependencyBinDirs(candidate);
+    }
   }
 }
 
