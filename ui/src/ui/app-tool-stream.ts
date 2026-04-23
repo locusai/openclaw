@@ -424,6 +424,7 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
   }
   const name = typeof data.name === "string" ? data.name : "tool";
   const phase = typeof data.phase === "string" ? data.phase : "";
+  const isError = data.isError === true;
   const args = phase === "start" ? data.args : undefined;
   const output =
     phase === "update"
@@ -448,7 +449,8 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       sessionKey,
       name,
       args,
-      output: output || undefined,
+      output:
+        phase === "result" && isError && !output ? "Error (details hidden)" : output || undefined,
       startedAt: typeof payload.ts === "number" ? payload.ts : now,
       updatedAt: now,
       message: {},
@@ -461,7 +463,8 @@ export function handleAgentEvent(host: ToolStreamHost, payload?: AgentEventPaylo
       entry.args = args;
     }
     if (output !== undefined) {
-      entry.output = output || undefined;
+      entry.output =
+        phase === "result" && isError && !output ? "Error (details hidden)" : output || undefined;
     }
     entry.updatedAt = now;
   }
