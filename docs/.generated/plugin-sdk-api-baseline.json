@@ -253,7 +253,7 @@
           "exportName": "CliBackendPlugin",
           "kind": "type",
           "source": {
-            "line": 1616,
+            "line": 1692,
             "path": "src/plugins/types.ts"
           }
         },
@@ -415,7 +415,7 @@
           "exportName": "OpenClawPluginApi",
           "kind": "type",
           "source": {
-            "line": 1660,
+            "line": 1736,
             "path": "src/plugins/types.ts"
           }
         },
@@ -1404,7 +1404,7 @@
           }
         },
         {
-          "declaration": "export type ReplyPrefixContext = import(\"../auto-reply/reply/response-prefix-template.ts\").ResponsePrefixContext;",
+          "declaration": "export type ReplyPrefixContext = import(\"src/auto-reply/reply/response-prefix-template\").ResponsePrefixContext;",
           "exportName": "ReplyPrefixContext",
           "kind": "type",
           "source": {
@@ -3707,7 +3707,7 @@
           }
         },
         {
-          "declaration": "export type ChannelOutboundSessionRouteParams = {    cfg: OpenClawConfig;    agentId: string;    accountId?: string | null;    target: string;    resolvedTarget?: {        to: string;        kind: import(\"../channels/plugins/types.core.js\").ChannelDirectoryEntryKind | \"channel\";        display?: string;        source: \"normalized\" | \"directory\";    };    replyToId?: string | null;    threadId?: string | number | null;};",
+          "declaration": "export type ChannelOutboundSessionRouteParams = {    cfg: OpenClawConfig;    agentId: string;    accountId?: string | null;    target: string;    resolvedTarget?: {        to: string;        kind: import(\"src/channels/plugins/types.core\").ChannelDirectoryEntryKind | \"channel\";        display?: string;        source: \"normalized\" | \"directory\";    };    replyToId?: string | null;    threadId?: string | number | null;};",
           "exportName": "ChannelOutboundSessionRouteParams",
           "kind": "type",
           "source": {
@@ -3765,7 +3765,7 @@
           "exportName": "OpenClawPluginApi",
           "kind": "type",
           "source": {
-            "line": 1660,
+            "line": 1736,
             "path": "src/plugins/types.ts"
           }
         },
@@ -3792,7 +3792,7 @@
           "exportName": "OpenClawPluginDefinition",
           "kind": "type",
           "source": {
-            "line": 1642,
+            "line": 1718,
             "path": "src/plugins/types.ts"
           }
         },
@@ -3801,7 +3801,7 @@
           "exportName": "OpenClawPluginService",
           "kind": "type",
           "source": {
-            "line": 1609,
+            "line": 1685,
             "path": "src/plugins/types.ts"
           }
         },
@@ -3810,7 +3810,7 @@
           "exportName": "OpenClawPluginServiceContext",
           "kind": "type",
           "source": {
-            "line": 1601,
+            "line": 1677,
             "path": "src/plugins/types.ts"
           }
         },
@@ -4280,7 +4280,7 @@
           "exportName": "OpenClawPluginApi",
           "kind": "type",
           "source": {
-            "line": 1660,
+            "line": 1736,
             "path": "src/plugins/types.ts"
           }
         },
@@ -4307,7 +4307,7 @@
           "exportName": "OpenClawPluginDefinition",
           "kind": "type",
           "source": {
-            "line": 1642,
+            "line": 1718,
             "path": "src/plugins/types.ts"
           }
         },
@@ -4316,7 +4316,7 @@
           "exportName": "OpenClawPluginService",
           "kind": "type",
           "source": {
-            "line": 1609,
+            "line": 1685,
             "path": "src/plugins/types.ts"
           }
         },
@@ -4325,7 +4325,7 @@
           "exportName": "OpenClawPluginServiceContext",
           "kind": "type",
           "source": {
-            "line": 1601,
+            "line": 1677,
             "path": "src/plugins/types.ts"
           }
         },
