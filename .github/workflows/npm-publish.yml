@@ -128,9 +128,9 @@ jobs:
             }
           '
           if [ -n "${NPM_PUBLISH_DIST_TAG:-}" ]; then
-            npm publish --tag "$NPM_PUBLISH_DIST_TAG" --registry "https://npm.pkg.github.com"
+            npm publish --ignore-scripts --tag "$NPM_PUBLISH_DIST_TAG" --registry "https://npm.pkg.github.com"
           else
-            npm publish --registry "https://npm.pkg.github.com"
+            npm publish --ignore-scripts --registry "https://npm.pkg.github.com"
           fi
           if [ -n "${NPM_BASE_DIST_TAG:-}" ]; then
             npm dist-tag add "${TARGET_NAME}@${TAG_VERSION}" "$NPM_BASE_DIST_TAG" --registry "https://npm.pkg.github.com"
