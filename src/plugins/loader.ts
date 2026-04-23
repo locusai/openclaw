@@ -26,6 +26,7 @@ import {
 import { resolveUserPath } from "../utils.js";
 import { buildPluginApi } from "./api-builder.js";
 import { inspectBundleMcpRuntimeSupport } from "./bundle-mcp.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import { clearPluginCommands } from "./command-registry-state.js";
 import {
   clearCompactionProviders,
@@ -740,6 +741,7 @@ function createPluginRecord(params: {
     cliCommands: [],
     services: [],
     commands: [],
+    commandOptions: [],
     httpRoutes: 0,
     hookCount: 0,
     configSchema: params.configSchema,
@@ -1159,6 +1161,7 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
     if (shouldActivate) {
       clearAgentHarnesses();
       clearPluginCommands();
+      clearPluginCommandOptions();
       clearPluginInteractiveHandlers();
       clearMemoryPluginState();
     }
