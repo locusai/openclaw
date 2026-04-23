@@ -4,19 +4,9 @@ on:
   pull_request:
     branches:
       - integration/ikentic
-      - carry/tests
-      - carry/docs
-      - carry/ops
-      - carry/docker
-      - carry/publish
   push:
     branches:
       - integration/ikentic
-      - carry/tests
-      - carry/docs
-      - carry/ops
-      - carry/docker
-      - carry/publish
 
 jobs:
   governance-gates:
@@ -36,39 +26,38 @@ jobs:
         run: |
           set -euo pipefail
           git fetch origin --prune \
-            +refs/heads/main:refs/remotes/origin/main \
             +refs/heads/integration/ikentic:refs/remotes/origin/integration/ikentic \
-            +refs/heads/carry/*:refs/remotes/origin/carry/* \
-            +refs/heads/pr/*:refs/remotes/origin/pr/* \
-            +refs/heads/feat/*:refs/remotes/origin/feat/*
+            +refs/heads/topic/source-packets/*:refs/remotes/origin/topic/source-packets/*
 
-      - name: Run ancestry + branch audits
+      - name: Run packet-stack audits
         id: audits
         run: |
           set -euo pipefail
           mkdir -p .ikentic/reports
 
-          ancestry_status=0
-          if ! git merge-base --is-ancestor refs/remotes/origin/main refs/remotes/origin/integration/ikentic; then
-            ancestry_status=1
+          packet_status=0
+          latest_packet_ref="$(git for-each-ref --sort=refname --format='%(refname:short)' refs/remotes/origin/topic/source-packets | tail -n 1)"
+          if [[ -z "$latest_packet_ref" ]]; then
+            echo "No topic/source-packets refs found." > .ikentic/reports/packet-stack.txt
+            packet_status=1
+          elif git merge-base --is-ancestor "$latest_packet_ref" refs/remotes/origin/integration/ikentic; then
+            {
+              echo "Integration Ref: refs/remotes/origin/integration/ikentic"
+              echo "Latest Packet Source: ${latest_packet_ref}"
+              echo "PASS ${latest_packet_ref}"
+            } > .ikentic/reports/packet-stack.txt
+          else
+            {
+              echo "Integration Ref: refs/remotes/origin/integration/ikentic"
+              echo "Latest Packet Source: ${latest_packet_ref}"
+              echo "FAIL ${latest_packet_ref}"
+            } > .ikentic/reports/packet-stack.txt
+            packet_status=1
           fi
 
-          set +e
-          bun scripts/ikentic-branch-gap-audit.ts --format json > .ikentic/reports/gap.json
-          gap_status=$?
-          bun scripts/ikentic-branch-inventory.ts --format json > .ikentic/reports/inventory.json
-          inventory_status=$?
-          set -e
+          echo "packet_status=${packet_status}" | tee .ikentic/reports/governance-status.txt
 
-          {
-            echo "ancestry_status=${ancestry_status}"
-            echo "gap_status=${gap_status}"
-            echo "inventory_status=${inventory_status}"
-          } | tee .ikentic/reports/governance-status.txt
-
-          echo "ancestry_status=${ancestry_status}" >> "$GITHUB_OUTPUT"
-          echo "gap_status=${gap_status}" >> "$GITHUB_OUTPUT"
-          echo "inventory_status=${inventory_status}" >> "$GITHUB_OUTPUT"
+          echo "packet_status=${packet_status}" >> "$GITHUB_OUTPUT"
 
       - name: Upload governance reports
         if: always()
@@ -83,26 +72,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          ancestry='${{ steps.audits.outputs.ancestry_status }}'
-          gap='${{ steps.audits.outputs.gap_status }}'
-          inventory='${{ steps.audits.outputs.inventory_status }}'
+          packet='${{ steps.audits.outputs.packet_status }}'
 
-          if [[ "$ancestry" != "0" ]]; then
-            echo "FAIL: origin/main is not ancestor of origin/integration/ikentic"
+          if [[ "$packet" != "0" ]]; then
+            echo "FAIL: integration/ikentic does not contain the latest source packet ref"
             exit 1
-          fi
-          if [[ "$gap" != "0" ]]; then
-            echo "FAIL: required carry-lane completeness gate failed (gap exit: ${gap})"
-            exit 1
-          fi
-          if [[ "$inventory" == "3" ]]; then
-            echo "FAIL: branch inventory returned config/runtime error (exit 3)"
-            exit 1
-          fi
-
-          # inventory exit 2 is advisory for CI because review-lane commits can be expected.
-          if [[ "$inventory" == "2" ]]; then
-            echo "INFO: inventory found review-lane/missing commits (exit 2). See artifacts."
           fi
 
           echo "PASS: blocking governance gates satisfied"
