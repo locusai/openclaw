@@ -29,6 +29,10 @@ import {
 import { resolveUserPath } from "../utils.js";
 import { buildPluginApi } from "./api-builder.js";
 import { normalizeRegisteredChannelPlugin } from "./channel-validation.js";
+import {
+  registerPluginCommandOption,
+  validatePluginCommandOptionDefinition,
+} from "./command-options.js";
 import { registerPluginCommand, validatePluginCommandDefinition } from "./command-registration.js";
 import { clearPluginCommandsForPlugin } from "./command-registry-state.js";
 import {
@@ -133,6 +137,7 @@ export type {
   PluginChannelSetupRegistration,
   PluginCliBackendRegistration,
   PluginCliRegistration,
+  PluginCommandOptionRegistration,
   PluginCommandRegistration,
   PluginConversationBindingResolvedHandlerRegistration,
   PluginHookRegistration,
@@ -1041,6 +1046,33 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
+  const registerCommandOption = (
+    record: PluginRecord,
+    definition: import("./types.js").OpenClawPluginCommandOptionDefinition,
+  ) => {
+    const result = registryParams.activateGlobalSideEffects
+      ? registerPluginCommandOption(record.id, definition)
+      : validatePluginCommandOptionDefinition(definition);
+    if (!result.ok) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `command option registration failed: ${result.error}`,
+      });
+      return;
+    }
+
+    record.commandOptions.push(`${definition.command}:${definition.option}`);
+    registry.commandOptions.push({
+      pluginId: record.id,
+      pluginName: record.name,
+      definition,
+      source: record.source,
+      rootDir: record.rootDir,
+    });
+  };
+
   const registerTypedHook = <K extends PluginHookName>(
     record: PluginRecord,
     hookName: K,
@@ -1227,6 +1259,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
               onConversationBindingResolved: (handler) =>
                 registerConversationBindingResolvedHandler(record, handler),
               registerCommand: (command) => registerCommand(record, command),
+              registerCommandOption: (definition) => registerCommandOption(record, definition),
               registerContextEngine: (id, factory) => {
                 if (id === defaultSlotIdForKey("contextEngine")) {
                   pushDiagnostic({
@@ -1499,6 +1532,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerSecurityAuditCollector,
     registerService,
     registerCommand,
+    registerCommandOption,
     registerHook,
     registerTypedHook,
   };
