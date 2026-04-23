@@ -208,12 +208,12 @@ export function extractToolCards(message: unknown, prefix = "tool"): ToolCard[] 
 
   const hasOutputText = cards.some((card) => Boolean(card.outputText?.trim()));
   if (!hasOutputText) {
-    return cards.filter(
-      (card) =>
-        card.outputText !== undefined ||
-        card.inputText === undefined ||
-        !shouldSuppressToolCardWhenNoOutput(card.name),
-    );
+    return cards.filter((card) => {
+      if (!shouldSuppressToolCardWhenNoOutput(card.name)) {
+        return true;
+      }
+      return Boolean(card.outputText?.trim());
+    });
   }
 
   return cards;
