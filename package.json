@@ -1531,6 +1531,7 @@
     "@mariozechner/pi-tui": "0.67.68",
     "@modelcontextprotocol/sdk": "1.29.0",
     "@mozilla/readability": "^0.6.0",
+    "@pierre/theme": "0.0.29",
     "@sinclair/typebox": "0.34.49",
     "acpx": "0.5.3",
     "ajv": "^8.18.0",
