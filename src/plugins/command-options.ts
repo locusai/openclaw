@@ -471,11 +471,16 @@ export async function executePluginCommandOptions(params: {
     namespace: selectedNamespace,
     options: options
       .filter((option) => option.name !== "plugin")
-      .map((option) => ({
-        name: option.name,
-        presentAs: option.presentAs,
-        ...(option.value != null ? { value: option.value } : undefined),
-      })),
+      .map((option) => {
+        const invocationOption: PluginCommandOptionInvocation["options"][number] = {
+          name: option.name,
+          presentAs: option.presentAs,
+        };
+        if (option.value != null) {
+          invocationOption.value = option.value;
+        }
+        return invocationOption;
+      }),
     positionals: positionals
       .filter((positional) => !consumedTokenIndexes.has(positional.tokenIndex))
       .map((positional) => positional.value),
