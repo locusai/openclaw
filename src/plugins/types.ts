@@ -305,6 +305,59 @@ export type OpenClawPluginCommandDefinition = {
   handler: PluginCommandHandler;
 };
 
+export type PluginCommandOptionInvocation = {
+  commandName: string;
+  commandBody: string;
+  namespace?: string;
+  options: Array<{
+    name: string;
+    presentAs: string;
+    value?: string;
+  }>;
+  positionals: string[];
+};
+
+export type PluginCommandOptionContext = PluginCommandContext & {
+  sessionKey?: string;
+  sessionId?: string;
+  invocation: PluginCommandOptionInvocation;
+  option: {
+    name: string;
+    presentAs: string;
+    value?: string;
+  };
+};
+
+export type PluginCommandOptionHandlerResult =
+  | { action: "continue" }
+  | { action: "reply"; reply: ReplyPayload }
+  | { action: "silent" };
+
+export type PluginCommandOptionHandler = (
+  ctx: PluginCommandOptionContext,
+) => PluginCommandOptionHandlerResult | void | Promise<PluginCommandOptionHandlerResult | void>;
+
+export type OpenClawPluginCommandOptionDefinition = {
+  /** Base command without a leading slash (e.g. "new"). */
+  command: string;
+  /** Option name without leading dashes (e.g. "print"). */
+  option: string;
+  /** Additional option aliases without leading dashes. */
+  aliases?: string[];
+  /** Whether this option expects a value from `--option=value` or `--option value`. */
+  takesValue?: boolean;
+  /** Optional namespace selector for command options. */
+  namespace?: string;
+  /** Optional aliases for the namespace selector. */
+  namespaceAliases?: string[];
+  /** Whether the matched option should be removed from the core command body. */
+  consume?: boolean;
+  /** Whether authorization is required for this option. */
+  requireAuth?: boolean;
+  description?: string;
+  handler: PluginCommandOptionHandler;
+};
+
 export type OpenClawPluginHttpRouteAuth = "gateway" | "plugin";
 export type OpenClawPluginHttpRouteMatch = "exact" | "prefix";
 
@@ -394,6 +447,7 @@ export type OpenClawPluginApi = {
    * Use this for simple state-toggling or status commands that don't need AI reasoning.
    */
   registerCommand: (command: OpenClawPluginCommandDefinition) => void;
+  registerCommandOption: (definition: OpenClawPluginCommandOptionDefinition) => void;
   /** Register a context engine implementation (exclusive slot — only one active at a time). */
   registerContextEngine: (
     id: string,
