@@ -54,12 +54,6 @@ const forbiddenPrefixes = [
   "dist/plugin-sdk/.tsbuildinfo",
   "docs/.generated/",
 ];
-// 2026.3.12 ballooned to ~213.6 MiB unpacked and correlated with low-memory
-// startup/doctor OOM reports. 2026.4.12 intentionally stages Matrix runtime
-// dependencies, including crypto wasm, so packaged installs do not miss Docker
-// and gateway runtime dependencies. Keep the budget below the 2026.3.12 bloat
-// level while allowing that mirrored runtime surface.
-const npmPackUnpackedSizeBudgetBytes = 202 * 1024 * 1024;
 const controlUiAssetPrefix = "dist/control-ui/assets/";
 const appcastPath = resolve("appcast.xml");
 const laneBuildMin = 1_000_000_000;
