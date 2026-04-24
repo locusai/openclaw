@@ -3,6 +3,7 @@ import {
   collectAppcastSparkleVersionErrors,
   collectBundledExtensionManifestErrors,
   collectBundledExtensionRootDependencyGapErrors,
+  collectControlUiAssetPayloadErrors,
   collectForbiddenPackPaths,
 } from "../scripts/release-check.ts";
 
@@ -161,5 +162,22 @@ describe("collectForbiddenPackPaths", () => {
         "node_modules/.bin/openclaw",
       ]),
     ).toEqual(["extensions/tlon/node_modules/.bin/tlon", "node_modules/.bin/openclaw"]);
+  });
+});
+
+describe("collectControlUiAssetPayloadErrors", () => {
+  it("rejects packs that ship the dashboard HTML without the asset payload", () => {
+    expect(collectControlUiAssetPayloadErrors(["dist/control-ui/index.html"])).toEqual([
+      "missing Control UI asset payload under dist/control-ui/assets/",
+    ]);
+  });
+
+  it("accepts packs that ship dashboard assets", () => {
+    expect(
+      collectControlUiAssetPayloadErrors([
+        "dist/control-ui/index.html",
+        "dist/control-ui/assets/index-Bu8rSoJV.js",
+      ]),
+    ).toEqual([]);
   });
 });
