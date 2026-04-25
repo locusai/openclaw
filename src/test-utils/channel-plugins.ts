@@ -51,6 +51,7 @@ export const createTestRegistry = (channels: TestChannelRegistration[] = []): Pl
   services: [],
   gatewayDiscoveryServices: [],
   commands: [],
+  commandOptions: [],
   conversationBindingResolvedHandlers: [],
   diagnostics: [],
 });
