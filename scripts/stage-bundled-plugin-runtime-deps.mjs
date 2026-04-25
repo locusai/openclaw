@@ -624,6 +624,24 @@ function pruneStagedRuntimeDependencyCargo(nodeModulesDir, pruneConfig) {
   for (const depName of listInstalledDependencyNames(nodeModulesDir)) {
     pruneStagedInstalledDependencyCargo(nodeModulesDir, depName, pruneConfig);
   }
+  pruneStagedRuntimeDependencyBinDirs(nodeModulesDir);
+}
+
+function pruneStagedRuntimeDependencyBinDirs(nodeModulesDir) {
+  if (!fs.existsSync(nodeModulesDir)) {
+    return;
+  }
+
+  for (const dirent of fs.readdirSync(nodeModulesDir, { withFileTypes: true })) {
+    const candidate = path.join(nodeModulesDir, dirent.name);
+    if (dirent.name === ".bin") {
+      removePathIfExists(candidate);
+      continue;
+    }
+    if (dirent.isDirectory()) {
+      pruneStagedRuntimeDependencyBinDirs(candidate);
+    }
+  }
 }
 
 function listBundledPluginRuntimeDirs(repoRoot) {
