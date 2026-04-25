@@ -194,6 +194,48 @@ requires `NPM_TOKEN`, while the public repo keeps OIDC-only publish.
 That keeps the direct publish path and the beta-first promotion path both
 documented and operator-visible.
 
+## Maintained fork package carry
+
+For the `locusai/openclaw` maintained fork, `origin` is the fork and `upstream`
+is `openclaw/openclaw`. New package versions start from refreshed upstream
+stable tags, not from fork-local tag guesses.
+
+Carry maintenance has separate source and output surfaces:
+
+- maintained packet branches own reusable fork changes
+- merge-only assembly refs combine packet branches in order
+- version branches, release-tail refs, tags, packages, and images are stamped
+  outputs
+
+Do not author shared carry directly on `version/openclaw-*` branches or
+release-tail refs. If an upstream delta requires a fork adaptation, put that
+adaptation on the affected packet branch, rebuild the assembly/version branch
+from packet truth, then tag and publish from the rebuilt output.
+
+Before pushing a carried package branch or tag, run the local release gates
+from the repo root:
+
+```bash
+direnv exec . pnpm install --frozen-lockfile
+direnv exec . pnpm build
+direnv exec . pnpm ui:build
+direnv exec . pnpm release:check
+```
+
+Run any narrower packet-specific gates first, but these package gates must pass
+before pushing a release branch for publish. `release:check` must prove that
+the packed npm payload includes the built Control UI assets and other generated
+release artifacts. Missing `dist/control-ui/index.html` or an empty
+`dist/control-ui/assets/` payload is a release blocker.
+
+Use annotated tags for published fork package builds. After GitHub Actions
+publishes, verify package visibility through the workspace npm auth path before
+declaring the version complete.
+
+Do not change runtime dependencies just to satisfy a replay or local image
+build. Dependency changes belong only to upstream changes or to an explicit
+accepted carry packet that owns that dependency.
+
 ## Public references
 
 - [`.github/workflows/openclaw-npm-release.yml`](https://github.com/openclaw/openclaw/blob/main/.github/workflows/openclaw-npm-release.yml)
