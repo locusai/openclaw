@@ -2553,6 +2553,14 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     debug: logger.debug,
   });
 
+  const resolvePluginLogger = (record: PluginRecord): PluginLogger => {
+    const base = registryParams.logger as PluginLogger & {
+      child?: (name: string) => PluginLogger;
+    };
+    const childLogger = typeof base.child === "function" ? base.child(record.id) : base;
+    return normalizeLogger(childLogger);
+  };
+
   const pluginRuntimeById = new Map<string, PluginRuntime>();
   const pluginRuntimeRecordById = new Map<string, PluginRecord>();
 
@@ -2706,7 +2714,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
       config: params.config,
       pluginConfig: params.pluginConfig,
       runtime: resolvePluginRuntime(record.id),
-      logger: normalizeLogger(registryParams.logger),
+      logger: resolvePluginLogger(record),
       resolvePath: (input: string) => resolvePluginPath(input, record.rootDir),
       handlers: {
         ...(registrationCapabilities.capabilityHandlers
