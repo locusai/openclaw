@@ -35,6 +35,7 @@ function createStubPluginRegistry(): PluginRegistry {
     services: [],
     gatewayDiscoveryServices: [],
     commands: [],
+    commandOptions: [],
     sessionExtensions: [],
     trustedToolPolicies: [],
     toolMetadata: [],
