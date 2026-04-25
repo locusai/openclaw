@@ -577,4 +577,45 @@ describe("tool-cards", () => {
     expect(container.querySelector(".chat-tool-msg-summary--error")).toBeNull();
     expect(container.querySelector(".chat-tool-card__status-badge")).toBeNull();
   });
+  it("suppresses call and empty result cards for suppressWhenNoOutput tools when no result text exists", () => {
+    const message = {
+      content: [
+        { type: "tool_call", name: "ikentic_locus_check_task", arguments: { taskId: "task-1" } },
+        { type: "tool_result", name: "ikentic_locus_check_task", content: "" },
+      ],
+    };
+
+    expect(extractToolCards(message)).toEqual([]);
+  });
+
+  it("keeps cards for non-suppressed tools when no result text exists", () => {
+    const message = {
+      content: [
+        { type: "tool_call", name: "search", arguments: {} },
+        { type: "tool_result", name: "search", content: "" },
+      ],
+    };
+
+    expect(extractToolCards(message)).toEqual([
+      expect.objectContaining({
+        name: "search",
+        outputText: "",
+      }),
+    ]);
+  });
+
+  it("does not suppress when any result has text", () => {
+    const message = {
+      content: [
+        { type: "tool_call", name: "ikentic_locus_check_task", arguments: {} },
+        { type: "tool_result", name: "search", content: "ok" },
+      ],
+    };
+
+    const cards = extractToolCards(message);
+
+    expect(
+      cards.some((card) => card.name === "ikentic_locus_check_task" && card.inputText != null),
+    ).toBe(true);
+  });
 });
