@@ -3,6 +3,7 @@ import { initSubagentRegistry } from "../agents/subagent-registry.js";
 import { runChannelPluginStartupMaintenance } from "../channels/plugins/lifecycle-startup.js";
 import { applyPluginAutoEnable } from "../config/plugin-auto-enable.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
+import { clearInternalHooks } from "../hooks/internal-hooks.js";
 import {
   resolveConfiguredDeferredChannelPluginIds,
   resolveGatewayStartupPluginIds,
@@ -89,6 +90,8 @@ export async function prepareGatewayPluginBootstrap(params: {
   let baseGatewayMethods = baseMethods;
 
   if (!params.minimalTestGateway) {
+    // Reset before plugin registration; sidecar hook discovery must stay additive.
+    clearInternalHooks();
     ({ pluginRegistry, gatewayMethods: baseGatewayMethods } = loadGatewayStartupPlugins({
       cfg: gatewayPluginConfigAtStart,
       activationSourceConfig: params.cfgAtStart,
