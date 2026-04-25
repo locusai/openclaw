@@ -10,6 +10,7 @@ function fakeApi(overrides: Partial<OpenClawPluginApi> = {}): OpenClawPluginApi 
     name: "lobster",
     source: "test",
     runtime: { version: "test" } as any,
+    registerCommandOption() {},
     resolvePath: (p) => p,
     ...overrides,
   });
