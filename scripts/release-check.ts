@@ -90,6 +90,7 @@ const forbiddenPrivateQaContentMarkers = [
   "qa-lab/runtime-api.js",
 ] as const;
 const forbiddenPrivateQaContentScanPrefixes = ["dist/"] as const;
+const controlUiAssetPrefix = "dist/control-ui/assets/";
 const appcastPath = resolve("appcast.xml");
 const laneBuildMin = 1_000_000_000;
 const laneFloorAdoptionDateKey = 20260227;
@@ -749,6 +750,12 @@ async function checkPluginSdkExports() {
   }
 }
 
+export function collectControlUiAssetPayloadErrors(paths: Iterable<string>): string[] {
+  return [...paths].some((path) => path.startsWith(controlUiAssetPrefix))
+    ? []
+    : [`missing Control UI asset payload under ${controlUiAssetPrefix}`];
+}
+
 async function main() {
   checkAppcastSparkleVersions();
   await checkPluginSdkExports();
@@ -770,12 +777,14 @@ async function main() {
   const forbidden = collectForbiddenPackPaths(paths);
   const forbiddenContent = collectForbiddenPackContentPaths(paths);
   const sizeErrors = collectNpmPackUnpackedSizeErrors(results);
+  const controlUiAssetErrors = collectControlUiAssetPayloadErrors(paths);
 
   if (
     missing.length > 0 ||
     forbidden.length > 0 ||
     forbiddenContent.length > 0 ||
-    sizeErrors.length > 0
+    sizeErrors.length > 0 ||
+    controlUiAssetErrors.length > 0
   ) {
     if (missing.length > 0) {
       console.error("release-check: missing files in npm pack:");
@@ -794,6 +803,15 @@ async function main() {
           "release-check: build artifacts are missing. Run `pnpm build` before `pnpm release:check`.",
         );
       }
+    }
+    if (controlUiAssetErrors.length > 0) {
+      console.error("release-check: missing Control UI asset payload in npm pack:");
+      for (const error of controlUiAssetErrors) {
+        console.error(`  - ${error}`);
+      }
+      console.error(
+        "release-check: Control UI release artifacts are incomplete. Run `pnpm build && pnpm ui:build` before `pnpm release:check`.",
+      );
     }
     if (forbidden.length > 0) {
       console.error("release-check: forbidden files in npm pack:");
