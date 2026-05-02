@@ -50,10 +50,10 @@ import { normalizeRegisteredChannelPlugin } from "./channel-validation.js";
 import { CODEX_APP_SERVER_EXTENSION_RUNTIME_ID } from "./codex-app-server-extension-factory.js";
 import type { CodexAppServerExtensionFactory } from "./codex-app-server-extension-types.js";
 import {
-import {
   registerPluginCommandOption,
   validatePluginCommandOptionDefinition,
 } from "./command-options.js";
+import {
   isReservedCommandName,
   registerPluginCommand,
   validatePluginCommandDefinition,
