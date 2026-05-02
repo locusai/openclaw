@@ -54,10 +54,10 @@ import { CODEX_APP_SERVER_EXTENSION_RUNTIME_ID } from "./codex-app-server-extens
 import { getPluginCompatRecord } from "./compat/registry.js";
 import type { CodexAppServerExtensionFactory } from "./codex-app-server-extension-types.js";
 import {
-import {
   registerPluginCommandOption,
   validatePluginCommandOptionDefinition,
 } from "./command-options.js";
+import {
   isReservedCommandName,
   registerPluginCommand,
   validatePluginCommandDefinition,
