@@ -69,12 +69,12 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.3.6)
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
       '@napi-rs/canvas':
         specifier: ^0.1.89
         version: 0.1.92
+      '@pierre/theme':
+        specifier: 0.0.29
+        version: 0.0.29
       '@vincentkoc/qrcode-tui':
         specifier: 0.2.1
         version: 0.2.1
