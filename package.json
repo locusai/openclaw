@@ -1668,7 +1668,7 @@
     "@mariozechner/pi-coding-agent": "0.71.1",
     "@mariozechner/pi-tui": "0.71.1",
     "@modelcontextprotocol/sdk": "1.29.0",
-    "@mozilla/readability": "^0.6.0",
+    "@pierre/theme": "0.0.29",
     "@slack/bolt": "^4.7.2",
     "@slack/types": "^2.20.1",
     "@slack/web-api": "^7.15.1",
