@@ -32,6 +32,7 @@ function createStubPluginRegistry(): PluginRegistry {
     cliRegistrars: [],
     services: [],
     commands: [],
+    commandOptions: [],
     conversationBindingResolvedHandlers: [],
     diagnostics: [],
   };
