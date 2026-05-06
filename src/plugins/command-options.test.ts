@@ -4,6 +4,7 @@ import {
   clearPluginCommandOptions,
   executePluginCommandOptions,
   registerPluginCommandOption,
+  stripPluginCommandOptionsFromBody,
 } from "./command-options.js";
 
 const cfg = {} as OpenClawConfig;
@@ -50,6 +51,62 @@ describe("plugin command options", () => {
     expect(result.matched).toBe(true);
     expect(result.shouldStop).toBe(false);
     expect(result.commandBody).toBe("/new keep-going");
+  });
+
+  it("runs command options only in their registered phase", async () => {
+    const calls: string[] = [];
+    expect(
+      registerPluginCommandOption("test-plugin", {
+        command: "new",
+        option: "persona",
+        phase: "after-core",
+        takesValue: true,
+        handler: async (ctx) => {
+          calls.push(`${ctx.invocation.phase}:${ctx.option.value}`);
+          return { action: "continue" };
+        },
+      }).ok,
+    ).toBe(true);
+
+    const before = await executePluginCommandOptions({
+      commandBody: "/new --persona finance",
+      phase: "before-core",
+      channel: "whatsapp",
+      isAuthorizedSender: true,
+      config: cfg,
+    });
+    expect(before.matched).toBe(false);
+    expect(before.commandBody).toBe("/new --persona finance");
+    expect(calls).toEqual([]);
+
+    const after = await executePluginCommandOptions({
+      commandBody: "/new --persona finance",
+      phase: "after-core",
+      channel: "whatsapp",
+      isAuthorizedSender: true,
+      config: cfg,
+    });
+    expect(after.matched).toBe(true);
+    expect(after.commandBody).toBe("/new");
+    expect(calls).toEqual(["after-core:finance"]);
+  });
+
+  it("strips consumed options before core handling even when handler phase is after-core", () => {
+    expect(
+      registerPluginCommandOption("test-plugin", {
+        command: "new",
+        option: "persona",
+        phase: "after-core",
+        takesValue: true,
+        handler: async () => ({ action: "continue" }),
+      }).ok,
+    ).toBe(true);
+
+    const result = stripPluginCommandOptionsFromBody({
+      commandBody: "/new --persona finance continue this",
+    });
+    expect(result.matched).toBe(true);
+    expect(result.commandBody).toBe("/new continue this");
   });
 
   it("supports namespace selection with positional prefix", async () => {
