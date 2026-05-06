@@ -362,14 +362,14 @@ async function dispatchSlashCommand(
       await handleAbortChat(host);
       return;
     case "new":
-      await sendChatMessageNow(host, "/new", {
+      await sendChatMessageNow(host, args ? `/new ${args}` : "/new", {
         refreshSessions: true,
         previousDraft: sendOpts?.previousDraft,
         restoreDraft: sendOpts?.restoreDraft,
       });
       return;
     case "reset":
-      await sendChatMessageNow(host, "/reset", {
+      await sendChatMessageNow(host, args ? `/reset ${args}` : "/reset", {
         refreshSessions: true,
         previousDraft: sendOpts?.previousDraft,
         restoreDraft: sendOpts?.restoreDraft,
