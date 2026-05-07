@@ -102,7 +102,56 @@ describe("IKE carry web chat command options", () => {
     expect(host.chatMessage).toBe("");
   });
 
-  it("queues reset command args while the active run is busy", async () => {
+  it("routes bare /new through the fresh-session action", async () => {
+    const onSlashAction = vi.fn();
+    const request = vi.fn(async (method: string) => {
+      throw new Error(`Unexpected request: ${method}`);
+    });
+    const host = makeHost({
+      client: { request } as unknown as ChatHost["client"],
+      chatMessage: "/new",
+      onSlashAction,
+    });
+
+    await handleSendChat(host);
+
+    expect(onSlashAction).toHaveBeenCalledWith("new-session");
+    expect(request).not.toHaveBeenCalled();
+    expect(host.chatMessage).toBe("");
+  });
+
+  it("keeps bare /reset on the command pipeline", async () => {
+    const onSlashAction = vi.fn();
+    const request = vi.fn(async (method: string) => {
+      if (method === "chat.send") {
+        return { status: "started", runId: "run-reset" };
+      }
+      throw new Error(`Unexpected request: ${method}`);
+    });
+    const host = makeHost({
+      client: { request } as unknown as ChatHost["client"],
+      chatMessage: "/reset",
+      onSlashAction,
+    });
+
+    await handleSendChat(host);
+
+    expect(onSlashAction).not.toHaveBeenCalled();
+    expect(request).toHaveBeenCalledWith(
+      "chat.send",
+      expect.objectContaining({
+        sessionKey: "agent:main",
+        message: "/reset",
+        deliver: false,
+        idempotencyKey: expect.any(String),
+      }),
+    );
+    const sentParams = request.mock.calls[0]?.[1] as { idempotencyKey?: string } | undefined;
+    expect(host.refreshSessionsAfterChat).toContain(sentParams?.idempotencyKey);
+    expect(host.chatMessage).toBe("");
+  });
+
+  it("queues /new command args while the active run is busy", async () => {
     const host = makeHost({
       chatRunId: "run-1",
       chatStream: "Working...",
