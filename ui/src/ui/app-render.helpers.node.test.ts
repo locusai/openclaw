@@ -556,9 +556,9 @@ describe("resolveSessionOptionGroups", () => {
 });
 
 describe("createChatSession", () => {
-  it("creates a dashboard session, switches to it, and preserves the current composer", async () => {
+  it("creates a webchat session, switches to it, and preserves the current composer", async () => {
     const state = createChatSessionState();
-    createSessionAndRefreshMock.mockResolvedValue("agent:ops:dashboard:new-chat");
+    createSessionAndRefreshMock.mockResolvedValue("agent:ops:webchat:new-chat");
     refreshChatAvatarMock.mockResolvedValue(undefined);
     refreshSlashCommandsMock.mockResolvedValue(undefined);
     loadChatHistoryMock.mockResolvedValue(undefined);
@@ -579,8 +579,8 @@ describe("createChatSession", () => {
         includeUnknown: true,
       },
     );
-    expect(state.sessionKey).toBe("agent:ops:dashboard:new-chat");
-    expect(state.settings.sessionKey).toBe("agent:ops:dashboard:new-chat");
+    expect(state.sessionKey).toBe("agent:ops:webchat:new-chat");
+    expect(state.settings.sessionKey).toBe("agent:ops:webchat:new-chat");
     expect(state.chatMessage).toBe("draft prompt");
     expect(state.chatAttachments).toEqual([
       { id: "att-1", mimeType: "image/png", dataUrl: "data:image/png;base64,AAA" },
