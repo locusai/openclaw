@@ -17,7 +17,7 @@ import { ChatState, loadChatHistory } from "./controllers/chat.ts";
 import { loadSessions } from "./controllers/sessions.ts";
 import { icons } from "./icons.ts";
 import { iconForTab, pathForTab, titleForTab, type Tab } from "./navigation.ts";
-import { parseAgentSessionKey } from "./session-key.ts";
+import { parseAgentSessionKey, resolveAgentIdFromSessionKey } from "./session-key.ts";
 import { normalizeOptionalString } from "./string-coerce.ts";
 import type { ThemeMode } from "./theme.ts";
 import type { SessionsListResult } from "./types.ts";
@@ -521,6 +521,40 @@ export function switchChatSession(state: AppViewState, nextSessionKey: string) {
   );
   void loadChatHistory(state as unknown as ChatState);
   void refreshSessionOptions(state);
+}
+
+export async function createChatSession(state: AppViewState) {
+  if (!state.client || !state.connected || state.sessionsLoading) {
+    return;
+  }
+
+  state.lastError = null;
+  const previousSessionKey = state.sessionKey;
+  const parentSessionKey = state.sessionsResult?.sessions.some(
+    (row) => row.key === previousSessionKey,
+  )
+    ? previousSessionKey
+    : undefined;
+
+  try {
+    const result = await state.client.request<{ key?: string }>("sessions.create", {
+      agentId: resolveAgentIdFromSessionKey(previousSessionKey),
+      parentSessionKey,
+    });
+    const nextSessionKey = typeof result?.key === "string" ? result.key.trim() : "";
+    if (!nextSessionKey) {
+      state.lastError = "Failed to create new chat session.";
+      return;
+    }
+
+    const preservedDraft = state.chatMessage;
+    const preservedAttachments = state.chatAttachments;
+    switchChatSession(state, nextSessionKey);
+    state.chatMessage = preservedDraft;
+    state.chatAttachments = preservedAttachments;
+  } catch (err) {
+    state.lastError = String(err);
+  }
 }
 
 async function refreshSessionOptions(state: AppViewState) {

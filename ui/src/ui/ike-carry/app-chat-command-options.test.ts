@@ -28,17 +28,11 @@ async function loadChatHelpers(): Promise<void> {
 function makeHost(overrides?: Partial<ChatHarnessHost>): ChatHarnessHost {
   return {
     client: null,
-    chatLoading: false,
     chatMessages: [],
     chatStream: null,
     chatStreamSegments: [],
     connected: true,
     chatMessage: "",
-    chatLocalInputHistoryBySession: {},
-    chatInputHistorySessionKey: null,
-    chatInputHistoryItems: null,
-    chatInputHistoryIndex: -1,
-    chatDraftBeforeHistory: null,
     chatAttachments: [],
     chatQueue: [],
     chatRunId: null,
@@ -48,9 +42,6 @@ function makeHost(overrides?: Partial<ChatHarnessHost>): ChatHarnessHost {
     basePath: "",
     hello: null,
     chatAvatarUrl: null,
-    chatAvatarSource: null,
-    chatAvatarStatus: null,
-    chatAvatarReason: null,
     chatSideResult: null,
     chatSideResultTerminalRuns: new Set<string>(),
     chatToolMessages: [],
@@ -75,7 +66,8 @@ describe("IKE carry web chat command options", () => {
     { command: "/new --persona finance", expectedMessage: "/new --persona finance" },
     { command: "/reset --persona finance", expectedMessage: "/reset --persona finance" },
   ])("preserves reset command args for $command", async ({ command, expectedMessage }) => {
-    const request = vi.fn(async (method: string) => {
+    const request = vi.fn(async (...args: unknown[]) => {
+      const method = String(args[0]);
       if (method === "chat.send") {
         return { status: "started", runId: "run-reset" };
       }
@@ -104,8 +96,8 @@ describe("IKE carry web chat command options", () => {
 
   it("routes bare /new through the fresh-session action", async () => {
     const onSlashAction = vi.fn();
-    const request = vi.fn(async (method: string) => {
-      throw new Error(`Unexpected request: ${method}`);
+    const request = vi.fn(async (...args: unknown[]) => {
+      throw new Error(`Unexpected request: ${String(args[0])}`);
     });
     const host = makeHost({
       client: { request } as unknown as ChatHost["client"],
@@ -122,7 +114,8 @@ describe("IKE carry web chat command options", () => {
 
   it("keeps bare /reset on the command pipeline", async () => {
     const onSlashAction = vi.fn();
-    const request = vi.fn(async (method: string) => {
+    const request = vi.fn(async (...args: unknown[]) => {
+      const method = String(args[0]);
       if (method === "chat.send") {
         return { status: "started", runId: "run-reset" };
       }
