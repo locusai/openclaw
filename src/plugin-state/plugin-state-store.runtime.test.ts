@@ -40,6 +40,7 @@ function createPluginRecord(
     services: [],
     gatewayDiscoveryServiceIds: [],
     commands: [],
+    commandOptions: [],
     httpRoutes: 0,
     hookCount: 0,
     configSchema: false,
