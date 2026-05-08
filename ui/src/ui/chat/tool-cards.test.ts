@@ -3,6 +3,7 @@
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
 import {
+  extractToolCards,
   formatCollapsedToolPreviewText,
   formatCollapsedToolSummaryText,
   isToolErrorOutput,
@@ -34,6 +35,7 @@ vi.mock("../tool-display.ts", () => ({
         ? String((args as { detail: unknown }).detail)
         : undefined,
   }),
+  shouldSuppressToolCardWhenNoOutput: (name?: string) => name === "ikentic_locus_check_task",
 }));
 
 function requireFirstMockArg(

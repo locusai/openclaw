@@ -17,6 +17,7 @@ vi.mock("../tool-display.ts", () => ({
       .join(" "),
     icon: "zap",
   }),
+  shouldSuppressToolCardWhenNoOutput: () => false,
 }));
 
 describe("tool-card extraction", () => {

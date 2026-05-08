@@ -109,6 +109,7 @@ vi.mock("../tool-display.ts", () => ({
         ? String((args as { detail: unknown }).detail)
         : undefined,
   }),
+  shouldSuppressToolCardWhenNoOutput: () => false,
 }));
 
 type RenderMessageGroupOptions = Parameters<typeof renderMessageGroup>[1];

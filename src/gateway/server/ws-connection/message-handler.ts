@@ -164,6 +164,11 @@ import { isUnauthorizedRoleError, UnauthorizedFloodGuard } from "./unauthorized-
 
 type SubsystemLogger = ReturnType<typeof createSubsystemLogger>;
 
+type RuntimePairingRequiredReason = Exclude<
+  ConnectPairingRequiredReason,
+  "device-identity-required"
+>;
+
 const DEVICE_SIGNATURE_SKEW_MS = 2 * 60 * 1000;
 const DEVICE_CREDENTIAL_INVALIDATING_METHODS = new Set([
   "device.pair.remove",
@@ -1118,7 +1123,7 @@ export function attachGatewayWsMessageHandler(params: GatewayWsMessageHandlerPar
             remoteIp: reportedClientIp,
           };
           const requirePairing = async (
-            reason: ConnectPairingRequiredReason,
+            reason: RuntimePairingRequiredReason,
             existingPairedDevice: Awaited<ReturnType<typeof getPairedDevice>> | null = null,
           ) => {
             const pairingStateAllowsRequestedAccess = (
