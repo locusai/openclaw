@@ -12,7 +12,10 @@ import {
   resolveAgentEffectiveModelPrimary,
 } from "../agents/agent-scope.js";
 import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
-import { parseModelRef } from "../agents/model-selection.js";
+import {
+  inferUniqueProviderFromConfiguredModels,
+  parseModelRef,
+} from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { resolveAgentTimeoutMs } from "../agents/timeout.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -21,6 +24,30 @@ import { normalizeLowercaseStringOrEmpty } from "../shared/string-coerce.js";
 
 const log = createSubsystemLogger("llm-slug-generator");
 const DEFAULT_SLUG_GENERATOR_TIMEOUT_MS = 15_000;
+
+function resolveSlugGeneratorModelRef(
+  cfg: OpenClawConfig,
+  agentId: string,
+): {
+  provider: string;
+  model: string;
+} {
+  const modelRef = resolveAgentEffectiveModelPrimary(cfg, agentId);
+  if (!modelRef) {
+    return { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL };
+  }
+  const trimmed = modelRef.trim();
+  if (!trimmed) {
+    return { provider: DEFAULT_PROVIDER, model: DEFAULT_MODEL };
+  }
+  if (!trimmed.includes("/")) {
+    const inferredProvider = inferUniqueProviderFromConfiguredModels({ cfg, model: trimmed });
+    if (inferredProvider) {
+      return { provider: inferredProvider, model: trimmed };
+    }
+  }
+  return parseModelRef(trimmed, DEFAULT_PROVIDER) ?? { provider: DEFAULT_PROVIDER, model: trimmed };
+}
 
 function resolveSlugGeneratorTimeoutMs(cfg: OpenClawConfig): number {
   const configuredTimeoutSeconds = cfg.agents?.defaults?.timeoutSeconds;
@@ -58,10 +85,9 @@ ${params.sessionContent.slice(0, 2000)}
 Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", "bug-fix"`;
 
     // Resolve model from agent config instead of using hardcoded defaults
-    const modelRef = resolveAgentEffectiveModelPrimary(params.cfg, agentId);
-    const parsed = modelRef ? parseModelRef(modelRef, DEFAULT_PROVIDER) : null;
-    const provider = params.provider ?? parsed?.provider ?? DEFAULT_PROVIDER;
-    const model = params.model ?? parsed?.model ?? DEFAULT_MODEL;
+    const resolvedModelRef = resolveSlugGeneratorModelRef(params.cfg, agentId);
+    const provider = params.provider ?? resolvedModelRef.provider;
+    const model = params.model ?? resolvedModelRef.model;
     const timeoutMs = resolveSlugGeneratorTimeoutMs(params.cfg);
 
     const result = await runEmbeddedPiAgent({
