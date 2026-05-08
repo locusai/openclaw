@@ -29,6 +29,7 @@ import {
   handleFirstUpdated,
   handleUpdated,
 } from "./app-lifecycle.ts";
+import { createChatSession as createChatSessionInternal } from "./app-render.helpers.ts";
 import { renderApp } from "./app-render.ts";
 import {
   exportLogs as exportLogsInternal,
@@ -194,7 +195,7 @@ export class OpenClawApp extends LitElement {
   @state() chatManualRefreshInFlight = false;
   @state() navDrawerOpen = false;
 
-  onSlashAction?: (action: string) => void;
+  onSlashAction?: (action: string) => void | Promise<void>;
 
   // Sidebar state for tool output viewing
   @state() sidebarOpen = false;
@@ -542,8 +543,11 @@ export class OpenClawApp extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
-    this.onSlashAction = (action: string) => {
+    this.onSlashAction = async (action: string) => {
       switch (action) {
+        case "new-session":
+          await createChatSessionInternal(this as unknown as AppViewState);
+          break;
         case "toggle-focus":
           this.applySettings({
             ...this.settings,
@@ -554,7 +558,7 @@ export class OpenClawApp extends LitElement {
           exportChatMarkdown(this.chatMessages, this.assistantName);
           break;
         case "refresh-tools-effective": {
-          void refreshVisibleToolsEffectiveForCurrentSessionInternal(this);
+          await refreshVisibleToolsEffectiveForCurrentSessionInternal(this);
           break;
         }
       }
