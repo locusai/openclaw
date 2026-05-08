@@ -102,6 +102,7 @@ vi.mock("../tool-display.ts", () => ({
     label: name,
     icon: "zap",
   }),
+  shouldSuppressToolCardWhenNoOutput: () => false,
 }));
 
 type RenderMessageGroupOptions = Parameters<typeof renderMessageGroup>[1];
