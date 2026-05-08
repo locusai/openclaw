@@ -206,7 +206,7 @@ describe("plugin command options", () => {
         option: "mode",
         phase: "during-core",
         handler: async () => ({ action: "continue" }),
-      } as Parameters<typeof registerPluginCommandOption>[1]).ok,
+      } as unknown as Parameters<typeof registerPluginCommandOption>[1]).ok,
     ).toBe(false);
 
     expect(
