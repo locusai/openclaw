@@ -102,6 +102,7 @@ describe("trajectory metadata", () => {
       cliCommands: [],
       services: [],
       commands: [],
+      commandOptions: [],
       httpRoutes: 0,
       hookCount: 0,
       configSchema: false,

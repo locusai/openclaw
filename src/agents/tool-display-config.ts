@@ -2,6 +2,7 @@ import type { ToolDisplaySpec as ToolDisplaySpecBase } from "./tool-display-comm
 
 export type ToolDisplaySpec = ToolDisplaySpecBase & {
   emoji?: string;
+  suppressWhenNoOutput?: boolean;
 };
 
 export type ToolDisplayConfig = {
@@ -41,6 +42,12 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
       emoji: "🛠️",
       title: "Bash",
       detailKeys: ["command"],
+    },
+    ikentic_locus_check_task: {
+      emoji: "✅",
+      title: "Ike Locus Check Task",
+      detailKeys: ["taskId"],
+      suppressWhenNoOutput: true,
     },
     process: {
       emoji: "🧰",
