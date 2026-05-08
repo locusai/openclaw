@@ -2,7 +2,7 @@
 
 import { render } from "lit";
 import { describe, expect, it, vi } from "vitest";
-import { renderToolCard } from "./tool-cards.ts";
+import { extractToolCards, renderToolCard } from "./tool-cards.ts";
 
 vi.mock("../icons.ts", () => ({
   icons: {},
@@ -18,6 +18,7 @@ vi.mock("../tool-display.ts", () => ({
       .join(" "),
     icon: "zap",
   }),
+  shouldSuppressToolCardWhenNoOutput: (name?: string) => name === "ikentic_locus_check_task",
 }));
 
 describe("tool-cards", () => {
