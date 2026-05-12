@@ -2016,6 +2016,7 @@ export type PluginInteractiveHandlerRegistration = PluginInteractiveRegistration
 export type PluginCommandOptionInvocation = {
   commandName: string;
   commandBody: string;
+  phase: PluginCommandOptionPhase;
   namespace?: string;
   options: Array<{
     name: string;
@@ -2036,9 +2037,22 @@ export type PluginCommandOptionContext = PluginCommandContext & {
   };
 };
 
+export type PluginCommandOptionPhase = "before-core" | "after-core";
+
 export type PluginCommandOptionHandlerResult =
+  /**
+   * Continue the built-in command after plugin side effects complete.
+   * When the registration's `consume` flag is true, OpenClaw removes only
+   * the matched option token and value before downstream command handling.
+   */
   | { action: "continue" }
+  /**
+   * Stop built-in command handling and send this reply.
+   */
   | { action: "reply"; reply: ReplyPayload }
+  /**
+   * Stop built-in command handling without sending a reply.
+   */
   | { action: "silent" };
 
 export type PluginCommandOptionHandler = (
@@ -2072,10 +2086,17 @@ export type OpenClawPluginCommandOptionDefinition = {
    */
   namespaceAliases?: string[];
   /**
-   * Whether the matched option should be removed from the core command body when continuing.
+   * Whether the matched option should be removed from the core command body.
+   * Set false when the built-in command must still receive the original option text.
    * Defaults to true.
    */
   consume?: boolean;
+  /**
+   * When the handler runs relative to OpenClaw's built-in command handling.
+   * Consumed options are stripped before built-in commands in both phases.
+   * Defaults to "before-core".
+   */
+  phase?: PluginCommandOptionPhase;
   /**
    * Whether authorization is required for this option (default: true).
    */
