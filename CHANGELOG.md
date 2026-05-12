@@ -2861,6 +2861,7 @@ Docs: https://docs.openclaw.ai
 - Providers/OpenAI: honor the private-network SSRF opt-in for OpenAI-compatible image generation endpoints, so trusted LocalAI/LAN `image_generate` routes work without disabling SSRF checks globally. Fixes #62879. Thanks @seitzbg.
 - Providers/OpenAI: stop advertising the removed `gpt-5.3-codex-spark` Codex model through fallback catalogs, and suppress stale rows with a GPT-5.5 recovery hint.
 - Control UI/chat: persist assistant-generated images as authenticated managed media and accept paired-device tokens for assistant media fetches, so webchat history reloads keep showing generated images. (#70719, #70741) Thanks @Patrick-Erichsen.
+- Control UI/webchat: route bare `/new` through fresh-session creation and keep bare `/reset` on the command pipeline, so `/new` starts a new local session instead of sending the text to the model. Fixes #214.
 - Control UI/chat: queue Stop-button aborts across Gateway reconnects so a disconnected active run is canceled on reconnect instead of only clearing local UI state. (#70673) Thanks @chinar-amrutkar.
 - Memory/QMD: recreate stale managed QMD collections when startup repair finds the collection name already exists, so root memory narrows back to `MEMORY.md` instead of staying on broad workspace markdown indexing.
 - Agents/OpenAI: surface selected-model capacity failures from PI, Codex, and auto-reply harness paths with a model-switch hint instead of the generic empty-response error. Thanks @vincentkoc.
