@@ -36,6 +36,7 @@ export const ConnectPairingRequiredReasons = {
   NOT_PAIRED: "not-paired",
   ROLE_UPGRADE: "role-upgrade",
   SCOPE_UPGRADE: "scope-upgrade",
+  DEVICE_IDENTITY_REQUIRED: "device-identity-required",
   METADATA_UPGRADE: "metadata-upgrade",
 } as const;
 
@@ -71,6 +72,39 @@ export type ConnectPairingRequiredDetails = Pick<
   "reason" | "requestId"
 >;
 
+export type GatewayConnectSnapshot = {
+  accessState?: unknown;
+  deviceId?: string | null;
+  connection?: {
+    requestedScopes?: readonly string[];
+  };
+};
+
+export type GatewayConnectFailureInput = {
+  error: unknown;
+  details?: unknown;
+  message?: string;
+  snapshot?: GatewayConnectSnapshot;
+};
+
+export type GatewayConnectFailure =
+  | { kind: "token"; code: ConnectErrorDetailCode; message?: string }
+  | {
+      kind: "origin";
+      code: typeof ConnectErrorDetailCodes.CONTROL_UI_ORIGIN_NOT_ALLOWED;
+      message?: string;
+    }
+  | {
+      kind: "pairing";
+      code: typeof ConnectErrorDetailCodes.PAIRING_REQUIRED;
+      reason?: ConnectPairingRequiredReason;
+      requestId?: string;
+      deviceId?: string;
+      message?: string;
+    }
+  | { kind: "unavailable"; message?: string; error: unknown }
+  | { kind: "unknown"; code?: string; message?: string; error: unknown };
+
 const CONNECT_RECOVERY_NEXT_STEP_VALUES: ReadonlySet<ConnectRecoveryNextStep> = new Set([
   "retry_with_device_token",
   "update_auth_configuration",
@@ -83,8 +117,49 @@ const CONNECT_PAIRING_REQUIRED_REASON_VALUES: ReadonlySet<ConnectPairingRequired
   "not-paired",
   "role-upgrade",
   "scope-upgrade",
+  "device-identity-required",
   "metadata-upgrade",
 ]);
+
+const CONNECT_ERROR_DETAIL_CODE_VALUES: ReadonlySet<ConnectErrorDetailCode> = new Set(
+  Object.values(ConnectErrorDetailCodes),
+);
+
+const CONNECT_TOKEN_DETAIL_CODES: ReadonlySet<ConnectErrorDetailCode> = new Set([
+  ConnectErrorDetailCodes.AUTH_REQUIRED,
+  ConnectErrorDetailCodes.AUTH_UNAUTHORIZED,
+  ConnectErrorDetailCodes.AUTH_TOKEN_MISSING,
+  ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH,
+  ConnectErrorDetailCodes.AUTH_TOKEN_NOT_CONFIGURED,
+  ConnectErrorDetailCodes.AUTH_BOOTSTRAP_TOKEN_INVALID,
+]);
+
+const CONNECT_UNAVAILABLE_ERROR_CODES = new Set([
+  "ECONNREFUSED",
+  "ECONNRESET",
+  "ETIMEDOUT",
+  "EHOSTUNREACH",
+  "ENETUNREACH",
+  "ENOTFOUND",
+  "EAI_AGAIN",
+  "UNAVAILABLE",
+]);
+
+const CONNECT_UNAVAILABLE_MESSAGE_PATTERNS = [
+  /\bECONNREFUSED\b/iu,
+  /\bECONNRESET\b/iu,
+  /\bETIMEDOUT\b/iu,
+  /\bEHOSTUNREACH\b/iu,
+  /\bENETUNREACH\b/iu,
+  /\bENOTFOUND\b/iu,
+  /\bEAI_AGAIN\b/iu,
+  /\bsocket hang up\b/iu,
+  /\bwebsocket closed\b/iu,
+  /\bwebsocket stream ended\b/iu,
+  /\bunexpected server response\b/iu,
+  /\bconnect failed\b/iu,
+  /\bfailed to connect\b/iu,
+];
 const PAIRING_CONNECT_REQUEST_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 
 const PAIRING_CONNECT_REASON_METADATA: Readonly<
@@ -112,6 +187,11 @@ const PAIRING_CONNECT_REASON_METADATA: Readonly<
     remediationHint: "Review the requested scopes, then approve the pending upgrade.",
     recoveryTitle: "Gateway scope upgrade approval required.",
   },
+  "device-identity-required": {
+    requirement: "device identity is required before this connection can continue",
+    remediationHint: "Approve this device identity from the pending pairing requests.",
+    recoveryTitle: "Gateway device identity approval required.",
+  },
   "metadata-upgrade": {
     requirement: "device identity changed and must be re-approved",
     remediationHint: "Review the refreshed device details, then approve the pending request.",
@@ -125,6 +205,7 @@ const CONNECT_PAIRING_REQUIRED_MESSAGE_BY_REASON: Readonly<
   "not-paired": "device pairing required",
   "role-upgrade": "role upgrade pending approval",
   "scope-upgrade": "scope upgrade pending approval",
+  "device-identity-required": "device identity required",
   "metadata-upgrade": "device metadata change pending approval",
 };
 
@@ -432,4 +513,165 @@ export function formatConnectErrorMessage(params: { message?: string; details?: 
     return formatConnectPairingRequiredMessage(params.details);
   }
   return normalizeOptionalString(params.message) ?? "gateway request failed";
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function readRecordField(value: unknown, field: string): unknown {
+  return isRecord(value) ? value[field] : undefined;
+}
+
+function readConnectFailureMessage(input: GatewayConnectFailureInput): string | undefined {
+  return (
+    normalizeOptionalString(input.message) ??
+    normalizeOptionalString(readRecordField(input.error, "message"))
+  );
+}
+
+function inferConnectErrorDetailCodeFromString(value: string): ConnectErrorDetailCode | undefined {
+  const normalized = normalizeOptionalString(value);
+  if (!normalized) {
+    return undefined;
+  }
+  const upper = normalized.toUpperCase();
+  for (const code of CONNECT_ERROR_DETAIL_CODE_VALUES) {
+    if (upper.includes(code)) {
+      return code;
+    }
+  }
+  const lower = normalized.toLowerCase();
+  if (lower.includes("device token mismatch")) {
+    return ConnectErrorDetailCodes.AUTH_DEVICE_TOKEN_MISMATCH;
+  }
+  if (lower.includes("pairing required") || lower.includes("pairing approval")) {
+    return ConnectErrorDetailCodes.PAIRING_REQUIRED;
+  }
+  if (lower.includes("origin not allowed") || lower.includes("control ui origin")) {
+    return ConnectErrorDetailCodes.CONTROL_UI_ORIGIN_NOT_ALLOWED;
+  }
+  if (lower.includes("bootstrap token invalid")) {
+    return ConnectErrorDetailCodes.AUTH_BOOTSTRAP_TOKEN_INVALID;
+  }
+  if (lower.includes("token not configured") || lower.includes("token missing config")) {
+    return ConnectErrorDetailCodes.AUTH_TOKEN_NOT_CONFIGURED;
+  }
+  if (lower.includes("token missing") || lower.includes("missing token")) {
+    return ConnectErrorDetailCodes.AUTH_TOKEN_MISSING;
+  }
+  if (lower.includes("token mismatch")) {
+    return ConnectErrorDetailCodes.AUTH_TOKEN_MISMATCH;
+  }
+  if (lower.includes("auth required") || lower.includes("authentication required")) {
+    return ConnectErrorDetailCodes.AUTH_REQUIRED;
+  }
+  if (lower.includes("unauthorized")) {
+    return ConnectErrorDetailCodes.AUTH_UNAUTHORIZED;
+  }
+  return undefined;
+}
+
+function readKnownConnectErrorDetailCode(value: unknown): ConnectErrorDetailCode | undefined {
+  const structuredCode = readConnectErrorDetailCode(value);
+  if (
+    structuredCode &&
+    CONNECT_ERROR_DETAIL_CODE_VALUES.has(structuredCode as ConnectErrorDetailCode)
+  ) {
+    return structuredCode as ConnectErrorDetailCode;
+  }
+  return typeof value === "string" ? inferConnectErrorDetailCodeFromString(value) : undefined;
+}
+
+function readConnectFailureDetailSource(input: GatewayConnectFailureInput):
+  | {
+      code: ConnectErrorDetailCode;
+      source: unknown;
+    }
+  | undefined {
+  const sources = [
+    input.details,
+    readRecordField(input.error, "details"),
+    readRecordField(input.error, "detail"),
+    input.snapshot?.accessState,
+    input.message,
+    readRecordField(input.error, "message"),
+  ];
+  for (const source of sources) {
+    const code = readKnownConnectErrorDetailCode(source);
+    if (code) {
+      return { code, source };
+    }
+  }
+  return undefined;
+}
+
+function isKnownUnavailableConnectFailure(input: GatewayConnectFailureInput, message?: string) {
+  const errorCode =
+    normalizeOptionalString(readRecordField(input.error, "code")) ??
+    normalizeOptionalString(readRecordField(input.error, "gatewayCode"));
+  if (errorCode && CONNECT_UNAVAILABLE_ERROR_CODES.has(errorCode.toUpperCase())) {
+    return true;
+  }
+  return message
+    ? CONNECT_UNAVAILABLE_MESSAGE_PATTERNS.some((pattern) => pattern.test(message))
+    : false;
+}
+
+export function classifyGatewayConnectFailure(
+  input: GatewayConnectFailureInput,
+): GatewayConnectFailure {
+  const message = readConnectFailureMessage(input);
+  const detail = readConnectFailureDetailSource(input);
+
+  if (detail && CONNECT_TOKEN_DETAIL_CODES.has(detail.code)) {
+    return {
+      kind: "token",
+      code: detail.code,
+      ...(message ? { message } : {}),
+    };
+  }
+
+  if (detail?.code === ConnectErrorDetailCodes.CONTROL_UI_ORIGIN_NOT_ALLOWED) {
+    return {
+      kind: "origin",
+      code: ConnectErrorDetailCodes.CONTROL_UI_ORIGIN_NOT_ALLOWED,
+      ...(message ? { message } : {}),
+    };
+  }
+
+  if (detail?.code === ConnectErrorDetailCodes.PAIRING_REQUIRED) {
+    const pairingDetails = readPairingConnectErrorDetails(detail.source);
+    const pairingMessageDetails = readConnectPairingRequiredMessage(
+      typeof detail.source === "string" ? detail.source : message,
+    );
+    const deviceId = pairingDetails?.deviceId ?? normalizeOptionalString(input.snapshot?.deviceId);
+    return {
+      kind: "pairing",
+      code: ConnectErrorDetailCodes.PAIRING_REQUIRED,
+      ...((pairingDetails?.reason ?? pairingMessageDetails?.reason)
+        ? { reason: pairingDetails?.reason ?? pairingMessageDetails?.reason }
+        : {}),
+      ...((pairingDetails?.requestId ?? pairingMessageDetails?.requestId)
+        ? { requestId: pairingDetails?.requestId ?? pairingMessageDetails?.requestId }
+        : {}),
+      ...(deviceId ? { deviceId } : {}),
+      ...(message ? { message } : {}),
+    };
+  }
+
+  if (!detail && isKnownUnavailableConnectFailure(input, message)) {
+    return {
+      kind: "unavailable",
+      ...(message ? { message } : {}),
+      error: input.error,
+    };
+  }
+
+  return {
+    kind: "unknown",
+    ...(detail?.code ? { code: detail.code } : {}),
+    ...(message ? { message } : {}),
+    error: input.error,
+  };
 }
