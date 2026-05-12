@@ -9,8 +9,10 @@ import {
   resolveDefaultAgentId,
   resolveAgentWorkspaceDir,
   resolveAgentDir,
+  resolveAgentEffectiveModelPrimary,
 } from "../agents/agent-scope.js";
-import { resolveDefaultModelForAgent } from "../agents/model-selection.js";
+import { DEFAULT_PROVIDER, DEFAULT_MODEL } from "../agents/defaults.js";
+import { parseModelRef } from "../agents/model-selection.js";
 import { runEmbeddedPiAgent } from "../agents/pi-embedded.js";
 import { resolveAgentTimeoutMs } from "../agents/timeout.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
@@ -34,6 +36,8 @@ function resolveSlugGeneratorTimeoutMs(cfg: OpenClawConfig): number {
 export async function generateSlugViaLLM(params: {
   sessionContent: string;
   cfg: OpenClawConfig;
+  provider?: string;
+  model?: string;
 }): Promise<string | null> {
   let tempSessionFile: string | null = null;
 
@@ -53,10 +57,11 @@ ${params.sessionContent.slice(0, 2000)}
 
 Reply with ONLY the slug, nothing else. Examples: "vendor-pitch", "api-design", "bug-fix"`;
 
-    const { provider, model } = resolveDefaultModelForAgent({
-      cfg: params.cfg,
-      agentId,
-    });
+    // Resolve model from agent config instead of using hardcoded defaults
+    const modelRef = resolveAgentEffectiveModelPrimary(params.cfg, agentId);
+    const parsed = modelRef ? parseModelRef(modelRef, DEFAULT_PROVIDER) : null;
+    const provider = params.provider ?? parsed?.provider ?? DEFAULT_PROVIDER;
+    const model = params.model ?? parsed?.model ?? DEFAULT_MODEL;
     const timeoutMs = resolveSlugGeneratorTimeoutMs(params.cfg);
 
     const result = await runEmbeddedPiAgent({
