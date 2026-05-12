@@ -105,6 +105,7 @@ const forbiddenPrivateQaContentMarkers = [
   "qa-lab/runtime-api.js",
 ] as const;
 const forbiddenPrivateQaContentScanPrefixes = ["dist/"] as const;
+const controlUiAssetPrefix = "dist/control-ui/assets/";
 const appcastPath = resolve("appcast.xml");
 const laneBuildMin = 1_000_000_000;
 const laneFloorAdoptionDateKey = 20260227;
@@ -596,6 +597,35 @@ export function collectForbiddenPackContentPaths(
     .toSorted((left, right) => left.localeCompare(right));
 }
 
+export function collectInventoryPackMismatchErrors(
+  paths: Iterable<string>,
+  rootDir = process.cwd(),
+): string[] {
+  const packedPaths = new Set(paths);
+  if (!packedPaths.has(PACKAGE_DIST_INVENTORY_RELATIVE_PATH)) {
+    return [];
+  }
+
+  const inventoryPath = resolve(rootDir, PACKAGE_DIST_INVENTORY_RELATIVE_PATH);
+  let inventory: unknown;
+  try {
+    inventory = JSON.parse(readFileSync(inventoryPath, "utf8")) as unknown;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}: ${message}`];
+  }
+
+  if (!Array.isArray(inventory) || inventory.some((entry) => typeof entry !== "string")) {
+    return [`invalid package dist inventory ${PACKAGE_DIST_INVENTORY_RELATIVE_PATH}`];
+  }
+
+  return inventory
+    .map((entry) => entry.replace(/\\/g, "/"))
+    .filter((entry) => !packedPaths.has(entry))
+    .map((entry) => `inventory references missing npm pack entry ${entry}`)
+    .toSorted((left, right) => left.localeCompare(right));
+}
+
 export { collectPackUnpackedSizeErrors } from "./lib/npm-pack-budget.mjs";
 
 function extractTag(item: string, tag: string): string | null {
@@ -791,6 +821,12 @@ function runCriticalPluginSdkEntrypointImportSmoke() {
   });
 }
 
+export function collectControlUiAssetPayloadErrors(paths: Iterable<string>): string[] {
+  return [...paths].some((path) => path.startsWith(controlUiAssetPrefix))
+    ? []
+    : [`missing Control UI asset payload under ${controlUiAssetPrefix}`];
+}
+
 async function main() {
   checkAppcastSparkleVersions();
   checkCliBootstrapExternalImports({
@@ -825,13 +861,17 @@ async function main() {
     .toSorted((left, right) => left.localeCompare(right));
   const forbidden = collectForbiddenPackPaths(paths);
   const forbiddenContent = collectForbiddenPackContentPaths(paths);
+  const inventoryMismatch = collectInventoryPackMismatchErrors(paths);
   const sizeErrors = collectNpmPackUnpackedSizeErrors(results);
+  const controlUiAssetErrors = collectControlUiAssetPayloadErrors(paths);
 
   if (
     missing.length > 0 ||
     forbidden.length > 0 ||
     forbiddenContent.length > 0 ||
-    sizeErrors.length > 0
+    inventoryMismatch.length > 0 ||
+    sizeErrors.length > 0 ||
+    controlUiAssetErrors.length > 0
   ) {
     if (missing.length > 0) {
       console.error("release-check: missing files in npm pack:");
@@ -843,6 +883,15 @@ async function main() {
         console.error(buildHint);
       }
     }
+    if (controlUiAssetErrors.length > 0) {
+      console.error("release-check: missing Control UI asset payload in npm pack:");
+      for (const error of controlUiAssetErrors) {
+        console.error(`  - ${error}`);
+      }
+      console.error(
+        "release-check: Control UI release artifacts are incomplete. Run `pnpm build && pnpm ui:build` before `pnpm release:check`.",
+      );
+    }
     if (forbidden.length > 0) {
       console.error("release-check: forbidden files in npm pack:");
       for (const path of forbidden) {
@@ -853,6 +902,12 @@ async function main() {
       console.error("release-check: forbidden private QA markers in npm pack:");
       for (const path of forbiddenContent) {
         console.error(`  - ${path}`);
+      }
+    }
+    if (inventoryMismatch.length > 0) {
+      console.error("release-check: package dist inventory does not match npm pack:");
+      for (const error of inventoryMismatch) {
+        console.error(`  - ${error}`);
       }
     }
     if (sizeErrors.length > 0) {

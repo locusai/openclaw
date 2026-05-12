@@ -97,9 +97,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: 1.29.0
         version: 1.29.0(zod@4.4.3)
-      '@mozilla/readability':
-        specifier: ^0.6.0
-        version: 0.6.0
+      '@pierre/theme':
+        specifier: 0.0.29
+        version: 0.0.29
       '@slack/bolt':
         specifier: ^4.7.2
         version: 4.7.2(@types/express@5.0.6)
