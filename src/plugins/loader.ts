@@ -31,6 +31,7 @@ import {
   listRegisteredPluginCommands,
   restorePluginCommands,
 } from "./command-registry-state.js";
+import { clearPluginCommandOptions } from "./command-options.js";
 import {
   clearCompactionProviders,
   listRegisteredCompactionProviders,
@@ -292,6 +293,7 @@ export function clearPluginLoaderCache(): void {
 export function clearActivatedPluginRuntimeState(): void {
   clearAgentHarnesses();
   clearPluginCommands();
+  clearPluginCommandOptions();
   clearCompactionProviders();
   clearDetachedTaskLifecycleRuntimeRegistration();
   clearPluginInteractiveHandlers();

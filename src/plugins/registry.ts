@@ -50,6 +50,10 @@ import { normalizeRegisteredChannelPlugin } from "./channel-validation.js";
 import { CODEX_APP_SERVER_EXTENSION_RUNTIME_ID } from "./codex-app-server-extension-factory.js";
 import type { CodexAppServerExtensionFactory } from "./codex-app-server-extension-types.js";
 import {
+  registerPluginCommandOption,
+  validatePluginCommandOptionDefinition,
+} from "./command-options.js";
+import {
   isReservedCommandName,
   registerPluginCommand,
   validatePluginCommandDefinition,
@@ -192,6 +196,7 @@ export type {
   PluginChannelSetupRegistration,
   PluginCliBackendRegistration,
   PluginCliRegistration,
+  PluginCommandOptionRegistration,
   PluginCommandRegistration,
   PluginConversationBindingResolvedHandlerRegistration,
   PluginHookRegistration,
@@ -1586,6 +1591,32 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     });
   };
 
+  const registerCommandOption = (
+    record: PluginRecord,
+    definition: import("./types.js").OpenClawPluginCommandOptionDefinition,
+  ) => {
+    const result = registryParams.activateGlobalSideEffects
+      ? registerPluginCommandOption(record.id, definition)
+      : validatePluginCommandOptionDefinition(definition);
+    if (!result.ok) {
+      pushDiagnostic({
+        level: "error",
+        pluginId: record.id,
+        source: record.source,
+        message: `command option registration failed: ${result.error}`,
+      });
+      return;
+    }
+
+    record.commandOptions.push(`${definition.command}:${definition.option}`);
+    registry.commandOptions.push({
+      pluginId: record.id,
+      pluginName: record.name,
+      definition,
+      source: record.source,
+      rootDir: record.rootDir,
+    });
+  };
   const normalizeHostHookString = (value: unknown): string =>
     typeof value === "string" ? normalizePluginHostHookId(value) : "";
 
@@ -2321,6 +2352,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
               onConversationBindingResolved: (handler) =>
                 registerConversationBindingResolvedHandler(record, handler),
               registerCommand: (command) => registerCommand(record, command),
+              registerCommandOption: (definition) => registerCommandOption(record, definition),
               registerContextEngine: (id, factory) => {
                 const normalizedId = normalizeOptionalString(id) ?? "";
                 if (!normalizedId) {
@@ -2686,6 +2718,7 @@ export function createPluginRegistry(registryParams: PluginRegistryParams) {
     registerSecurityAuditCollector,
     registerService,
     registerCommand,
+    registerCommandOption,
     registerSessionExtension,
     registerTrustedToolPolicy,
     registerToolMetadata,

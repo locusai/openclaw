@@ -41,6 +41,7 @@ export function createTestPluginApi(api: TestPluginApiInput = {}): OpenClawPlugi
     registerInteractiveHandler() {},
     onConversationBindingResolved() {},
     registerCommand() {},
+    registerCommandOption() {},
     registerContextEngine() {},
     registerCompactionProvider() {},
     registerAgentHarness() {},

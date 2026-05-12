@@ -20,6 +20,10 @@ import {
   peekSystemEvents,
   resetSystemEventsForTest,
 } from "../../infra/system-events.js";
+import {
+  clearPluginCommandOptions,
+  registerPluginCommandOption,
+} from "../../plugins/command-options.js";
 import { resetPluginRuntimeStateForTest, setActivePluginRegistry } from "../../plugins/runtime.js";
 import {
   createChannelTestPluginBase,
@@ -1342,6 +1346,66 @@ describe("initSessionState RawBody", () => {
   });
 });
 
+describe("initSessionState reset trigger metadata stripping", () => {
+  it("strips registered plugin command options from /new body", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona marketing-assistant hello there",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello there");
+    clearPluginCommandOptions();
+  });
+
+  it("strips registered plugin command options with equals syntax", async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-reset-plugin-opts-eq-"));
+    const storePath = path.join(root, "sessions.json");
+    const cfg = { session: { store: storePath } } as OpenClawConfig;
+
+    clearPluginCommandOptions();
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async () => ({ action: "continue" }),
+    });
+    expect(registered.ok).toBe(true);
+
+    const result = await initSessionState({
+      ctx: {
+        RawBody: "/new --persona=marketing-assistant hello",
+        ChatType: "direct",
+        SessionKey: "agent:main:whatsapp:dm:s1",
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.bodyStripped).toBe("hello");
+    clearPluginCommandOptions();
+  });
+});
+
 describe("initSessionState reset policy", () => {
   let clearBootstrapSnapshotOnSessionRolloverSpy: ReturnType<typeof vi.spyOn>;
 
@@ -2133,6 +2197,47 @@ describe("initSessionState reset triggers in Slack channels", () => {
     expect(result.resetTriggered).toBe(true);
     expect(result.sessionId).not.toBe(existingSessionId);
     expect(result.bodyStripped).toBe("take notes");
+  });
+
+  it("strips command-style options from reset body before prompting the agent", async () => {
+    setMinimalCurrentConversationBindingRegistryForTests();
+    const storePath = await createStorePath("openclaw-slack-channel-new-opts-");
+    const sessionKey = "agent:main:slack:channel:c3";
+    const existingSessionId = "existing-session-123";
+    await seedSessionStore({
+      storePath,
+      sessionKey,
+      sessionId: existingSessionId,
+    });
+
+    const cfg = {
+      session: { store: storePath, idleMinutes: 999 },
+    } as OpenClawConfig;
+
+    const result = await initSessionState({
+      ctx: {
+        Body: "<@U123> /new --persona marketing-assistant",
+        RawBody: "<@U123> /new --persona marketing-assistant",
+        BodyForCommands: "/new --persona marketing-assistant",
+        CommandBody: "<@U123> /new --persona marketing-assistant",
+        From: "slack:channel:C3",
+        To: "channel:C3",
+        ChatType: "channel",
+        SessionKey: sessionKey,
+        Provider: "slack",
+        Surface: "slack",
+        SenderId: "U123",
+        SenderName: "Owner",
+        WasMentioned: true,
+      },
+      cfg,
+      commandAuthorized: true,
+    });
+
+    expect(result.isNewSession).toBe(true);
+    expect(result.resetTriggered).toBe(true);
+    expect(result.sessionId).not.toBe(existingSessionId);
+    expect(result.bodyStripped).toBe("");
   });
 });
 
