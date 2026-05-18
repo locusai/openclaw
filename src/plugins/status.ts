@@ -211,6 +211,7 @@ function buildPluginRecordFromInstalledIndex(
     services: [],
     gatewayDiscoveryServiceIds: [],
     commands: [...(manifest?.commandAliases?.map((alias) => alias.name) ?? [])],
+    commandOptions: [],
     httpRoutes: 0,
     hookCount: 0,
     configSchema: false,
