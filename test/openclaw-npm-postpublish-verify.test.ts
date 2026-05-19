@@ -227,6 +227,9 @@ describe("normalizeInstalledBinaryVersion", () => {
     expect(normalizeInstalledBinaryVersion("OpenClaw 2026.4.8-alpha.1 (9ece252)")).toBe(
       "2026.4.8-alpha.1",
     );
+    expect(normalizeInstalledBinaryVersion("OpenClaw 2026.5.18-ike.24 (6ed4b38)")).toBe(
+      "2026.5.18-ike.24",
+    );
   });
 });
 
