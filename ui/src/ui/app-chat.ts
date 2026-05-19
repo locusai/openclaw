@@ -573,7 +573,10 @@ export async function handleSendChat(
   // Intercept local slash commands (/status, /model, /compact, etc.)
   const parsed = parseSlashCommand(message);
   if (parsed?.command.executeLocal) {
-    if (isChatBusy(host) && shouldQueueLocalSlashCommand(parsed.command.key)) {
+    const shouldQueueParsedCommand =
+      shouldQueueLocalSlashCommand(parsed.command.key) ||
+      (parsed.command.key === "new" && parsed.args.trim().length > 0);
+    if (isChatBusy(host) && shouldQueueParsedCommand) {
       if (messageOverride == null) {
         recordNonTranscriptInputHistory(host, message);
         host.chatMessage = "";
@@ -638,6 +641,12 @@ function shouldQueueLocalSlashCommand(name: string): boolean {
   return !["stop", "focus", "export-session", "steer", "redirect", "new"].includes(name);
 }
 
+function buildResetSlashCommandMessage(name: "new" | "reset", args: string): string {
+  const trimmedArgs = args.trim();
+  const command = `/${name}`;
+  return trimmedArgs ? `${command} ${trimmedArgs}` : command;
+}
+
 // ── Slash Command Dispatch ──
 
 async function dispatchSlashCommand(
@@ -651,6 +660,14 @@ async function dispatchSlashCommand(
       await handleAbortChat(host);
       return;
     case "new":
+      if (args.trim()) {
+        await sendChatMessageNow(host, buildResetSlashCommandMessage("new", args), {
+          refreshSessions: true,
+          previousDraft: sendOpts?.previousDraft,
+          restoreDraft: sendOpts?.restoreDraft,
+        });
+        return;
+      }
       if (!host.onSlashAction) {
         host.lastError = "New Chat is unavailable.";
         return;
@@ -658,7 +675,7 @@ async function dispatchSlashCommand(
       await host.onSlashAction("new-session");
       return;
     case "reset":
-      await sendChatMessageNow(host, "/reset", {
+      await sendChatMessageNow(host, buildResetSlashCommandMessage("reset", args), {
         refreshSessions: true,
         previousDraft: sendOpts?.previousDraft,
         restoreDraft: sendOpts?.restoreDraft,
