@@ -64,6 +64,11 @@ import {
 } from "../../infra/voicewake-routing.js";
 import type { PromptImageOrderEntry } from "../../media/prompt-image-order.js";
 import {
+  executePluginCommandOptions,
+  stripPluginCommandOptionsFromBody,
+} from "../../plugins/command-options.js";
+import type { PluginCommandOptionPhase } from "../../plugins/types.js";
+import {
   classifySessionKeyShape,
   isAcpSessionKey,
   isSubagentSessionKey,
@@ -217,6 +222,47 @@ async function runSessionResetFromAgent(params: {
     key: result.key,
     sessionId: result.entry.sessionId,
   };
+}
+
+async function executeAgentResetCommandOptions(params: {
+  commandBody: string;
+  phase: PluginCommandOptionPhase;
+  sessionKey: string;
+  sessionId?: string;
+  cfg: OpenClawConfig;
+  request: {
+    channel?: string;
+    replyChannel?: string;
+    accountId?: string;
+    threadId?: string;
+    replyTo?: string;
+    to?: string;
+  };
+  senderId?: string;
+}): Promise<Awaited<ReturnType<typeof executePluginCommandOptions>>> {
+  const channel =
+    normalizeMessageChannel(params.request.channel?.trim()) ??
+    normalizeMessageChannel(params.request.replyChannel?.trim()) ??
+    INTERNAL_MESSAGE_CHANNEL;
+  const threadId =
+    typeof params.request.threadId === "string" && params.request.threadId.trim()
+      ? Number(params.request.threadId)
+      : undefined;
+  return executePluginCommandOptions({
+    commandBody: params.commandBody,
+    phase: params.phase,
+    sessionKey: params.sessionKey,
+    sessionId: params.sessionId,
+    senderId: params.senderId,
+    channel,
+    channelId: channel,
+    isAuthorizedSender: true,
+    config: params.cfg,
+    from: normalizeOptionalString(params.request.replyTo),
+    to: normalizeOptionalString(params.request.to),
+    accountId: normalizeOptionalString(params.request.accountId),
+    messageThreadId: Number.isFinite(threadId) ? threadId : undefined,
+  });
 }
 
 function resolveSessionRuntimeWorkspace(params: {
@@ -984,8 +1030,46 @@ export const agentHandlers: GatewayRequestHandlers = {
           );
           return;
         }
+        const preResetSession = loadSessionEntry(requestedSessionKey);
+        requestedSessionKey = preResetSession.canonicalKey;
+        const originalResetCommandBody = message;
+        const beforeCoreOptionResult = await executeAgentResetCommandOptions({
+          commandBody: originalResetCommandBody,
+          phase: "before-core",
+          sessionKey: requestedSessionKey,
+          sessionId: preResetSession.entry?.sessionId ?? resolvedSessionId,
+          cfg: preResetSession.cfg ?? cfg,
+          request,
+          senderId: normalizeOptionalString(client?.connect?.client?.id),
+        });
+        if (beforeCoreOptionResult.shouldStop) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              beforeCoreOptionResult.reply?.text ?? "command option stopped agent reset",
+            ),
+          );
+          return;
+        }
+        const strippedResetBody = stripPluginCommandOptionsFromBody({
+          commandBody: beforeCoreOptionResult.commandBody,
+        }).commandBody.trim();
+        message = strippedResetBody || beforeCoreOptionResult.commandBody.trim();
+        const strippedResetCommandMatch = message.match(RESET_COMMAND_RE);
+        if (!strippedResetCommandMatch) {
+          respond(
+            false,
+            undefined,
+            errorShape(ErrorCodes.INVALID_REQUEST, "invalid reset command"),
+          );
+          return;
+        }
         const resetReason =
-          normalizeOptionalLowercaseString(resetCommandMatch[1]) === "new" ? "new" : "reset";
+          normalizeOptionalLowercaseString(strippedResetCommandMatch[1]) === "new"
+            ? "new"
+            : "reset";
         const resetResult = await runSessionResetFromAgent({
           key: requestedSessionKey,
           reason: resetReason,
@@ -996,7 +1080,27 @@ export const agentHandlers: GatewayRequestHandlers = {
         }
         requestedSessionKey = resetResult.key;
         resolvedSessionId = resetResult.sessionId ?? resolvedSessionId;
-        const postResetMessage = normalizeOptionalString(resetCommandMatch[2]) ?? "";
+        const afterCoreOptionResult = await executeAgentResetCommandOptions({
+          commandBody: originalResetCommandBody,
+          phase: "after-core",
+          sessionKey: requestedSessionKey,
+          sessionId: resolvedSessionId,
+          cfg: preResetSession.cfg ?? cfg,
+          request,
+          senderId: normalizeOptionalString(client?.connect?.client?.id),
+        });
+        if (afterCoreOptionResult.shouldStop) {
+          respond(
+            false,
+            undefined,
+            errorShape(
+              ErrorCodes.INVALID_REQUEST,
+              afterCoreOptionResult.reply?.text ?? "command option stopped agent reset",
+            ),
+          );
+          return;
+        }
+        const postResetMessage = normalizeOptionalString(strippedResetCommandMatch[2]) ?? "";
         if (postResetMessage) {
           message = postResetMessage;
         } else {
