@@ -97,6 +97,7 @@ function expectNoSubagentControlTools(tools: ReturnType<typeof createOpenClawCod
   expect(names.has("sessions_spawn")).toBe(false);
   expect(names.has("sessions_list")).toBe(false);
   expect(names.has("sessions_history")).toBe(false);
+  expect(names.has("sessions_create")).toBe(false);
   expect(names.has("subagents")).toBe(false);
 }
 
@@ -816,6 +817,7 @@ describe("createOpenClawCodingTools", () => {
     const names = new Set(tools.map((tool) => tool.name));
     expect(names.has("sessions_list")).toBe(false);
     expect(names.has("sessions_history")).toBe(false);
+    expect(names.has("sessions_create")).toBe(false);
     expect(names.has("sessions_send")).toBe(false);
     expect(names.has("sessions_spawn")).toBe(false);
     expect(names.has("subagents")).toBe(false);

@@ -723,6 +723,18 @@ describe("POST /tools/invoke", () => {
     expect(res.status).toBe(404);
   });
 
+  it("denies sessions_create via HTTP gateway", async () => {
+    setMainAllowedTools({ allow: ["sessions_create"] });
+
+    const res = await invokeToolAuthed({
+      tool: "sessions_create",
+      sessionKey: "main",
+      args: { parentSessionKey: "main" },
+    });
+
+    expect(res.status).toBe(404);
+  });
+
   it("denies gateway tool via HTTP", async () => {
     setMainAllowedTools({ allow: ["gateway"] });
 

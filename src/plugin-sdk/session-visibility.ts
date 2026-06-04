@@ -25,7 +25,7 @@ export type AgentToAgentPolicy = {
   isAllowed: (requesterAgentId: string, targetAgentId: string) => boolean;
 };
 
-export type SessionAccessAction = "history" | "send" | "list" | "status";
+export type SessionAccessAction = "history" | "send" | "list" | "status" | "create";
 
 export type SessionAccessResult =
   | { allowed: true }
@@ -139,6 +139,9 @@ function actionPrefix(action: SessionAccessAction): string {
   if (action === "send") {
     return "Session send";
   }
+  if (action === "create") {
+    return "Session create";
+  }
   if (action === "status") {
     return "Session status";
   }
@@ -151,6 +154,9 @@ function a2aDisabledMessage(action: SessionAccessAction): string {
   }
   if (action === "send") {
     return "Agent-to-agent messaging is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent sends.";
+  }
+  if (action === "create") {
+    return "Agent-to-agent session creation is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent access.";
   }
   if (action === "status") {
     return "Agent-to-agent status is disabled. Set tools.agentToAgent.enabled=true to allow cross-agent access.";
@@ -165,6 +171,9 @@ function a2aDeniedMessage(action: SessionAccessAction): string {
   if (action === "send") {
     return "Agent-to-agent messaging denied by tools.agentToAgent.allow.";
   }
+  if (action === "create") {
+    return "Agent-to-agent session creation denied by tools.agentToAgent.allow.";
+  }
   if (action === "status") {
     return "Agent-to-agent status denied by tools.agentToAgent.allow.";
   }
@@ -177,6 +186,9 @@ function crossVisibilityMessage(action: SessionAccessAction): string {
   }
   if (action === "send") {
     return "Session send visibility is restricted. Set tools.sessions.visibility=all to allow cross-agent access.";
+  }
+  if (action === "create") {
+    return "Session create visibility is restricted. Set tools.sessions.visibility=all to allow cross-agent access.";
   }
   if (action === "status") {
     return "Session status visibility is restricted. Set tools.sessions.visibility=all to allow cross-agent access.";
