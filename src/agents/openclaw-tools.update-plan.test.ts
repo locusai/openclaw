@@ -136,8 +136,10 @@ describe("openclaw-tools update_plan gating", () => {
     });
 
     expect(toolNames(defaultTools)).not.toContain("sessions_spawn");
+    expect(toolNames(defaultTools)).not.toContain("sessions_create");
     expect(toolNames(defaultTools)).not.toContain("sessions_send");
     expect(toolNames(gatewayBoundTools)).toContain("sessions_spawn");
+    expect(toolNames(gatewayBoundTools)).not.toContain("sessions_create");
     expect(toolNames(gatewayBoundTools)).not.toContain("sessions_send");
   });
 
