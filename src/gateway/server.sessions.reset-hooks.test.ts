@@ -1,6 +1,10 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { expect, test } from "vitest";
+import { afterEach, expect, test } from "vitest";
+import {
+  clearPluginCommandOptions,
+  registerPluginCommandOption,
+} from "../plugins/command-options.js";
 import { embeddedRunMock, testState, writeSessionStore } from "./test-helpers.js";
 import {
   setupGatewaySessionsTestHarness,
@@ -17,6 +21,10 @@ import {
 } from "./test/server-sessions.test-helpers.js";
 
 const { createSessionStoreDir, seedActiveMainSession } = setupGatewaySessionsTestHarness();
+
+afterEach(() => {
+  clearPluginCommandOptions();
+});
 
 type HookEventRecord = Record<string, unknown> & {
   context?: Record<string, unknown> & {
@@ -446,6 +454,78 @@ test("sessions.create with emitCommandHooks=true resets parent in place when ses
     expect(endEvent.reason).toBe("new");
     expect(startEvent.sessionKey).toBe("agent:main:main");
     expect(startEvent.resumedFrom).toBe("sess-parent-dms");
+  } finally {
+    testState.sessionConfig = undefined;
+  }
+});
+
+test("sessions.create reset-in-place runs plugin command options from reset command body", async () => {
+  const { dir } = await createSessionStoreDir();
+  const transcriptPath = path.join(dir, "sess-parent-command-body.jsonl");
+  await fs.writeFile(
+    transcriptPath,
+    `${JSON.stringify({
+      type: "message",
+      id: "m1",
+      message: { role: "user", content: "hello before /new --persona" },
+    })}\n`,
+    "utf-8",
+  );
+
+  const optionEvents: string[] = [];
+  const registered = registerPluginCommandOption("ike-test", {
+    command: "new",
+    option: "persona",
+    takesValue: true,
+    handler: async (ctx) => {
+      optionEvents.push(
+        `${ctx.invocation.phase}:${ctx.option.value}:${ctx.sessionKey}:${ctx.sessionId}`,
+      );
+      return { action: "continue" };
+    },
+  });
+  expect(registered.ok).toBe(true);
+
+  testState.sessionConfig = { dmScope: "main" };
+  try {
+    await writeSessionStore({
+      entries: {
+        main: {
+          sessionId: "sess-parent-command-body",
+          sessionFile: transcriptPath,
+          updatedAt: Date.now(),
+        },
+      },
+    });
+
+    const result = await directSessionReq<{
+      ok: boolean;
+      key: string;
+      sessionId: string;
+      runStarted: boolean;
+    }>("sessions.create", {
+      parentSessionKey: "main",
+      emitCommandHooks: true,
+      commandBody: "/new --persona ike-marketing-assistant",
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.payload?.key).toBe("agent:main:main");
+    expect(result.payload?.runStarted).toBe(false);
+    expect(result.payload?.sessionId).not.toBe("sess-parent-command-body");
+    expect(optionEvents).toEqual([
+      "before-core:ike-marketing-assistant:agent:main:main:sess-parent-command-body",
+    ]);
+
+    expect(sessionLifecycleHookMocks.runSessionEnd).toHaveBeenCalledTimes(1);
+    expect(sessionLifecycleHookMocks.runSessionStart).toHaveBeenCalledTimes(1);
+    const [endEvent] = firstHookCall(sessionLifecycleHookMocks.runSessionEnd);
+    const [startEvent] = firstHookCall(sessionLifecycleHookMocks.runSessionStart);
+    expect(endEvent.sessionId).toBe("sess-parent-command-body");
+    expect(endEvent.sessionKey).toBe("agent:main:main");
+    expect(endEvent.reason).toBe("new");
+    expect(startEvent.sessionKey).toBe("agent:main:main");
+    expect(startEvent.resumedFrom).toBe("sess-parent-command-body");
   } finally {
     testState.sessionConfig = undefined;
   }

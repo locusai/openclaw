@@ -83,11 +83,6 @@ import {
 import type { PromptImageOrderEntry } from "../../media/prompt-image-order.js";
 import type { PluginHookSessionEndReason } from "../../plugins/hook-types.js";
 import {
-  executePluginCommandOptions,
-  stripPluginCommandOptionsFromBody,
-} from "../../plugins/command-options.js";
-import type { PluginCommandOptionPhase } from "../../plugins/types.js";
-import {
   classifySessionKeyShape,
   isAcpSessionKey,
   isSubagentSessionKey,
@@ -105,10 +100,7 @@ import {
   parseRawSessionConversationRef,
   parseThreadSessionSuffix,
 } from "../../sessions/session-key-utils.js";
-import {
-  normalizeOptionalLowercaseString,
-  normalizeOptionalString,
-} from "../../shared/string-coerce.js";
+import { normalizeOptionalString } from "../../shared/string-coerce.js";
 import { normalizeStringEntries, uniqueStrings } from "../../shared/string-normalization.js";
 import { createRunningTaskRun, finalizeTaskRunByRunId } from "../../tasks/detached-task-runtime.js";
 import type { TaskStatus } from "../../tasks/task-registry.types.js";
@@ -139,6 +131,11 @@ import {
 import { resolveAssistantAvatarUrl } from "../control-ui-shared.js";
 import { ADMIN_SCOPE } from "../method-scopes.js";
 import {
+  executeResetCommandOptions,
+  RESET_COMMAND_RE,
+  stripAndParseResetCommandBody,
+} from "../session-reset-command-options.js";
+import {
   emitGatewaySessionEndPluginHook,
   emitGatewaySessionStartPluginHook,
   performGatewaySessionReset,
@@ -168,8 +165,6 @@ import type {
   GatewayRequestHandlerOptions,
   GatewayRequestHandlers,
 } from "./types.js";
-
-const RESET_COMMAND_RE = /^\/(new|reset)(?:\s+([\s\S]*))?$/i;
 
 type AgentSendSessionLifecycleTransition = {
   cfg: OpenClawConfig;
@@ -278,47 +273,6 @@ async function runSessionResetFromAgent(params: {
     key: result.key,
     sessionId: result.entry.sessionId,
   };
-}
-
-async function executeAgentResetCommandOptions(params: {
-  commandBody: string;
-  phase: PluginCommandOptionPhase;
-  sessionKey: string;
-  sessionId?: string;
-  cfg: OpenClawConfig;
-  request: {
-    channel?: string;
-    replyChannel?: string;
-    accountId?: string;
-    threadId?: string;
-    replyTo?: string;
-    to?: string;
-  };
-  senderId?: string;
-}): Promise<Awaited<ReturnType<typeof executePluginCommandOptions>>> {
-  const channel =
-    normalizeMessageChannel(params.request.channel?.trim()) ??
-    normalizeMessageChannel(params.request.replyChannel?.trim()) ??
-    INTERNAL_MESSAGE_CHANNEL;
-  const threadId =
-    typeof params.request.threadId === "string" && params.request.threadId.trim()
-      ? Number(params.request.threadId)
-      : undefined;
-  return executePluginCommandOptions({
-    commandBody: params.commandBody,
-    phase: params.phase,
-    sessionKey: params.sessionKey,
-    sessionId: params.sessionId,
-    senderId: params.senderId,
-    channel,
-    channelId: channel,
-    isAuthorizedSender: true,
-    config: params.cfg,
-    from: normalizeOptionalString(params.request.replyTo),
-    to: normalizeOptionalString(params.request.to),
-    accountId: normalizeOptionalString(params.request.accountId),
-    messageThreadId: Number.isFinite(threadId) ? threadId : undefined,
-  });
 }
 
 function resolveSessionRuntimeWorkspace(params: {
@@ -1315,7 +1269,7 @@ export const agentHandlers: GatewayRequestHandlers = {
         const preResetSession = loadSessionEntry(requestedSessionKey);
         requestedSessionKey = preResetSession.canonicalKey;
         const originalResetCommandBody = message;
-        const beforeCoreOptionResult = await executeAgentResetCommandOptions({
+        const beforeCoreOptionResult = await executeResetCommandOptions({
           commandBody: originalResetCommandBody,
           phase: "before-core",
           sessionKey: requestedSessionKey,
@@ -1335,12 +1289,10 @@ export const agentHandlers: GatewayRequestHandlers = {
           );
           return;
         }
-        const strippedResetBody = stripPluginCommandOptionsFromBody({
-          commandBody: beforeCoreOptionResult.commandBody,
-        }).commandBody.trim();
-        message = strippedResetBody || beforeCoreOptionResult.commandBody.trim();
-        const strippedResetCommandMatch = message.match(RESET_COMMAND_RE);
-        if (!strippedResetCommandMatch) {
+        const strippedResetCommand = stripAndParseResetCommandBody(
+          beforeCoreOptionResult.commandBody,
+        );
+        if (!strippedResetCommand) {
           respond(
             false,
             undefined,
@@ -1348,10 +1300,8 @@ export const agentHandlers: GatewayRequestHandlers = {
           );
           return;
         }
-        const resetReason =
-          normalizeOptionalLowercaseString(strippedResetCommandMatch[1]) === "new"
-            ? "new"
-            : "reset";
+        message = strippedResetCommand.commandBody;
+        const resetReason = strippedResetCommand.reason;
         const resetResult = await runSessionResetFromAgent({
           key: requestedSessionKey,
           reason: resetReason,
@@ -1362,7 +1312,7 @@ export const agentHandlers: GatewayRequestHandlers = {
         }
         requestedSessionKey = resetResult.key;
         resolvedSessionId = resetResult.sessionId ?? resolvedSessionId;
-        const afterCoreOptionResult = await executeAgentResetCommandOptions({
+        const afterCoreOptionResult = await executeResetCommandOptions({
           commandBody: originalResetCommandBody,
           phase: "after-core",
           sessionKey: requestedSessionKey,
@@ -1382,7 +1332,7 @@ export const agentHandlers: GatewayRequestHandlers = {
           );
           return;
         }
-        const postResetMessage = normalizeOptionalString(strippedResetCommandMatch[2]) ?? "";
+        const postResetMessage = strippedResetCommand.tail;
         if (postResetMessage) {
           message = postResetMessage;
         } else {

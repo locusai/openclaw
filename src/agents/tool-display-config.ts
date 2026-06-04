@@ -311,6 +311,11 @@ export const TOOL_DISPLAY_CONFIG: ToolDisplayConfig = {
       title: "Session Send",
       detailKeys: ["label", "sessionKey", "agentId", "timeoutSeconds"],
     },
+    sessions_create: {
+      emoji: "🆕",
+      title: "Session Create",
+      detailKeys: ["parentSessionKey", "commandBody", "agentId", "label", "model"],
+    },
     sessions_history: {
       emoji: "🧾",
       title: "Session History",
