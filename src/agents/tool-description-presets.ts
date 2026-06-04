@@ -3,6 +3,7 @@ export const PROCESS_TOOL_DISPLAY_SUMMARY = "Inspect/control exec sessions.";
 export const CRON_TOOL_DISPLAY_SUMMARY = "Schedule reminders, cron, wake events.";
 export const SESSIONS_LIST_TOOL_DISPLAY_SUMMARY = "List visible sessions; filters/previews.";
 export const SESSIONS_HISTORY_TOOL_DISPLAY_SUMMARY = "Read sanitized session history.";
+export const SESSIONS_CREATE_TOOL_DISPLAY_SUMMARY = "Create/reset visible session.";
 export const SESSIONS_SEND_TOOL_DISPLAY_SUMMARY = "Message session or configured agent.";
 export const SESSIONS_SPAWN_TOOL_DISPLAY_SUMMARY = "Spawn subagent or ACP session.";
 export const SESSIONS_SPAWN_SUBAGENT_TOOL_DISPLAY_SUMMARY = "Spawn subagent session.";
@@ -20,6 +21,14 @@ export function describeSessionsHistoryTool(): string {
   return [
     "Fetch sanitized history for visible session.",
     "Use before replying, debugging, resuming; supports limits/tool messages.",
+  ].join(" ");
+}
+
+export function describeSessionsCreateTool(): string {
+  return [
+    "Create/reset a visible session through the session-management path.",
+    "Pass parentSessionKey; optional commandBody must be /new or /reset.",
+    "Uses command hooks so plugin reset options are honored.",
   ].join(" ");
 }
 

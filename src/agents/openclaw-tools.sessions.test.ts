@@ -34,6 +34,7 @@ vi.mock("../config/config.js", () => ({
 import "./test-helpers/fast-openclaw-tools-sessions.js";
 import { setActivePluginRegistry } from "../plugins/runtime.js";
 import { testing as agentStepTesting } from "./tools/agent-step.js";
+import { createSessionsCreateTool } from "./tools/sessions-create-tool.js";
 import { createSessionsHistoryTool } from "./tools/sessions-history-tool.js";
 import { createSessionsListTool } from "./tools/sessions-list-tool.js";
 import { testing as sessionsResolutionTesting } from "./tools/sessions-resolution.js";
@@ -144,6 +145,13 @@ function createOpenClawTools(options?: {
     }),
     createSessionsHistoryTool({
       agentSessionKey: options?.agentSessionKey,
+      sandboxed: options?.sandboxed,
+      config,
+      callGateway: gatewayCall,
+    }),
+    createSessionsCreateTool({
+      agentSessionKey: options?.agentSessionKey,
+      agentChannel: options?.agentChannel as never,
       sandboxed: options?.sandboxed,
       config,
       callGateway: gatewayCall,
@@ -279,7 +287,75 @@ describe("sessions tools", () => {
     expect(schemaProp("sessions_list", "search").type).toBe("string");
     expect(schemaProp("sessions_list", "includeDerivedTitles").type).toBe("boolean");
     expect(schemaProp("sessions_list", "includeLastMessage").type).toBe("boolean");
+    expect(schemaProp("sessions_create", "parentSessionKey").type).toBe("string");
+    expect(schemaProp("sessions_create", "commandBody").type).toBe("string");
     expect(schemaProp("sessions_send", "timeoutSeconds").type).toBe("number");
+  });
+
+  it("sessions_create calls sessions.create with command hooks and reset command body", async () => {
+    const calls: Array<{ method?: string; params?: Record<string, unknown> }> = [];
+    callGatewayMock.mockImplementation(async (opts: unknown) => {
+      const request = opts as { method?: string; params?: Record<string, unknown> };
+      calls.push(request);
+      if (request.method === "sessions.resolve") {
+        return { key: "agent:main:main" };
+      }
+      if (request.method === "sessions.list") {
+        return { sessions: [] };
+      }
+      if (request.method === "sessions.create") {
+        return { key: "agent:main:main", sessionId: "new-session-id", runStarted: false };
+      }
+      return {};
+    });
+
+    const tool = createOpenClawTools({
+      agentSessionKey: "agent:main:main",
+    }).find((candidate) => candidate.name === "sessions_create");
+    if (!tool) {
+      throw new Error("missing sessions_create tool");
+    }
+
+    const result = await tool.execute("call-create", {
+      parentSessionKey: "current",
+      commandBody: "/new --persona ike-marketing-assistant",
+    });
+    const details = result.details as {
+      status?: string;
+      sessionKey?: string;
+      sessionId?: string;
+      runStarted?: boolean;
+    };
+    expect(details).toMatchObject({
+      status: "created",
+      sessionKey: "agent:main:main",
+      sessionId: "new-session-id",
+      runStarted: false,
+    });
+    const createCall = calls.find((call) => call.method === "sessions.create");
+    expect(createCall?.params).toEqual({
+      parentSessionKey: "agent:main:main",
+      emitCommandHooks: true,
+      commandBody: "/new --persona ike-marketing-assistant",
+    });
+  });
+
+  it("sessions_create rejects non-reset command bodies", async () => {
+    const tool = createOpenClawTools({
+      agentSessionKey: "agent:main:main",
+    }).find((candidate) => candidate.name === "sessions_create");
+    if (!tool) {
+      throw new Error("missing sessions_create tool");
+    }
+
+    const result = await tool.execute("call-create-invalid", {
+      parentSessionKey: "main",
+      commandBody: "/status",
+    });
+    const details = result.details as { status?: string; error?: string };
+    expect(details.status).toBe("error");
+    expect(details.error).toContain("/new or /reset");
+    expect(callGatewayMock).not.toHaveBeenCalled();
   });
 
   it("sessions_list forwards mailbox filters and includes messages", async () => {

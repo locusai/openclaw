@@ -246,6 +246,7 @@ describe("tool mutation helpers", () => {
   });
 
   it("keeps legacy name-only mutating heuristics for payload fallback", () => {
+    expect(isLikelyMutatingToolName("sessions_create")).toBe(true);
     expect(isLikelyMutatingToolName("sessions_spawn")).toBe(true);
     expect(isLikelyMutatingToolName("sessions_send")).toBe(true);
     expect(isLikelyMutatingToolName("browser_actions")).toBe(true);
