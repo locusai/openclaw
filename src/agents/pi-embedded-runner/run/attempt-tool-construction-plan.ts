@@ -29,6 +29,7 @@ const OPENCLAW_TOOL_FACTORY_NAMES = new Set([
   "nodes",
   "pdf",
   "session_status",
+  "sessions_create",
   "sessions_history",
   "sessions_list",
   "sessions_send",

@@ -82,6 +82,11 @@ import {
 } from "../session-compaction-checkpoints.js";
 import { triggerSessionPatchHook } from "../session-patch-hooks.js";
 import {
+  executeResetCommandOptions,
+  isResetCommandBody,
+  stripAndParseResetCommandBody,
+} from "../session-reset-command-options.js";
+import {
   resolveSessionStoreAgentId,
   resolveSessionStoreKey,
   resolveStoredSessionKeyForAgentStore,
@@ -158,7 +163,6 @@ let sessionsRuntimeModulePromise: Promise<SessionsRuntimeModule> | undefined;
 let loggedSlowSessionsListCatalog = false;
 
 const SESSIONS_LIST_MODEL_CATALOG_TIMEOUT_MS = 750;
-
 function loadSessionsRuntimeModule(): Promise<SessionsRuntimeModule> {
   sessionsRuntimeModulePromise ??= import("./sessions.runtime.js");
   return sessionsRuntimeModulePromise;
@@ -252,6 +256,21 @@ function resolveOptionalInitialSessionMessage(params: {
     return params.message;
   }
   return undefined;
+}
+
+function resolveOptionalResetCommandBody(params: {
+  commandBody?: unknown;
+  task?: unknown;
+  message?: unknown;
+}): string | undefined {
+  if (typeof params.commandBody === "string") {
+    const commandBody = normalizeOptionalString(params.commandBody);
+    if (commandBody && isResetCommandBody(commandBody)) {
+      return commandBody;
+    }
+  }
+  const message = resolveOptionalInitialSessionMessage(params);
+  return message && isResetCommandBody(message) ? message : undefined;
 }
 
 function shouldAttachPendingMessageSeq(params: { payload: unknown; cached?: boolean }): boolean {
@@ -1278,11 +1297,13 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       }
       canonicalParentSessionKey = parent.canonicalKey;
     }
+    const resetCommandBody = resolveOptionalResetCommandBody(p);
+    const initialMessage = resetCommandBody ? undefined : resolveOptionalInitialSessionMessage(p);
     if (
       canonicalParentSessionKey &&
       p.emitCommandHooks === true &&
       !requestedKey &&
-      !resolveOptionalInitialSessionMessage(p) &&
+      !initialMessage &&
       cfg.session?.dmScope === "main"
     ) {
       const parentAgentId = normalizeAgentId(
@@ -1290,15 +1311,71 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       );
       const parentMainKey = resolveAgentMainSessionKey({ cfg, agentId: parentAgentId });
       if (canonicalParentSessionKey === parentMainKey) {
+        let resetReason: "new" | "reset" = "new";
+        const preResetSession = loadSessionEntry(canonicalParentSessionKey);
+        if (resetCommandBody) {
+          const beforeCoreOptionResult = await executeResetCommandOptions({
+            commandBody: resetCommandBody,
+            phase: "before-core",
+            sessionKey: canonicalParentSessionKey,
+            sessionId: preResetSession.entry?.sessionId,
+            cfg: preResetSession.cfg ?? cfg,
+            senderId: normalizeOptionalString(client?.connect?.client?.id),
+          });
+          if (beforeCoreOptionResult.shouldStop) {
+            respond(
+              false,
+              undefined,
+              errorShape(
+                ErrorCodes.INVALID_REQUEST,
+                beforeCoreOptionResult.reply?.text ?? "command option stopped session reset",
+              ),
+            );
+            return;
+          }
+          const parsedResetCommand = stripAndParseResetCommandBody(
+            beforeCoreOptionResult.commandBody,
+          );
+          if (!parsedResetCommand) {
+            respond(
+              false,
+              undefined,
+              errorShape(ErrorCodes.INVALID_REQUEST, "invalid reset command"),
+            );
+            return;
+          }
+          resetReason = parsedResetCommand.reason;
+        }
         const { performGatewaySessionReset } = await loadSessionsRuntimeModule();
         const resetResult = await performGatewaySessionReset({
           key: canonicalParentSessionKey,
-          reason: "new",
+          reason: resetReason,
           commandSource: "webchat",
         });
         if (!resetResult.ok) {
           respond(false, undefined, resetResult.error);
           return;
+        }
+        if (resetCommandBody) {
+          const afterCoreOptionResult = await executeResetCommandOptions({
+            commandBody: resetCommandBody,
+            phase: "after-core",
+            sessionKey: resetResult.key,
+            sessionId: resetResult.entry.sessionId,
+            cfg: preResetSession.cfg ?? cfg,
+            senderId: normalizeOptionalString(client?.connect?.client?.id),
+          });
+          if (afterCoreOptionResult.shouldStop) {
+            respond(
+              false,
+              undefined,
+              errorShape(
+                ErrorCodes.INVALID_REQUEST,
+                afterCoreOptionResult.reply?.text ?? "command option stopped session reset",
+              ),
+            );
+            return;
+          }
         }
         respond(
           true,
@@ -1313,7 +1390,7 @@ export const sessionsHandlers: GatewayRequestHandlers = {
         );
         emitSessionsChanged(context, {
           sessionKey: resetResult.key,
-          reason: "new",
+          reason: resetReason,
         });
         return;
       }
@@ -1426,7 +1503,6 @@ export const sessionsHandlers: GatewayRequestHandlers = {
       });
     }
 
-    const initialMessage = resolveOptionalInitialSessionMessage(p);
     let runPayload: Record<string, unknown> | undefined;
     let runError: unknown;
     let runMeta: Record<string, unknown> | undefined;
