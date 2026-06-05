@@ -1,5 +1,10 @@
 # Changelog
 
+## 2026.5.19-ike.28
+
+### Changes
+- Version alignment with core OpenClaw release numbers.
+
 ## 2026.5.19
 
 ### Changes
