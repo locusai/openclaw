@@ -1,4 +1,8 @@
-import { executePluginCommandOptions } from "../../plugins/command-options.js";
+import {
+  executePluginCommandOptions,
+  stripPluginCommandOptionsFromBody,
+} from "../../plugins/command-options.js";
+import type { PluginCommandOptionPhase } from "../../plugins/types.js";
 import { createLazyImportLoader } from "../../shared/lazy-promise.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
 import { maybeHandleResetCommand } from "./commands-reset.js";
@@ -31,13 +35,69 @@ function normalizeCommandHandlerResult(result: CommandHandlerResult): CommandHan
   };
 }
 
+async function runPluginCommandOptions(params: {
+  commandParams: HandleCommandsParams;
+  commandBody: string;
+  phase: PluginCommandOptionPhase;
+}): Promise<CommandHandlerResult | null> {
+  const { commandParams, commandBody, phase } = params;
+  const optionResult = await executePluginCommandOptions({
+    commandBody,
+    phase,
+    sessionKey: commandParams.sessionKey,
+    sessionId: commandParams.sessionEntry?.sessionId,
+    senderId: commandParams.command.senderId,
+    channel: commandParams.command.channel,
+    channelId: commandParams.command.channelId,
+    isAuthorizedSender: commandParams.command.isAuthorizedSender,
+    config: commandParams.cfg,
+    from: commandParams.command.from,
+    to: commandParams.command.to,
+    accountId: commandParams.ctx.AccountId ?? undefined,
+    messageThreadId:
+      typeof commandParams.ctx.MessageThreadId === "number"
+        ? commandParams.ctx.MessageThreadId
+        : undefined,
+  });
+  if (phase === "before-core" && optionResult.commandBody !== commandBody) {
+    commandParams.command.commandBodyNormalized = optionResult.commandBody;
+  }
+  if (!optionResult.shouldStop) {
+    return null;
+  }
+  return {
+    shouldContinue: false,
+    ...(optionResult.reply ? { reply: optionResult.reply } : {}),
+  };
+}
+
+function stripPluginCommandOptionsForCore(params: HandleCommandsParams): void {
+  const stripResult = stripPluginCommandOptionsFromBody({
+    commandBody: params.command.commandBodyNormalized,
+  });
+  if (stripResult.commandBody !== params.command.commandBodyNormalized) {
+    params.command.commandBodyNormalized = stripResult.commandBody;
+  }
+}
+
+async function runAfterCorePluginCommandOptions(params: {
+  commandParams: HandleCommandsParams;
+  commandBody: string;
+  allowTextCommands: boolean;
+}): Promise<CommandHandlerResult | null> {
+  if (!params.allowTextCommands) {
+    return null;
+  }
+  return runPluginCommandOptions({
+    commandParams: params.commandParams,
+    commandBody: params.commandBody,
+    phase: "after-core",
+  });
+}
+
 export async function handleCommands(params: HandleCommandsParams): Promise<CommandHandlerResult> {
   if (HANDLERS === null) {
     HANDLERS = (await loadCommandHandlersRuntime()).loadCommandHandlers();
-  }
-  const resetResult = await maybeHandleResetCommand(params);
-  if (resetResult) {
-    return normalizeCommandHandlerResult(resetResult);
   }
 
   const allowTextCommands = shouldHandleTextCommands({
@@ -46,38 +106,57 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
     commandSource: params.ctx.CommandSource,
   });
 
+  const originalCommandBody = params.command.commandBodyNormalized;
+
   if (allowTextCommands) {
-    const optionResult = await executePluginCommandOptions({
-      commandBody: params.command.commandBodyNormalized,
-      sessionKey: params.sessionKey,
-      sessionId: params.sessionEntry?.sessionId,
-      senderId: params.command.senderId,
-      channel: params.command.channel,
-      channelId: params.command.channelId,
-      isAuthorizedSender: params.command.isAuthorizedSender,
-      config: params.cfg,
-      from: params.command.from,
-      to: params.command.to,
-      accountId: params.ctx.AccountId ?? undefined,
-      messageThreadId:
-        typeof params.ctx.MessageThreadId === "number" ? params.ctx.MessageThreadId : undefined,
+    const beforeCoreResult = await runPluginCommandOptions({
+      commandParams: params,
+      commandBody: originalCommandBody,
+      phase: "before-core",
     });
-    if (optionResult.commandBody !== params.command.commandBodyNormalized) {
-      params.command.commandBodyNormalized = optionResult.commandBody;
+    if (beforeCoreResult) {
+      return normalizeCommandHandlerResult(beforeCoreResult);
     }
-    if (optionResult.shouldStop) {
-      return {
-        shouldContinue: false,
-        ...(optionResult.reply ? { reply: optionResult.reply } : {}),
-      };
+    stripPluginCommandOptionsForCore(params);
+  }
+
+  const resetResult = await maybeHandleResetCommand(params);
+  if (resetResult || params.command.resetHookTriggered || params.command.softResetTriggered) {
+    const afterCoreResult = await runAfterCorePluginCommandOptions({
+      commandParams: params,
+      commandBody: originalCommandBody,
+      allowTextCommands,
+    });
+    if (afterCoreResult) {
+      return normalizeCommandHandlerResult(afterCoreResult);
     }
+  }
+  if (resetResult) {
+    return normalizeCommandHandlerResult(resetResult);
   }
 
   for (const handler of HANDLERS) {
     const result = await handler(params, allowTextCommands);
     if (result) {
+      const afterCoreResult = await runAfterCorePluginCommandOptions({
+        commandParams: params,
+        commandBody: originalCommandBody,
+        allowTextCommands,
+      });
+      if (afterCoreResult) {
+        return normalizeCommandHandlerResult(afterCoreResult);
+      }
       return normalizeCommandHandlerResult(result);
     }
+  }
+
+  const afterCoreResult = await runAfterCorePluginCommandOptions({
+    commandParams: params,
+    commandBody: originalCommandBody,
+    allowTextCommands,
+  });
+  if (afterCoreResult) {
+    return normalizeCommandHandlerResult(afterCoreResult);
   }
 
   // sendPolicy "deny" is now handled downstream in dispatch-from-config.ts
