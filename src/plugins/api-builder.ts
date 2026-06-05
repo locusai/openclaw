@@ -51,6 +51,7 @@ export type BuildPluginApiParams = {
       | "registerInteractiveHandler"
       | "onConversationBindingResolved"
       | "registerCommand"
+      | "registerCommandOption"
       | "registerContextEngine"
       | "registerCompactionProvider"
       | "registerAgentHarness"
@@ -127,6 +128,7 @@ const noopRegisterInteractiveHandler: OpenClawPluginApi["registerInteractiveHand
 const noopOnConversationBindingResolved: OpenClawPluginApi["onConversationBindingResolved"] =
   () => {};
 const noopRegisterCommand: OpenClawPluginApi["registerCommand"] = () => {};
+const noopRegisterCommandOption: OpenClawPluginApi["registerCommandOption"] = () => {};
 const noopRegisterContextEngine: OpenClawPluginApi["registerContextEngine"] = () => {};
 const noopRegisterCompactionProvider: OpenClawPluginApi["registerCompactionProvider"] = () => {};
 const noopRegisterAgentHarness: OpenClawPluginApi["registerAgentHarness"] = () => {};
@@ -238,6 +240,7 @@ export function buildPluginApi(params: BuildPluginApiParams): OpenClawPluginApi 
     onConversationBindingResolved:
       handlers.onConversationBindingResolved ?? noopOnConversationBindingResolved,
     registerCommand: handlers.registerCommand ?? noopRegisterCommand,
+    registerCommandOption: handlers.registerCommandOption ?? noopRegisterCommandOption,
     registerContextEngine: handlers.registerContextEngine ?? noopRegisterContextEngine,
     registerCompactionProvider:
       handlers.registerCompactionProvider ?? noopRegisterCompactionProvider,
