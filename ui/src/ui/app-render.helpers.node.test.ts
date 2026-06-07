@@ -788,6 +788,38 @@ describe("createChatSession", () => {
     expect(loadChatHistoryMock).toHaveBeenCalledWith(state);
   });
 
+  it("creates /new commandBody sessions as independent visible sessions", async () => {
+    const state = createChatSessionState();
+    createSessionAndRefreshMock.mockResolvedValue("agent:ops:dashboard:new-persona-chat");
+    refreshChatAvatarMock.mockResolvedValue(undefined);
+    refreshSlashCommandsMock.mockResolvedValue(undefined);
+    loadChatHistoryMock.mockResolvedValue(undefined);
+    loadSessionsMock.mockResolvedValue(undefined);
+
+    await createChatSession(state, {
+      commandBody: "/new --persona ike-marketing-assistant",
+    });
+
+    expect(createSessionAndRefreshMock).toHaveBeenCalledWith(
+      state,
+      {
+        agentId: "ops",
+        parentSessionKey: undefined,
+        emitCommandHooks: true,
+        commandBody: "/new --persona ike-marketing-assistant",
+      },
+      {
+        activeMinutes: 120,
+        limit: 100,
+        includeGlobal: true,
+        includeUnknown: true,
+        showArchived: false,
+        agentId: "ops",
+      },
+    );
+    expect(state.sessionKey).toBe("agent:ops:dashboard:new-persona-chat");
+  });
+
   it("preserves draft and attachment edits made while session creation is in flight", async () => {
     const state = createChatSessionState();
     const updatedAttachments = [
