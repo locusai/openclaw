@@ -10,7 +10,7 @@ import type {
   PluginCommandOptionPhase,
 } from "./types.js";
 
-type RegisteredPluginCommandOption = {
+export type RegisteredPluginCommandOption = {
   pluginId: string;
   command: string;
   option: string;
@@ -294,6 +294,44 @@ function resolveOptionValue(
 export function clearPluginCommandOptions(): void {
   commandOptionsByCommand.clear();
   commandOptionKeys.clear();
+}
+
+export function listRegisteredPluginCommandOptions(): RegisteredPluginCommandOption[] {
+  return Array.from(commandOptionsByCommand.values()).flat();
+}
+
+function commandOptionRegistrationKeys(registration: RegisteredPluginCommandOption): string[] {
+  const keyScope = registration.namespace ?? "*";
+  return [registration.option, ...registration.aliases].map(
+    (optionName) => `${registration.command}|${keyScope}|${optionName}`,
+  );
+}
+
+export function mergePluginCommandOptions(
+  base: readonly RegisteredPluginCommandOption[],
+  overlay: readonly RegisteredPluginCommandOption[],
+): RegisteredPluginCommandOption[] {
+  const overlayKeys = new Set(overlay.flatMap(commandOptionRegistrationKeys));
+  return [
+    ...base.filter((registration) =>
+      commandOptionRegistrationKeys(registration).every((key) => !overlayKeys.has(key)),
+    ),
+    ...overlay,
+  ];
+}
+
+export function restorePluginCommandOptions(
+  registrations: readonly RegisteredPluginCommandOption[],
+): void {
+  clearPluginCommandOptions();
+  for (const registration of registrations) {
+    for (const key of commandOptionRegistrationKeys(registration)) {
+      commandOptionKeys.set(key, registration);
+    }
+    const current = commandOptionsByCommand.get(registration.command) ?? [];
+    current.push(registration);
+    commandOptionsByCommand.set(registration.command, current);
+  }
 }
 
 export function validatePluginCommandOptionDefinition(

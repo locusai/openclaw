@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { clearPluginCommandOptions, executePluginCommandOptions } from "./command-options.js";
 import { getCompactionProvider, registerCompactionProvider } from "./compaction-provider.js";
 import {
   testing,
@@ -7,7 +8,12 @@ import {
   loadOpenClawPlugins,
   resolveRuntimePluginRegistry,
 } from "./loader.js";
-import { resetPluginLoaderTestStateForTest } from "./loader.test-fixtures.js";
+import {
+  makeTempDir,
+  resetPluginLoaderTestStateForTest,
+  useNoBundledPlugins,
+  writePlugin,
+} from "./loader.test-fixtures.js";
 import {
   getMemoryEmbeddingProvider,
   registerMemoryEmbeddingProvider,
@@ -661,6 +667,102 @@ describe("loadOpenClawPlugins active runtime clearing", () => {
 
     expect(getCompactionProvider("stale-compaction")).toBeUndefined();
     expect(getMemoryEmbeddingProvider("stale-memory")).toBeUndefined();
+  });
+
+  it("restores command options when activating a cached registry", async () => {
+    useNoBundledPlugins();
+    const plugin = writePlugin({
+      id: "cache-command-option",
+      body: `module.exports = { id: "cache-command-option", register(api) {
+        api.registerCommandOption({
+          command: "new",
+          option: "persona",
+          takesValue: true,
+          requireAuth: false,
+          handler: async () => ({ action: "continue" }),
+        });
+      } };`,
+    });
+    const loadOptions = {
+      workspaceDir: makeTempDir(),
+      config: {
+        plugins: {
+          load: { paths: [plugin.file] },
+        },
+      },
+    };
+
+    loadOpenClawPlugins(loadOptions);
+    clearPluginCommandOptions();
+
+    const beforeCachedRestore = await executePluginCommandOptions({
+      commandBody: "/new --persona ike-marketing-assistant",
+      channel: "internal",
+      isAuthorizedSender: true,
+      config: {},
+    });
+    expect(beforeCachedRestore.matched).toBe(false);
+
+    loadOpenClawPlugins(loadOptions);
+
+    const afterCachedRestore = await executePluginCommandOptions({
+      commandBody: "/new --persona ike-marketing-assistant",
+      channel: "internal",
+      isAuthorizedSender: true,
+      config: {},
+    });
+    expect(afterCachedRestore.matched).toBe(true);
+    expect(afterCachedRestore.commandBody).toBe("/new");
+  });
+
+  it("preserves command options while activating scoped registries", async () => {
+    useNoBundledPlugins();
+    const commandPlugin = writePlugin({
+      id: "full-command-option",
+      body: `module.exports = { id: "full-command-option", register(api) {
+        api.registerCommandOption({
+          command: "new",
+          option: "persona",
+          takesValue: true,
+          requireAuth: false,
+          handler: async () => ({ action: "continue" }),
+        });
+      } };`,
+    });
+    const scopedPlugin = writePlugin({
+      id: "scoped-provider",
+      body: `module.exports = { id: "scoped-provider", register() {} };`,
+    });
+    const loadOptions = {
+      workspaceDir: makeTempDir(),
+      config: {
+        plugins: {
+          load: { paths: [commandPlugin.file, scopedPlugin.file] },
+        },
+      },
+    };
+
+    loadOpenClawPlugins(loadOptions);
+
+    const beforeScopedLoad = await executePluginCommandOptions({
+      commandBody: "/new --persona ike-marketing-assistant",
+      channel: "internal",
+      isAuthorizedSender: true,
+      config: {},
+    });
+    expect(beforeScopedLoad.matched).toBe(true);
+
+    loadOpenClawPlugins({ ...loadOptions, onlyPluginIds: ["scoped-provider"] });
+    loadOpenClawPlugins({ ...loadOptions, onlyPluginIds: ["scoped-provider"] });
+
+    const afterScopedLoad = await executePluginCommandOptions({
+      commandBody: "/new --persona ike-marketing-assistant",
+      channel: "internal",
+      isAuthorizedSender: true,
+      config: {},
+    });
+    expect(afterScopedLoad.matched).toBe(true);
+    expect(afterScopedLoad.commandBody).toBe("/new");
   });
 });
 
