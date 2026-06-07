@@ -531,6 +531,46 @@ test("sessions.create reset-in-place runs plugin command options from reset comm
   }
 });
 
+test("sessions.create /new command body without parent runs plugin command options on created session", async () => {
+  await createSessionStoreDir();
+
+  const optionEvents: string[] = [];
+  const registered = registerPluginCommandOption("ike-test", {
+    command: "new",
+    option: "persona",
+    takesValue: true,
+    handler: async (ctx) => {
+      optionEvents.push(
+        `${ctx.invocation.phase}:${ctx.option.value}:${ctx.sessionKey}:${ctx.sessionId}`,
+      );
+      return { action: "continue" };
+    },
+  });
+  expect(registered.ok).toBe(true);
+
+  const result = await directSessionReq<{
+    ok: boolean;
+    key: string;
+    sessionId: string;
+    runStarted: boolean;
+  }>("sessions.create", {
+    agentId: "main",
+    emitCommandHooks: true,
+    commandBody: "/new --persona ike-marketing-assistant",
+  });
+
+  expect(result.ok).toBe(true);
+  const createdKey = expectStringWithPrefix(
+    result.payload?.key,
+    "agent:main:dashboard:",
+    "created session key",
+  );
+  expect(result.payload?.runStarted).toBe(false);
+  expect(optionEvents).toEqual([
+    `before-core:ike-marketing-assistant:${createdKey}:${result.payload?.sessionId}`,
+  ]);
+});
+
 test("sessions.create without emitCommandHooks does not fire command:new hook (#76957)", async () => {
   const { dir } = await createSessionStoreDir();
   await writeSingleLineSession(dir, "sess-parent2", "hello from parent 2");

@@ -672,7 +672,10 @@ export function dismissChatError(state: AppViewState) {
   }
 }
 
-export async function createChatSession(state: AppViewState): Promise<boolean> {
+export async function createChatSession(
+  state: AppViewState,
+  options: { commandBody?: string } = {},
+): Promise<boolean> {
   if (!state.client || !state.connected) {
     return false;
   }
@@ -687,17 +690,19 @@ export async function createChatSession(state: AppViewState): Promise<boolean> {
 
   state.lastError = null;
   const previousSessionKey = state.sessionKey;
-  const parentSessionKey = state.sessionsResult?.sessions.some(
-    (row) => row.key === previousSessionKey,
-  )
-    ? previousSessionKey
-    : undefined;
+  const commandBody = normalizeOptionalString(options.commandBody);
+  const parentSessionKey = commandBody
+    ? undefined
+    : state.sessionsResult?.sessions.some((row) => row.key === previousSessionKey)
+      ? previousSessionKey
+      : undefined;
   const nextSessionKey = await createSessionAndRefresh(
     state as unknown as Parameters<typeof createSessionAndRefresh>[0],
     {
       agentId: resolveAgentIdFromSessionKey(previousSessionKey),
       parentSessionKey,
-      emitCommandHooks: parentSessionKey !== undefined ? true : undefined,
+      emitCommandHooks: commandBody || parentSessionKey !== undefined ? true : undefined,
+      ...(commandBody ? { commandBody } : {}),
     },
     {
       activeMinutes: CHAT_SESSIONS_ACTIVE_MINUTES,

@@ -1503,6 +1503,41 @@ export const sessionsHandlers: GatewayRequestHandlers = {
         }
       });
     }
+    if (!canonicalParentSessionKey && p.emitCommandHooks === true && resetCommandBody) {
+      const parsedResetCommand = stripAndParseResetCommandBody(resetCommandBody);
+      if (parsedResetCommand?.reason !== "new") {
+        respond(
+          false,
+          undefined,
+          errorShape(ErrorCodes.INVALID_REQUEST, "invalid session creation command"),
+        );
+        return;
+      }
+      const beforeCoreOptionResult = await executeResetCommandOptions({
+        commandBody: resetCommandBody,
+        phase: "before-core",
+        sessionKey: target.canonicalKey,
+        sessionId: createdEntry.sessionId,
+        cfg,
+        senderId: normalizeOptionalString(client?.connect?.client?.id),
+      });
+      if (beforeCoreOptionResult.shouldStop) {
+        respond(
+          false,
+          undefined,
+          errorShape(
+            ErrorCodes.INVALID_REQUEST,
+            beforeCoreOptionResult.reply?.text ?? "command option stopped session creation",
+          ),
+        );
+        return;
+      }
+      const parsedAfterOptions = stripAndParseResetCommandBody(beforeCoreOptionResult.commandBody);
+      if (!parsedAfterOptions) {
+        respond(false, undefined, errorShape(ErrorCodes.INVALID_REQUEST, "invalid reset command"));
+        return;
+      }
+    }
 
     let runPayload: Record<string, unknown> | undefined;
     let runError: unknown;

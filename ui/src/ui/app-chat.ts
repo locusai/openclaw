@@ -73,7 +73,7 @@ export type ChatHost = ChatInputHistoryState & {
   pendingAbort?: { runId?: string | null; sessionKey: string } | null;
   chatSubmitGuards?: Map<string, Promise<void>>;
   /** Callback for slash-command side effects that need app-level access. */
-  onSlashAction?: (action: string) => void | Promise<void>;
+  onSlashAction?: (action: string, options?: { commandBody?: string }) => void | Promise<void>;
 };
 
 export type ChatSendOptions = {
@@ -662,10 +662,12 @@ async function dispatchSlashCommand(
       return;
     case "new":
       if (args.trim()) {
-        await sendChatMessageNow(host, buildResetSlashCommandMessage("new", args), {
-          refreshSessions: true,
-          previousDraft: sendOpts?.previousDraft,
-          restoreDraft: sendOpts?.restoreDraft,
+        if (!host.onSlashAction) {
+          host.lastError = "New Chat is unavailable.";
+          return;
+        }
+        await host.onSlashAction("new-session", {
+          commandBody: buildResetSlashCommandMessage("new", args),
         });
         return;
       }
