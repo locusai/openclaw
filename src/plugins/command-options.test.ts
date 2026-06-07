@@ -3,7 +3,9 @@ import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   clearPluginCommandOptions,
   executePluginCommandOptions,
+  listRegisteredPluginCommandOptions,
   registerPluginCommandOption,
+  restorePluginCommandOptions,
   stripPluginCommandOptionsFromBody,
 } from "./command-options.js";
 
@@ -51,6 +53,34 @@ describe("plugin command options", () => {
     expect(result.matched).toBe(true);
     expect(result.shouldStop).toBe(false);
     expect(result.commandBody).toBe("/new keep-going");
+  });
+
+  it("restores registered options for plugin loader cache activation", async () => {
+    const calls: string[] = [];
+    const registered = registerPluginCommandOption("test-plugin", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async (ctx) => {
+        calls.push(ctx.option.value ?? "");
+        return { action: "continue" };
+      },
+    });
+    expect(registered.ok).toBe(true);
+
+    const snapshot = listRegisteredPluginCommandOptions();
+    clearPluginCommandOptions();
+    restorePluginCommandOptions(snapshot);
+
+    const result = await executePluginCommandOptions({
+      commandBody: "/new --persona ike-marketing-assistant",
+      channel: "internal",
+      isAuthorizedSender: true,
+      config: cfg,
+    });
+    expect(result.matched).toBe(true);
+    expect(result.commandBody).toBe("/new");
+    expect(calls).toEqual(["ike-marketing-assistant"]);
   });
 
   it("runs command options only in their registered phase", async () => {
