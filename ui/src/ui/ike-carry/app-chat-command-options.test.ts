@@ -68,10 +68,27 @@ describe("IKE carry web chat command options", () => {
     await loadChatHelpers();
   });
 
-  it.each([
-    { command: "/new --persona finance", expectedMessage: "/new --persona finance" },
-    { command: "/reset --persona finance", expectedMessage: "/reset --persona finance" },
-  ])("preserves command args for $command", async ({ command, expectedMessage }) => {
+  it("routes /new command args through the fresh-session action", async () => {
+    const onSlashAction = vi.fn();
+    const request = vi.fn(async (...args: unknown[]) => {
+      throw new Error(`Unexpected request: ${String(args[0])}`);
+    });
+    const host = makeHost({
+      client: { request } as unknown as ChatHost["client"],
+      chatMessage: "/new --persona finance",
+      onSlashAction,
+    });
+
+    await handleSendChat(host);
+
+    expect(request).not.toHaveBeenCalled();
+    expect(onSlashAction).toHaveBeenCalledWith("new-session", {
+      commandBody: "/new --persona finance",
+    });
+    expect(host.chatMessage).toBe("");
+  });
+
+  it("preserves /reset command args on the command pipeline", async () => {
     const request = vi.fn(async (...args: unknown[]) => {
       const method = String(args[0]);
       if (method === "chat.send") {
@@ -81,7 +98,7 @@ describe("IKE carry web chat command options", () => {
     });
     const host = makeHost({
       client: { request } as unknown as ChatHost["client"],
-      chatMessage: command,
+      chatMessage: "/reset --persona finance",
     });
 
     await handleSendChat(host);
@@ -90,7 +107,7 @@ describe("IKE carry web chat command options", () => {
       "chat.send",
       expect.objectContaining({
         sessionKey: "agent:main",
-        message: expectedMessage,
+        message: "/reset --persona finance",
         deliver: false,
         idempotencyKey: expect.any(String),
       }),
