@@ -32,11 +32,16 @@ import { attachPluginApiFacades } from "./api-facades.js";
 import { isLateCallablePluginApiMethod } from "./api-lifecycle.js";
 import { inspectBundleMcpRuntimeSupport } from "./bundle-mcp.js";
 import {
+  clearPluginCommandOptions,
+  listRegisteredPluginCommandOptions,
+  mergePluginCommandOptions,
+  restorePluginCommandOptions,
+} from "./command-options.js";
+import {
   clearPluginCommands,
   listRegisteredPluginCommands,
   restorePluginCommands,
 } from "./command-registry-state.js";
-import { clearPluginCommandOptions } from "./command-options.js";
 import {
   clearCompactionProviders,
   listRegisteredCompactionProviders,
@@ -278,6 +283,7 @@ type CachedPluginState = {
   registry: PluginRegistry;
   detachedTaskRuntimeRegistration: ReturnType<typeof getDetachedTaskLifecycleRuntimeRegistration>;
   commands?: ReturnType<typeof listRegisteredPluginCommands>;
+  commandOptions?: ReturnType<typeof listRegisteredPluginCommandOptions>;
   interactiveHandlers?: ReturnType<typeof listPluginInteractiveHandlers>;
   memoryCapability: ReturnType<typeof getMemoryCapabilityRegistration>;
   memoryCorpusSupplements: ReturnType<typeof listMemoryCorpusSupplements>;
@@ -1710,6 +1716,10 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
   const logger = options.logger ?? defaultLogger();
   const validateOnly = options.mode === "validate";
   const onlyPluginIdSet = createPluginIdScopeSet(onlyPluginIds);
+  const preserveCommandOptionsForScopedActivation = shouldActivate && onlyPluginIdSet !== undefined;
+  const previousCommandOptions = preserveCommandOptionsForScopedActivation
+    ? listRegisteredPluginCommandOptions()
+    : [];
 
   const cacheEnabled = options.cache !== false && options.resolveRawConfigEnvVars !== true;
   if (cacheEnabled) {
@@ -1723,6 +1733,11 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
       if (shouldActivate) {
         restoreRegisteredAgentHarnesses(cached.state.agentHarnesses);
         restorePluginCommands(cached.state.commands ?? []);
+        restorePluginCommandOptions(
+          preserveCommandOptionsForScopedActivation
+            ? mergePluginCommandOptions(previousCommandOptions, cached.state.commandOptions ?? [])
+            : (cached.state.commandOptions ?? []),
+        );
         restoreRegisteredCompactionProviders(cached.state.compactionProviders);
         restoreDetachedTaskLifecycleRuntimeRegistration(
           cached.state.detachedTaskRuntimeRegistration,
@@ -2721,11 +2736,20 @@ export function loadOpenClawPlugins(options: PluginLoadOptions = {}): PluginRegi
       }
     }
 
+    const loadedCommandOptions = listRegisteredPluginCommandOptions();
+    const activeCommandOptions = preserveCommandOptionsForScopedActivation
+      ? mergePluginCommandOptions(previousCommandOptions, loadedCommandOptions)
+      : loadedCommandOptions;
+    if (preserveCommandOptionsForScopedActivation) {
+      restorePluginCommandOptions(activeCommandOptions);
+    }
+
     if (cacheEnabled) {
       setCachedPluginRegistry(
         cacheKey,
         {
           commands: listRegisteredPluginCommands(),
+          commandOptions: loadedCommandOptions,
           detachedTaskRuntimeRegistration: getDetachedTaskLifecycleRuntimeRegistration(),
           interactiveHandlers: listPluginInteractiveHandlers(),
           memoryCapability: getMemoryCapabilityRegistration(),
