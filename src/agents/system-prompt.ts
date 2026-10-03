@@ -759,6 +759,7 @@ export function buildAgentSystemPrompt(params: {
       : "List OpenClaw agent ids allowed for sessions_spawn",
     sessions_list: "List other sessions (incl. sub-agents) with filters/last",
     sessions_history: "Fetch history for another session/sub-agent",
+    sessions_create: "Create/reset a visible session through the session-management path",
     sessions_send: "Send a message to another session/sub-agent",
     sessions_spawn: acpSpawnRuntimeEnabled
       ? 'Spawn a sub-agent or ACP coding session; defaults to isolated, native subagents may use context="fork" when current transcript context is required (runtime="acp" requires `agentId` unless `acp.defaultAgent` is configured; ACP harness ids follow acp.allowedAgents, not agents_list)'
@@ -793,6 +794,7 @@ export function buildAgentSystemPrompt(params: {
     "agents_list",
     "sessions_list",
     "sessions_history",
+    "sessions_create",
     "sessions_send",
     "sessions_spawn",
     "sessions_yield",

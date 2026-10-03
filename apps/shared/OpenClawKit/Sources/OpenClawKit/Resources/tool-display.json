@@ -440,6 +440,17 @@
         "timeoutSeconds"
       ]
     },
+    "sessions_create": {
+      "emoji": "🆕",
+      "title": "Session Create",
+      "detailKeys": [
+        "parentSessionKey",
+        "commandBody",
+        "agentId",
+        "label",
+        "model"
+      ]
+    },
     "sessions_history": {
       "emoji": "🧾",
       "title": "Session History",
