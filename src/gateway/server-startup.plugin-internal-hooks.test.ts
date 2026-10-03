@@ -10,7 +10,7 @@ import {
   triggerInternalHook,
 } from "../hooks/internal-hooks.js";
 import { loadOpenClawPlugins } from "../plugins/loader.js";
-import { startGatewaySidecars } from "./server-startup.js";
+import { startGatewaySidecars } from "./server-startup-post-attach.js";
 
 function createSilentLogger() {
   return {
