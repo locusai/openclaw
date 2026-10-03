@@ -13,6 +13,7 @@ vi.mock("../../../llm-slug-generator.js", () => ({
 }));
 
 let handler: typeof import("../handler.js").default;
+let flushSessionMemoryWritesForTest: typeof import("../handler.js").flushSessionMemoryWritesForTest;
 let suiteWorkspaceRoot = "";
 let workspaceCaseCounter = 0;
 
@@ -38,7 +39,7 @@ function createMockSessionContent(entries: Array<{ role: string; content: string
 }
 
 beforeAll(async () => {
-  ({ default: handler } = await import("../handler.js"));
+  ({ default: handler, flushSessionMemoryWritesForTest } = await import("../handler.js"));
   suiteWorkspaceRoot = await fs.mkdtemp(path.join(os.tmpdir(), "openclaw-session-memory-ike-"));
 });
 
@@ -79,7 +80,16 @@ describe("IKE carry session memory slug overrides", () => {
           createHookEvent("command", "new", "agent:main:main", {
             cfg: {
               agents: { defaults: { workspace: tempDir } },
-              hooks: { internal: { entries: { "session-memory": { enabled: true } } } },
+              hooks: {
+                internal: {
+                  entries: {
+                    "session-memory": {
+                      enabled: true,
+                      llmSlug: true,
+                    },
+                  },
+                },
+              },
             } satisfies OpenClawConfig,
             previousSessionEntry: {
               sessionId: "override-session",
@@ -89,9 +99,11 @@ describe("IKE carry session memory slug overrides", () => {
             },
           }),
         );
+        await flushSessionMemoryWritesForTest();
       },
     );
 
+    expect(generateSlug).toHaveBeenCalledTimes(1);
     expect(generateSlug).toHaveBeenCalledWith(
       expect.objectContaining({
         provider: "openrouter",
