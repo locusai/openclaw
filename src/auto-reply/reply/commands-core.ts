@@ -1,3 +1,4 @@
+import { executePluginCommandOptions } from "../../plugins/command-options.js";
 import { createLazyImportLoader } from "../../shared/lazy-promise.js";
 import { shouldHandleTextCommands } from "../commands-registry.js";
 import { maybeHandleResetCommand } from "./commands-reset.js";
@@ -44,6 +45,33 @@ export async function handleCommands(params: HandleCommandsParams): Promise<Comm
     surface: params.command.surface,
     commandSource: params.ctx.CommandSource,
   });
+
+  if (allowTextCommands) {
+    const optionResult = await executePluginCommandOptions({
+      commandBody: params.command.commandBodyNormalized,
+      sessionKey: params.sessionKey,
+      sessionId: params.sessionEntry?.sessionId,
+      senderId: params.command.senderId,
+      channel: params.command.channel,
+      channelId: params.command.channelId,
+      isAuthorizedSender: params.command.isAuthorizedSender,
+      config: params.cfg,
+      from: params.command.from,
+      to: params.command.to,
+      accountId: params.ctx.AccountId ?? undefined,
+      messageThreadId:
+        typeof params.ctx.MessageThreadId === "number" ? params.ctx.MessageThreadId : undefined,
+    });
+    if (optionResult.commandBody !== params.command.commandBodyNormalized) {
+      params.command.commandBodyNormalized = optionResult.commandBody;
+    }
+    if (optionResult.shouldStop) {
+      return {
+        shouldContinue: false,
+        ...(optionResult.reply ? { reply: optionResult.reply } : {}),
+      };
+    }
+  }
 
   for (const handler of HANDLERS) {
     const result = await handler(params, allowTextCommands);
