@@ -6,6 +6,10 @@ import {
 } from "../../agents/bash-tools.exec-approval-followup-state.js";
 import { BARE_SESSION_RESET_PROMPT } from "../../auto-reply/reply/session-reset-prompt.js";
 import {
+  clearPluginCommandOptions,
+  registerPluginCommandOption,
+} from "../../plugins/command-options.js";
+import {
   getDetachedTaskLifecycleRuntime,
   resetDetachedTaskLifecycleRuntimeForTests,
   setDetachedTaskLifecycleRuntime,
@@ -483,6 +487,7 @@ describe("gateway agent handler", () => {
     }
     resetDetachedTaskLifecycleRuntimeForTests();
     resetTaskRegistryForTests();
+    clearPluginCommandOptions();
     mocks.loadConfigReturn = {};
     mocks.resolveExplicitAgentSessionKey.mockReset().mockReturnValue(undefined);
     mocks.resolveBareResetBootstrapFileAccess.mockReset().mockReturnValue(true);
@@ -3027,6 +3032,44 @@ describe("gateway agent handler", () => {
     expect(call?.message).toContain("Current time:");
     expect(call?.message).not.toBe(BARE_SESSION_RESET_PROMPT);
     expect(call?.sessionId).toBe("reset-session-id");
+  });
+
+  it("runs plugin command options before the agent reset branch consumes /new args", async () => {
+    const order: string[] = [];
+    const registration = registerPluginCommandOption("ike-test", {
+      command: "new",
+      option: "persona",
+      takesValue: true,
+      handler: async (ctx) => {
+        order.push(`persona:${ctx.option.value}`);
+        expect(ctx.sessionKey).toBe("agent:main:main");
+        expect(ctx.sessionId).toBe("reset-session-id");
+        return { action: "continue" };
+      },
+    });
+    expect(registration.ok).toBe(true);
+    mockSessionResetSuccess({ reason: "new" });
+    mocks.performGatewaySessionReset.mockClear();
+    primeMainAgentRun({ sessionId: "reset-session-id" });
+
+    await invokeAgent(
+      {
+        message: "/new --persona finance",
+        sessionKey: "agent:main:main",
+        idempotencyKey: "test-idem-new-persona-option",
+      },
+      {
+        reqId: "4-persona-option",
+        client: { connect: { scopes: ["operator.admin"] } } as AgentHandlerArgs["client"],
+      },
+    );
+
+    expect(order).toEqual(["persona:finance"]);
+    expect(mocks.performGatewaySessionReset).toHaveBeenCalledTimes(1);
+    const call = await waitForAgentCommandCall();
+    expect(call?.message).toContain("Execute your Session Startup sequence now");
+    expect(call?.message).not.toContain("--persona");
+    expect(call?.message).not.toContain("finance");
   });
 
   it("prepends runtime-loaded startup memory to bare /new agent runs", async () => {
