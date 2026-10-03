@@ -1299,12 +1299,13 @@ export const sessionsHandlers: GatewayRequestHandlers = {
     }
     const resetCommandBody = resolveOptionalResetCommandBody(p);
     const initialMessage = resetCommandBody ? undefined : resolveOptionalInitialSessionMessage(p);
+    const hasExplicitResetCommand = Boolean(resetCommandBody);
     if (
       canonicalParentSessionKey &&
       p.emitCommandHooks === true &&
       !requestedKey &&
       !initialMessage &&
-      cfg.session?.dmScope === "main"
+      (hasExplicitResetCommand || cfg.session?.dmScope === "main")
     ) {
       const parentAgentId = normalizeAgentId(
         resolveAgentIdFromSessionKey(canonicalParentSessionKey) ?? resolveDefaultAgentId(cfg),

@@ -243,6 +243,41 @@ test("sessions.create rejects unknown parentSessionKey", async () => {
   );
 });
 
+test("sessions.create honors explicit reset command body outside main dmScope", async () => {
+  const { storePath } = await createSessionStoreDir();
+  testState.sessionConfig = { dmScope: "per-channel-peer" };
+  await writeSessionStore({
+    entries: {
+      main: sessionStoreEntry("sess-parent"),
+    },
+  });
+
+  const created = await directSessionReq<{
+    key?: string;
+    sessionId?: string;
+    entry?: {
+      sessionId?: string;
+    };
+  }>("sessions.create", {
+    parentSessionKey: "agent:main:main",
+    emitCommandHooks: true,
+    commandBody: "/new --persona ike-marketing-assistant",
+  });
+
+  expect(created.ok).toBe(true);
+  expect(created.payload?.key).toBe("agent:main:main");
+  expect(created.payload?.sessionId).not.toBe("sess-parent");
+  expect(created.payload?.key).not.toContain(":dashboard:");
+
+  const rawStore = JSON.parse(await fs.readFile(storePath, "utf-8")) as Record<
+    string,
+    {
+      sessionId?: string;
+    }
+  >;
+  expect(rawStore["agent:main:main"]?.sessionId).toBe(created.payload?.sessionId);
+});
+
 test("sessions.create can start the first agent turn from an initial task", async () => {
   await createSessionStoreDir();
   // Register "ops" so the deleted-agent guard added in #65986 does not
