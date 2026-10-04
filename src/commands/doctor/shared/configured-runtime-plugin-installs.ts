@@ -27,7 +27,7 @@ export const CONFIGURED_RUNTIME_PLUGIN_INSTALL_CANDIDATES: readonly ConfiguredRu
     {
       pluginId: "codex",
       label: "Codex",
-      npmSpec: "@openclaw/codex@2026.5.19",
+      npmSpec: "@openclaw/codex@2026.5.28",
       trustedSourceLinkedOfficialInstall: true,
     },
   ];

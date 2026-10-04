@@ -582,7 +582,7 @@ describe("provider install catalog", () => {
             },
           ],
           install: {
-            npmSpec: "@openclaw/codex@2026.5.19",
+            npmSpec: "@openclaw/codex@2026.5.28",
             defaultChoice: "npm",
           },
         },
@@ -602,15 +602,15 @@ describe("provider install catalog", () => {
       label: "Codex",
       origin: "bundled",
       install: {
-        npmSpec: "@openclaw/codex@2026.5.19",
+        npmSpec: "@openclaw/codex@2026.5.28",
         defaultChoice: "npm",
       },
       installSource: {
         defaultChoice: "npm",
         npm: {
-          spec: "@openclaw/codex@2026.5.19",
+          spec: "@openclaw/codex@2026.5.28",
           packageName: "@openclaw/codex",
-          selector: "2026.5.19",
+          selector: "2026.5.28",
           selectorKind: "exact-version",
           exactVersion: true,
           pinState: "exact-without-integrity",
