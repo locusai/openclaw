@@ -38,6 +38,27 @@ export {
   createOperatorApprovalsGatewayClient,
   withOperatorApprovalsGatewayClient,
 } from "../gateway/operator-approvals-client.js";
+export {
+  classifyGatewayConnectFailure,
+  ConnectErrorDetailCodes as GATEWAY_CONNECT_DETAIL_CODES,
+  ConnectPairingRequiredReasons as GATEWAY_CONNECT_PAIRING_REQUIRED_REASONS,
+  formatConnectErrorMessage,
+  readConnectErrorDetailCode,
+  readConnectErrorRecoveryAdvice,
+  readConnectPairingRequiredDetails,
+  readConnectPairingRequiredMessage,
+  readPairingConnectErrorDetails,
+} from "../../packages/gateway-protocol/src/connect-error-details.js";
+export type {
+  ConnectErrorDetailCode as GatewayConnectDetailCode,
+  ConnectErrorRecoveryAdvice as GatewayConnectRecoveryAdvice,
+  ConnectPairingRequiredDetails as GatewayPairingRequiredDetails,
+  ConnectPairingRequiredReason as GatewayConnectPairingRequiredReason,
+  GatewayConnectFailure,
+  GatewayConnectFailureInput,
+  GatewayConnectSnapshot,
+  PairingConnectErrorDetails as GatewayPairingConnectErrorDetails,
+} from "../../packages/gateway-protocol/src/connect-error-details.js";
 export { ErrorCodes, errorShape } from "../../packages/gateway-protocol/src/index.js";
 export type { EventFrame } from "../../packages/gateway-protocol/src/index.js";
 export type { GatewayRequestHandlerOptions } from "../gateway/server-methods/types.js";
