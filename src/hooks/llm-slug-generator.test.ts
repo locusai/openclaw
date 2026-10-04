@@ -70,6 +70,24 @@ describe("generateSlugViaLLM", () => {
     expect(requireFirstRunOptions().timeoutMs).toBe(500_000);
   });
 
+  it("passes explicit session overrides through the embedded agent abstraction", async () => {
+    await generateSlugViaLLM({
+      sessionContent: "Use the stored session model",
+      cfg: {
+        agents: { defaults: { model: { primary: "openai/gpt-5.5" } } },
+      } as OpenClawConfig,
+      provider: "openrouter",
+      model: "kimi-k2",
+    });
+
+    expect(runEmbeddedAgentMock).toHaveBeenCalledOnce();
+    const options = requireFirstRunOptions();
+    expect(options.provider).toBe("openrouter");
+    expect(options.model).toBe("kimi-k2");
+    expect(options.timeoutMs).toBe(15_000);
+    expect(options.cleanupBundleMcpOnRunEnd).toBe(true);
+  });
+
   it("infers provider metadata for bare configured agent models", async () => {
     await generateSlugViaLLM({
       sessionContent: "hello",
