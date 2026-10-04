@@ -47,6 +47,6 @@ describe("webchat new session", () => {
 
     expect(handleConnectedMock).toHaveBeenCalledTimes(1);
     expect(createChatSessionMock).toHaveBeenCalledTimes(1);
-    expect(createChatSessionMock).toHaveBeenCalledWith(app);
+    expect(createChatSessionMock).toHaveBeenCalledWith(app, undefined);
   });
 });
