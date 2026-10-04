@@ -7,6 +7,7 @@ import type {
   PluginCommandOptionContext,
   PluginCommandOptionHandlerResult,
   PluginCommandOptionInvocation,
+  PluginCommandOptionPhase,
 } from "./types.js";
 
 type RegisteredPluginCommandOption = {
@@ -18,6 +19,7 @@ type RegisteredPluginCommandOption = {
   namespace?: string;
   namespaceAliases: string[];
   consume: boolean;
+  phase: PluginCommandOptionPhase;
   requireAuth: boolean;
   definition: OpenClawPluginCommandOptionDefinition;
 };
@@ -53,6 +55,12 @@ export type ExecutePluginCommandOptionsResult = {
   reply?: ReplyPayload;
   commandBody: string;
 };
+
+function normalizePhase(
+  phase: OpenClawPluginCommandOptionDefinition["phase"],
+): PluginCommandOptionPhase {
+  return phase === "after-core" ? "after-core" : "before-core";
+}
 
 export type StripPluginCommandOptionsResult = {
   matched: boolean;
@@ -334,6 +342,17 @@ export function validatePluginCommandOptionDefinition(
     }
   }
 
+  if (
+    definition.phase !== undefined &&
+    definition.phase !== "before-core" &&
+    definition.phase !== "after-core"
+  ) {
+    return {
+      ok: false,
+      error: 'phase must be "before-core" or "after-core"',
+    };
+  }
+
   return { ok: true };
 }
 
@@ -384,6 +403,7 @@ export function registerPluginCommandOption(
     namespace,
     namespaceAliases,
     consume: definition.consume !== false,
+    phase: normalizePhase(definition.phase),
     requireAuth: definition.requireAuth !== false,
     definition,
   };
@@ -397,13 +417,14 @@ export function registerPluginCommandOption(
   current.push(registration);
   commandOptionsByCommand.set(command, current);
   logVerbose(
-    `Registered plugin command option: /${command} --${option}${namespace ? ` (namespace: ${namespace})` : ""} (plugin: ${pluginId})`,
+    `Registered plugin command option: /${command} --${option}${namespace ? ` (namespace: ${namespace})` : ""} (phase: ${registration.phase}, plugin: ${pluginId})`,
   );
   return { ok: true };
 }
 
 export async function executePluginCommandOptions(params: {
   commandBody: string;
+  phase?: PluginCommandOptionPhase;
   sessionKey?: string;
   sessionId?: string;
   senderId?: string;
@@ -425,7 +446,9 @@ export async function executePluginCommandOptions(params: {
     };
   }
 
-  const registrations = commandOptionsByCommand.get(parsed.commandName);
+  const allRegistrations = commandOptionsByCommand.get(parsed.commandName);
+  const phase = params.phase ?? "before-core";
+  const registrations = allRegistrations?.filter((registration) => registration.phase === phase);
   if (!registrations || registrations.length === 0) {
     return {
       matched: false,
@@ -468,6 +491,7 @@ export async function executePluginCommandOptions(params: {
   const invocation: PluginCommandOptionInvocation = {
     commandName: parsed.commandName,
     commandBody: params.commandBody,
+    phase,
     namespace: selectedNamespace,
     options: options
       .filter((option) => option.name !== "plugin")
