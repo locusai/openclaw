@@ -127,11 +127,13 @@ describe("buildEmbeddedAttemptToolRunContext", () => {
 
   it("keeps independently constructed Run contexts isolated across awaited work", async () => {
     const contexts = [Object.freeze({ request: "run-a" }), Object.freeze({ request: "run-b" })];
-    const results = await Promise.all(contexts.map(async (applicationContext) => {
-      const projected = buildEmbeddedAttemptToolRunContext({ applicationContext });
-      await Promise.resolve();
-      return projected.applicationContext;
-    }));
+    const results = await Promise.all(
+      contexts.map(async (applicationContext) => {
+        const projected = buildEmbeddedAttemptToolRunContext({ applicationContext });
+        await Promise.resolve();
+        return projected.applicationContext;
+      }),
+    );
     expect(results[0]).toBe(contexts[0]);
     expect(results[1]).toBe(contexts[1]);
   });

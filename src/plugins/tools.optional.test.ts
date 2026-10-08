@@ -1611,19 +1611,40 @@ describe("resolvePluginTools optional tools", () => {
     const denied = Object.freeze({ allowed: false, request: "b" });
     const factory = vi.fn((raw: unknown) => {
       const ctx = raw as { applicationContext?: typeof allowed | typeof denied };
-      if (ctx.applicationContext?.allowed === false) return null;
-      return { ...makeTool("request_tool"), description: ctx.applicationContext?.request ?? "ordinary" };
+      if (ctx.applicationContext?.allowed === false) {
+        return null;
+      }
+      return {
+        ...makeTool("request_tool"),
+        description: ctx.applicationContext?.request ?? "ordinary",
+      };
     });
-    setRegistry([{ pluginId: "request-test", optional: false, source: "/tmp/request-test.js", names: ["request_tool"], factory }]);
+    setRegistry([
+      {
+        pluginId: "request-test",
+        optional: false,
+        source: "/tmp/request-test.js",
+        names: ["request_tool"],
+        factory,
+      },
+    ]);
     resolvePluginTools(createResolveToolsParams());
     expect(factory).toHaveBeenCalledTimes(1);
-    const a = resolvePluginTools(createResolveToolsParams({ context: { ...createContext(), applicationContext: allowed } }));
-    const b = resolvePluginTools(createResolveToolsParams({ context: { ...createContext(), applicationContext: denied } }));
+    const a = resolvePluginTools(
+      createResolveToolsParams({ context: { ...createContext(), applicationContext: allowed } }),
+    );
+    const b = resolvePluginTools(
+      createResolveToolsParams({ context: { ...createContext(), applicationContext: denied } }),
+    );
     expect(a[0]?.description).toBe("a");
     expect(b).toEqual([]);
     expect(factory).toHaveBeenCalledTimes(3);
-    expect((factory.mock.calls[1]?.[0] as { applicationContext: unknown }).applicationContext).toBe(allowed);
-    expect((factory.mock.calls[2]?.[0] as { applicationContext: unknown }).applicationContext).toBe(denied);
+    expect((factory.mock.calls[1]?.[0] as { applicationContext: unknown }).applicationContext).toBe(
+      allowed,
+    );
+    expect((factory.mock.calls[2]?.[0] as { applicationContext: unknown }).applicationContext).toBe(
+      denied,
+    );
     const ordinary = resolvePluginTools(createResolveToolsParams());
     expect(ordinary[0]?.description).toBe("ordinary");
     expect(factory).toHaveBeenCalledTimes(3);
@@ -1631,8 +1652,19 @@ describe("resolvePluginTools optional tools", () => {
 
   it.each(["abortSignal", "toolCallId"])("does not cache request-bound %s descriptors", (key) => {
     const factory = vi.fn(() => makeTool("request_tool"));
-    setRegistry([{ pluginId: "request-test", optional: false, source: "/tmp/request-test.js", names: ["request_tool"], factory }]);
-    const context = { ...createContext(), [key]: key === "abortSignal" ? new AbortController().signal : "call-a" };
+    setRegistry([
+      {
+        pluginId: "request-test",
+        optional: false,
+        source: "/tmp/request-test.js",
+        names: ["request_tool"],
+        factory,
+      },
+    ]);
+    const context = {
+      ...createContext(),
+      [key]: key === "abortSignal" ? new AbortController().signal : "call-a",
+    };
     resolvePluginTools(createResolveToolsParams({ context }));
     resolvePluginTools(createResolveToolsParams({ context }));
     expect(factory).toHaveBeenCalledTimes(2);
