@@ -5,12 +5,14 @@ import {
 import type { EmbeddedRunTrigger } from "./params.js";
 
 export function buildEmbeddedAttemptToolRunContext(params: {
+  applicationContext?: Readonly<Record<string, unknown>>;
   trigger?: EmbeddedRunTrigger;
   jobId?: string;
   memoryFlushWritePath?: string;
   toolsAllow?: string[];
   trace?: DiagnosticTraceContext;
 }): {
+  applicationContext?: Readonly<Record<string, unknown>>;
   trigger?: EmbeddedRunTrigger;
   jobId?: string;
   memoryFlushWritePath?: string;
@@ -18,6 +20,7 @@ export function buildEmbeddedAttemptToolRunContext(params: {
   trace?: DiagnosticTraceContext;
 } {
   return {
+    ...(params.applicationContext ? { applicationContext: params.applicationContext } : {}),
     trigger: params.trigger,
     jobId: params.jobId,
     memoryFlushWritePath: params.memoryFlushWritePath,

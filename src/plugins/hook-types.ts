@@ -451,6 +451,9 @@ export type PluginHookToolKind = "code_mode_exec";
 export type PluginHookToolInputKind = "javascript" | "typescript";
 
 export type PluginHookToolContext = {
+  /** Opaque host-admitted request context, not tool arguments. */
+  applicationContext?: Readonly<Record<string, unknown>>;
+  abortSignal?: AbortSignal;
   agentId?: string;
   sessionKey?: string;
   sessionId?: string;

@@ -70,6 +70,7 @@ export function isAbortSignalCancellation(err: unknown, signal?: AbortSignal): b
 }
 
 export type HookContext = {
+  applicationContext?: Readonly<Record<string, unknown>>;
   agentId?: string;
   config?: OpenClawConfig;
   /** Tool execution cwd for host-derived path facts. */
@@ -690,6 +691,7 @@ export async function runBeforeToolCallHook(args: {
   signal?: AbortSignal;
   approvalMode?: "request" | "report" | "defer";
 }): Promise<HookOutcome> {
+  args.signal?.throwIfAborted();
   const toolName = normalizeToolName(args.toolName || "tool");
   const params = args.params;
 
@@ -787,6 +789,8 @@ export async function runBeforeToolCallHook(args: {
       ...(args.toolInputKind && { toolInputKind: args.toolInputKind }),
     };
     const buildToolContext = (identity: typeof toolIdentity) => ({
+      applicationContext: args.ctx?.applicationContext,
+      abortSignal: args.signal,
       toolName,
       ...identity,
       ...(args.ctx?.agentId && { agentId: args.ctx.agentId }),
@@ -798,6 +802,7 @@ export async function runBeforeToolCallHook(args: {
       ...(args.ctx?.channelId && { channelId: args.ctx.channelId }),
     });
     const toolContext = buildToolContext(toolIdentity);
+    args.signal?.throwIfAborted();
     const trustedPolicyResult = shouldRunTrustedPolicies
       ? await runTrustedToolPolicies(
           {
@@ -836,6 +841,7 @@ export async function runBeforeToolCallHook(args: {
           },
         )
       : undefined;
+    args.signal?.throwIfAborted();
     if (trustedPolicyResult?.block) {
       return {
         blocked: true,
@@ -905,6 +911,7 @@ export async function runBeforeToolCallHook(args: {
       return { blocked: false, params: policyAdjustedParams };
     }
     const hookEventParams = isPlainObject(policyAdjustedParams) ? policyAdjustedParams : {};
+    args.signal?.throwIfAborted();
     const hookResult = await hookRunner.runBeforeToolCall(
       {
         toolName,
@@ -919,6 +926,7 @@ export async function runBeforeToolCallHook(args: {
       policyAdjustedToolContext,
     );
 
+    args.signal?.throwIfAborted();
     if (hookResult?.block) {
       return {
         blocked: true,
@@ -979,6 +987,7 @@ export async function runBeforeToolCallHook(args: {
     }
     return { blocked: false, params: policyAdjustedParams };
   } catch (err) {
+    args.signal?.throwIfAborted();
     const toolCallId = args.toolCallId ? ` toolCallId=${args.toolCallId}` : "";
     const cause = unwrapErrorCause(err);
     log.error(`before_tool_call hook failed: tool=${toolName}${toolCallId} error=${String(cause)}`);
@@ -1010,6 +1019,7 @@ export function wrapToolWithBeforeToolCallHook(
   const wrappedTool: AnyAgentTool = {
     ...tool,
     execute: async (toolCallId, params, signal, onUpdate) => {
+      signal?.throwIfAborted();
       const hookParams = normalizeCodeModeExecBeforeHookParams({ tool, params });
       const hookMetadata = getCodeModeExecBeforeHookMetadata({ tool, params });
       const outcome = await runBeforeToolCallHook({
@@ -1021,6 +1031,7 @@ export function wrapToolWithBeforeToolCallHook(
         signal,
         approvalMode: hookOptions.approvalMode,
       });
+      signal?.throwIfAborted();
       if (outcome.blocked) {
         if (outcome.kind !== "veto") {
           throw new Error(outcome.reason);
@@ -1089,6 +1100,7 @@ export function wrapToolWithBeforeToolCallHook(
       }
       const startedAt = Date.now();
       try {
+        signal?.throwIfAborted();
         const result = await execute(toolCallId, executeParams, signal, onUpdate);
         const durationMs = Date.now() - startedAt;
         await recordLoopOutcome({

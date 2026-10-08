@@ -13,6 +13,12 @@ export type OpenClawPluginActiveModelContext = {
 /** Trusted execution context passed to plugin-owned agent tool factories. */
 export type OpenClawPluginToolContext = {
   config?: OpenClawConfig;
+  /** Opaque host-admitted request context. Never populated from tool arguments. */
+  applicationContext?: Readonly<Record<string, unknown>>;
+  /** Request signal available while materializing request-bound tools. */
+  abortSignal?: AbortSignal;
+  toolCallId?: string;
+
   /** Active runtime-resolved config snapshot when one is available. */
   runtimeConfig?: OpenClawConfig;
   /** Returns the latest runtime-resolved config snapshot for long-lived tool definitions. */

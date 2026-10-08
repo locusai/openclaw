@@ -147,6 +147,12 @@ export function createOpenClawTools(
     recordToolPrepStage?: (name: string) => void;
     /** Trusted sender id from inbound context (not tool args). */
     requesterSenderId?: string | null;
+    /** Opaque host-admitted request context. Never populated from tool arguments. */
+    applicationContext?: Readonly<Record<string, unknown>>;
+    /** Request signal available while materializing request-bound tools. */
+    abortSignal?: AbortSignal;
+    toolCallId?: string;
+    beforeToolCallApprovalMode?: "request" | "report";
     /** Auth profiles already loaded for this run; used for prompt-time tool availability. */
     authProfileStore?: AuthProfileStore;
     /** Ephemeral session UUID — regenerated on /new and /reset. */
@@ -512,6 +518,7 @@ export function createOpenClawTools(
   }
   const hookAgentId = options?.requesterAgentIdOverride ?? sessionAgentId;
   const defaultHookContext: HookContext = {
+    applicationContext: options?.applicationContext,
     ...(hookAgentId ? { agentId: hookAgentId } : {}),
     ...(resolvedConfig ? { config: resolvedConfig } : {}),
     ...(options?.agentSessionKey ? { sessionKey: options.agentSessionKey } : {}),
@@ -527,7 +534,9 @@ export function createOpenClawTools(
   return allTools.map((tool) =>
     isToolWrappedWithBeforeToolCallHook(tool)
       ? tool
-      : wrapToolWithBeforeToolCallHook(tool, hookContext),
+      : wrapToolWithBeforeToolCallHook(tool, hookContext, {
+          approvalMode: options?.beforeToolCallApprovalMode,
+        }),
   );
 }
 

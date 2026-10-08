@@ -7,6 +7,11 @@ import type { ToolFsPolicy } from "./tool-fs-policy.js";
 import { resolveWorkspaceRoot } from "./workspace-dir.js";
 
 export type OpenClawPluginToolOptions = {
+  /** Opaque host-admitted request context. Never populated from tool arguments. */
+  applicationContext?: Readonly<Record<string, unknown>>;
+  /** Request signal available while materializing request-bound tools. */
+  abortSignal?: AbortSignal;
+  toolCallId?: string;
   agentSessionKey?: string;
   agentChannel?: GatewayMessageChannel;
   agentAccountId?: string;
@@ -63,6 +68,9 @@ export function resolveOpenClawPluginToolInputs(params: {
 
   return {
     context: {
+      applicationContext: options?.applicationContext,
+      abortSignal: options?.abortSignal,
+      toolCallId: options?.toolCallId,
       config: options?.config,
       runtimeConfig,
       getRuntimeConfig,

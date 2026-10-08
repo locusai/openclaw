@@ -5,6 +5,18 @@ import { applyPluginToolDeliveryDefaults } from "./plugin-tool-delivery-defaults
 import type { AnyAgentTool } from "./tools/common.js";
 
 describe("openclaw plugin tool context", () => {
+  it("preserves the host request context and cancellation signal by identity", () => {
+    const applicationContext = Object.freeze({ request: "request-a" });
+    const abortSignal = new AbortController().signal;
+    const result = resolveOpenClawPluginToolInputs({ options: {
+      applicationContext, abortSignal, toolCallId: "call-a", requesterSenderId: "caller-a",
+    } });
+    expect(result.context.applicationContext).toBe(applicationContext);
+    expect(result.context.abortSignal).toBe(abortSignal);
+    expect(result.context.toolCallId).toBe("call-a");
+    expect(result.context.requesterSenderId).toBe("caller-a");
+  });
+
   it("forwards trusted requester sender identity", () => {
     const result = resolveOpenClawPluginToolInputs({
       options: {

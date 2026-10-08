@@ -37,6 +37,8 @@ export type CurrentInboundPromptContext = {
 };
 
 export type RunEmbeddedAgentParams = {
+  /** Opaque request-local host context. Never serialize into prompts or transcripts. */
+  applicationContext?: Readonly<Record<string, unknown>>;
   sessionId: string;
   sessionKey?: string;
   /** Provider prompt-cache affinity key; distinct from transcript/session identity. */

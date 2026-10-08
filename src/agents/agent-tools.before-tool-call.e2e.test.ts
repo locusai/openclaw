@@ -252,6 +252,88 @@ describe("before_tool_call loop detection behavior", () => {
     return record;
   }
 
+  it("preserves admitted context through trusted and plugin hooks without accepting argument forgery", async () => {
+    const applicationContext = Object.freeze({ request: "a" });
+    const controller = new AbortController();
+    const evaluate = vi.fn((_event: unknown, _context: unknown) => undefined);
+    const registry = createEmptyPluginRegistry();
+    registry.trustedToolPolicies = [{ pluginId: "request-test", pluginName: "Request Test", source: "test", policy: { id: "inspect", description: "inspect", evaluate } }];
+    setActivePluginRegistry(registry);
+    hookRunner.hasHooks.mockReturnValue(true);
+    hookRunner.runBeforeToolCall.mockResolvedValue({ params: { adjusted: true } });
+    const result = { content: [{ type: "text", text: "original" }], details: { preserved: true } };
+    const execute = vi.fn().mockResolvedValue(result);
+    const tool = wrapToolWithBeforeToolCallHook({ name: "request_tool", execute } as AnyAgentTool, { applicationContext });
+    expect(await tool.execute("call-a", { applicationContext: { request: "forged" } }, controller.signal)).toBe(result);
+    expect(evaluate).toHaveBeenCalledTimes(1);
+    expect(evaluate.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ applicationContext, abortSignal: controller.signal }));
+    expect((evaluate.mock.calls[0]?.[1] as { applicationContext: unknown }).applicationContext).toBe(applicationContext);
+    expect(hookRunner.runBeforeToolCall).toHaveBeenCalledTimes(1);
+    expect(hookRunner.runBeforeToolCall.mock.calls[0]?.[1].applicationContext).toBe(applicationContext);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ adjusted: true }));
+    expect(execute.mock.calls[0]?.[2]).toBe(controller.signal);
+  });
+
+  it("keeps concurrent request contexts isolated while hooks await", async () => {
+    setActivePluginRegistry(createEmptyPluginRegistry());
+    hookRunner.hasHooks.mockReturnValue(true);
+    const seen: unknown[] = [];
+    hookRunner.runBeforeToolCall.mockImplementation(async (_event, ctx) => {
+      await Promise.resolve();
+      seen.push(ctx.applicationContext);
+      return undefined;
+    });
+    const contexts = [Object.freeze({ request: "a" }), Object.freeze({ request: "b" })];
+    const execute = vi.fn().mockResolvedValue({ content: [] });
+    await Promise.all(contexts.map((applicationContext, i) =>
+      wrapToolWithBeforeToolCallHook({ name: "request_tool", execute } as AnyAgentTool, { applicationContext })
+        .execute(`call-${i}`, { applicationContext: { request: "forged" } }),
+    ));
+    expect(seen).toHaveLength(2);
+    expect(seen[0]).toBe(contexts[0]);
+    expect(seen[1]).toBe(contexts[1]);
+    expect(execute).toHaveBeenCalledTimes(2);
+  });
+
+  it.each(["before", "policy", "hook"])("does not dispatch after cancellation at %s", async (phase) => {
+    const controller = new AbortController();
+    const reason = new Error("request cancelled");
+    const registry = createEmptyPluginRegistry();
+    if (phase === "policy") {
+      registry.trustedToolPolicies = [{ pluginId: "request-test", pluginName: "Request Test", source: "test", policy: {
+        id: "cancel", description: "cancel", evaluate: async () => { await Promise.resolve(); controller.abort(reason); return undefined; },
+      } }];
+    }
+    setActivePluginRegistry(registry);
+    hookRunner.hasHooks.mockReturnValue(true);
+    hookRunner.runBeforeToolCall.mockImplementation(async () => {
+      await Promise.resolve();
+      if (phase === "hook") controller.abort(reason);
+      return undefined;
+    });
+    const execute = vi.fn();
+    const tool = wrapToolWithBeforeToolCallHook({ name: "request_tool", execute } as AnyAgentTool);
+    if (phase === "before") controller.abort(reason);
+    await expect(tool.execute("call-a", {}, controller.signal)).rejects.toBe(reason);
+    expect(execute).not.toHaveBeenCalled();
+    expect(hookRunner.runBeforeToolCall).toHaveBeenCalledTimes(phase === "hook" ? 1 : 0);
+  });
+
+  it("passes cancellation during original execution to the original tool", async () => {
+    setActivePluginRegistry(createEmptyPluginRegistry());
+    const controller = new AbortController();
+    const reason = new Error("cancel during execution");
+    const execute = vi.fn(async (_id, _params, signal: AbortSignal) => {
+      controller.abort(reason);
+      signal.throwIfAborted();
+    });
+    const tool = wrapToolWithBeforeToolCallHook({ name: "request_tool", execute } as unknown as AnyAgentTool);
+    await expect(tool.execute("call-a", {}, controller.signal)).rejects.toBe(reason);
+    expect(execute).toHaveBeenCalledTimes(1);
+    expect(execute.mock.calls[0]?.[2]).toBe(controller.signal);
+  });
+
   it("blocks known poll loops when no progress repeats", async () => {
     const { tool, params } = createNoProgressProcessFixture("sess-1");
 

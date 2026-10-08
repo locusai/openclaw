@@ -1533,6 +1533,7 @@ export async function runEmbeddedAgent(
             parentAbortSignal?.addEventListener("abort", relayParentAbort, { once: true });
           }
           const rawAttempt = await runEmbeddedAttemptWithBackend({
+            applicationContext: params.applicationContext,
             sessionId: activeSessionId,
             sessionKey: resolvedSessionKey,
             promptCacheKey: params.promptCacheKey,

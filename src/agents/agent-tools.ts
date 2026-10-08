@@ -421,6 +421,11 @@ export function createOpenClawCodingTools(options?: {
   spawnWorkspaceDir?: string;
   config?: OpenClawConfig;
   abortSignal?: AbortSignal;
+  /** Opaque host-admitted request context, preserved by identity for plugin factories/hooks. */
+  applicationContext?: Readonly<Record<string, unknown>>;
+  toolCallId?: string;
+  /** Use the native approval reporting path for programmatic callers. */
+  beforeToolCallApprovalMode?: "request" | "report";
   /** Disable hook-owned diagnostics when an outer runtime owns tool diagnostics. */
   emitBeforeToolCallDiagnostics?: boolean;
   /**
@@ -888,6 +893,9 @@ export function createOpenClawCodingTools(options?: {
       ? []
       : resolveOpenClawPluginToolsForOptions({
           options: {
+            applicationContext: options?.applicationContext,
+            abortSignal: options?.abortSignal,
+            toolCallId: options?.toolCallId,
             agentSessionKey: options?.sessionKey,
             agentChannel: resolveGatewayMessageChannel(options?.messageProvider),
             agentAccountId: options?.agentAccountId,
@@ -964,6 +972,9 @@ export function createOpenClawCodingTools(options?: {
     ...(includeChannelTools ? listChannelAgentTools({ cfg: options?.config }) : []),
     ...(includeOpenClawTools
       ? createOpenClawTools({
+          applicationContext: options?.applicationContext,
+          abortSignal: options?.abortSignal,
+          toolCallId: options?.toolCallId,
           sandboxBrowserBridgeUrl: sandbox?.browser?.bridgeUrl,
           allowHostBrowserControl: sandbox ? sandbox.browserAllowHostControl : true,
           agentSessionKey: options?.sessionKey,
@@ -1130,13 +1141,17 @@ export function createOpenClawCodingTools(options?: {
           : {}),
         sessionKey: options?.sessionKey,
         sessionId: options?.sessionId,
+        applicationContext: options?.applicationContext,
         runId: options?.runId,
         channelId: options?.hookChannelId ?? options?.currentChannelId,
         ...(options?.trace ? { trace: options.trace } : {}),
         loopDetection: resolveToolLoopDetectionConfig({ cfg: options?.config, agentId }),
         onToolOutcome: options?.onToolOutcome,
       },
-      { emitDiagnostics: options?.emitBeforeToolCallDiagnostics },
+      {
+        emitDiagnostics: options?.emitBeforeToolCallDiagnostics,
+        approvalMode: options?.beforeToolCallApprovalMode,
+      },
     ),
   );
   options?.recordToolPrepStage?.("tool-hooks");

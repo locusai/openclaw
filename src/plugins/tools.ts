@@ -638,6 +638,13 @@ function resolveCachedPluginTools(params: {
 }): { tools: AnyAgentTool[]; handledPluginIds: Set<string> } {
   const tools: AnyAgentTool[] = [];
   const handledPluginIds = new Set<string>();
+  if (
+    params.ctx.applicationContext !== undefined ||
+    params.ctx.abortSignal !== undefined ||
+    params.ctx.toolCallId !== undefined
+  ) {
+    return { tools, handledPluginIds };
+  }
   const onlyPluginIdSet = new Set(params.onlyPluginIds);
   for (const plugin of params.snapshot.plugins) {
     if (!onlyPluginIdSet.has(plugin.id)) {
@@ -1249,6 +1256,9 @@ export function resolvePluginTools(params: {
         }),
     );
     if (
+      params.context.applicationContext === undefined &&
+      params.context.abortSignal === undefined &&
+      params.context.toolCallId === undefined &&
       cachedDescriptorsCoverToolNames({
         descriptors,
         toolNames: availableToolNames,
